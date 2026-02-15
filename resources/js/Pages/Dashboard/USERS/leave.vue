@@ -1,23 +1,27 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
+import { computed } from 'vue';
 import {
     Plane,
     Calendar as CalendarIcon,
-    ChevronLeft,
-    ChevronRight,
-    MoreHorizontal,
     Clock,
-    FileText,
     CheckCircle2,
-    AlertCircle
+    XCircle
 } from 'lucide-vue-next';
 
-// Form logic
+// 1. Properly receiving real data from LeaveController
+const props = defineProps({
+    leaveHistory: {
+        type: Array,
+        default: () => []
+    }
+});
+
 const form = useForm({
     leave_type: '',
     start_date: '',
@@ -27,21 +31,37 @@ const form = useForm({
 
 const submit = () => {
     form.post(route('employee.leave.store'), {
-        onFinish: () => form.reset(),
+        onSuccess: () => {
+            form.reset();
+        },
     });
 };
 
-// Mock Data for UI
-const leaveBalances = [
-    { type: 'Sick Leave', used: 2, total: 10, color: 'stroke-rose-500', text: 'text-rose-500' },
-    { type: 'Vacation', used: 5, total: 15, color: 'stroke-blue-600', text: 'text-blue-600' },
-];
+const getStatusStyles = (status) => {
+    if (!status) return 'bg-slate-100 text-slate-600';
+    const styles = {
+        'approved': 'bg-emerald-100 text-emerald-700',
+        'pending': 'bg-amber-100 text-amber-700',
+        'rejected': 'bg-rose-100 text-rose-700',
+    };
+    return styles[status.toLowerCase()] || 'bg-slate-100 text-slate-600';
+};
 
-const leaveHistory = [
-    { type: 'Sick Leave', range: 'Feb 02 - Feb 03', status: 'Approved', statusClass: 'bg-emerald-100 text-emerald-700' },
-    { type: 'Vacation', range: 'Jan 10 - Jan 15', status: 'Completed', statusClass: 'bg-slate-100 text-slate-600' },
-    { type: 'Personal', range: 'Mar 01 - Mar 02', status: 'Pending', statusClass: 'bg-amber-100 text-amber-700' },
-];
+const page = usePage();
+const flashSuccess = computed(() => page.props.flash?.message);
+
+// Calculated real-time balances based on leaveHistory
+const leaveBalances = computed(() => {
+    const sickUsed = props.leaveHistory
+        .filter(l => l.leave_type === 'sick' && l.status === 'approved').length;
+    const vacUsed = props.leaveHistory
+        .filter(l => l.leave_type === 'vacation' && l.status === 'approved').length;
+
+    return [
+        { type: 'Sick Leave', used: sickUsed, total: 10, color: 'stroke-rose-500', text: 'text-rose-500' },
+        { type: 'Vacation', used: vacUsed, total: 15, color: 'stroke-blue-600', text: 'text-blue-600' },
+    ];
+});
 </script>
 
 <template>
@@ -52,23 +72,28 @@ const leaveHistory = [
         <div class="p-6 bg-[#f8faff] min-h-screen">
             <div class="max-w-[1400px] mx-auto">
 
+                <Transition enter-active-class="transition ease-out duration-300"
+                    enter-from-class="transform opacity-0 -translate-y-2"
+                    enter-to-class="transform opacity-100 translate-y-0">
+                    <div v-if="flashSuccess"
+                        class="mb-6 p-4 bg-emerald-500 text-white rounded-2xl shadow-lg flex items-center gap-3 font-bold uppercase text-xs tracking-widest">
+                        <CheckCircle2 class="size-5" />
+                        {{ flashSuccess }}
+                    </div>
+                </Transition>
+
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-
                     <div class="lg:col-span-8 space-y-8">
-
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <h1 class="text-3xl font-black text-slate-900 uppercase tracking-tight">
-                                    Leave <span class="text-blue-600 font-light">Management</span>
-                                </h1>
-                                <p class="text-sm text-slate-500 font-medium">Request time off and track your balances
-                                </p>
-                            </div>
+                        <div>
+                            <h1 class="text-3xl font-black text-slate-900 uppercase tracking-tight">
+                                Leave <span class="text-blue-600 font-light">Management</span>
+                            </h1>
+                            <p class="text-sm text-slate-500 font-medium">Request time off and track your balances</p>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div v-for="balance in leaveBalances" :key="balance.type"
-                                class="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 flex items-center gap-8 relative overflow-hidden transition-transform hover:scale-[1.02]">
+                                class="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 flex items-center gap-8 transition-transform hover:scale-[1.02]">
                                 <div class="relative size-24 flex items-center justify-center flex-shrink-0">
                                     <svg class="size-full -rotate-90" viewBox="0 0 36 36">
                                         <circle cx="18" cy="18" r="16" fill="none" class="stroke-slate-100"
@@ -98,97 +123,72 @@ const leaveHistory = [
                                 <h3 class="text-xl font-black uppercase italic mb-8 flex items-center gap-3">
                                     <Plane class="size-6 rotate-45" /> New Leave Application
                                 </h3>
-
                                 <form @submit.prevent="submit" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div class="space-y-2">
                                         <InputLabel for="leave_type" value="Leave Type"
                                             class="text-blue-100 text-[10px] font-bold uppercase ml-1" />
                                         <select id="leave_type" v-model="form.leave_type"
-                                            class="w-full bg-white/10 border-white/20 rounded-xl text-sm font-bold text-white focus:ring-white/30 focus:border-white/40">
+                                            class="w-full bg-white/10 border-white/20 rounded-xl text-sm font-bold text-white focus:ring-white/30">
                                             <option value="" disabled class="text-slate-900">Select Type</option>
                                             <option value="sick" class="text-slate-900">Sick Leave</option>
                                             <option value="vacation" class="text-slate-900">Vacation</option>
                                             <option value="personal" class="text-slate-900">Personal</option>
                                         </select>
+                                        <InputError :message="form.errors.leave_type" class="text-white mt-1" />
                                     </div>
-
                                     <div class="grid grid-cols-2 gap-4">
-                                        <div class="space-y-2">
-                                            <InputLabel for="start" value="Start Date"
-                                                class="text-blue-100 text-[10px] font-bold uppercase ml-1" />
-                                            <TextInput id="start" type="date" v-model="form.start_date"
-                                                class="w-full bg-white/10 border-white/20 rounded-xl text-white text-xs" />
+                                        <div>
+                                            <InputLabel value="Start Date"
+                                                class="text-blue-100 text-[10px] font-bold uppercase" />
+                                            <TextInput type="date" v-model="form.start_date"
+                                                class="w-full bg-white/10 border-white/20 text-white" />
+                                            <InputError :message="form.errors.start_date" class="text-white" />
                                         </div>
-                                        <div class="space-y-2">
-                                            <InputLabel for="end" value="End Date"
-                                                class="text-blue-100 text-[10px] font-bold uppercase ml-1" />
-                                            <TextInput id="end" type="date" v-model="form.end_date"
-                                                class="w-full bg-white/10 border-white/20 rounded-xl text-white text-xs" />
+                                        <div>
+                                            <InputLabel value="End Date"
+                                                class="text-blue-100 text-[10px] font-bold uppercase" />
+                                            <TextInput type="date" v-model="form.end_date"
+                                                class="w-full bg-white/10 border-white/20 text-white" />
+                                            <InputError :message="form.errors.end_date" class="text-white" />
                                         </div>
                                     </div>
-
-                                    <div class="md:col-span-2 space-y-2">
-                                        <InputLabel for="reason" value="Reason / Details"
-                                            class="text-blue-100 text-[10px] font-bold uppercase ml-1" />
-                                        <textarea id="reason" v-model="form.reason" rows="3"
-                                            class="w-full bg-white/10 border-white/20 rounded-2xl text-white text-sm focus:ring-white/30"
-                                            placeholder="Explain the reason for your request..."></textarea>
+                                    <div class="md:col-span-2">
+                                        <InputLabel value="Reason"
+                                            class="text-blue-100 text-[10px] font-bold uppercase" />
+                                        <textarea v-model="form.reason"
+                                            class="w-full bg-white/10 border-white/20 rounded-2xl text-white text-sm"
+                                            rows="3"></textarea>
+                                        <InputError :message="form.errors.reason" class="text-white" />
                                     </div>
-
                                     <div class="md:col-span-2 pt-4">
                                         <button type="submit" :disabled="form.processing"
-                                            class="w-full bg-white text-blue-600 font-black uppercase tracking-[0.2em] py-4 rounded-2xl shadow-lg hover:bg-blue-50 transition-all text-xs">
-                                            Submit Request
+                                            class="w-full bg-white text-blue-600 font-black uppercase py-4 rounded-2xl shadow-lg hover:bg-blue-50 transition-all text-xs disabled:opacity-50">
+                                            {{ form.processing ? 'Submitting...' : 'Submit Request' }}
                                         </button>
                                     </div>
                                 </form>
                             </div>
-                            <div class="absolute -right-20 -top-20 size-64 bg-white/5 rounded-full blur-3xl"></div>
                         </div>
-
                     </div>
 
                     <div class="lg:col-span-4">
                         <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-8 h-full">
-
-                            <div class="mb-10">
-                                <div class="flex justify-between items-center mb-6">
-                                    <h2 class="text-lg font-black text-slate-800 italic">Leave Tracker</h2>
-                                    <div class="flex gap-2">
-                                        <button class="p-2 rounded-xl hover:bg-slate-50 transition-colors">
-                                            <ChevronLeft class="size-4 text-slate-400" />
-                                        </button>
-                                        <button class="p-2 rounded-xl hover:bg-slate-50 transition-colors">
-                                            <ChevronRight class="size-4 text-slate-400" />
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="grid grid-cols-7 gap-1 text-center">
-                                    <span v-for="d in ['S', 'M', 'T', 'W', 'T', 'F', 'S']" :key="d"
-                                        class="text-[10px] font-black text-slate-300 uppercase pb-2">{{ d }}</span>
-                                    <div v-for="i in 28" :key="i" :class="[
-                                        'size-9 flex items-center justify-center text-xs font-bold rounded-xl transition-all',
-                                        i === 15 ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-600 hover:bg-slate-50',
-                                        [2, 3].includes(i) ? 'border-b-2 border-rose-500' : ''
-                                    ]">
-                                        {{ i }}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <hr class="border-slate-50 mb-8" />
-
+                            <h2 class="text-lg font-black text-slate-800 italic mb-10">Application Status</h2>
                             <div class="space-y-6 relative">
                                 <div class="absolute left-[15px] top-0 h-full w-[2px] bg-slate-50"></div>
-                                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-8 mb-4">
-                                    Application Status</h4>
 
-                                <div v-for="history in leaveHistory" :key="history.range"
+                                <div v-if="leaveHistory.length === 0" class="ml-8 text-xs text-slate-400 italic">
+                                    No records found in database.
+                                </div>
+
+                                <div v-for="history in leaveHistory" :key="history.id"
                                     class="flex gap-4 relative group">
                                     <div
                                         class="size-8 rounded-full bg-white border-4 border-slate-50 z-10 shadow-sm flex items-center justify-center">
-                                        <CheckCircle2 v-if="history.status === 'Approved'"
+                                        <CheckCircle2 v-if="history.status === 'approved'"
                                             class="size-3 text-emerald-500" />
+                                        <XCircle v-else-if="history.status === 'rejected'"
+                                            class="size-3 text-rose-500" />
                                         <Clock v-else class="size-3 text-amber-500" />
                                     </div>
                                     <div
@@ -197,29 +197,21 @@ const leaveHistory = [
                                             <div>
                                                 <p
                                                     class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                                    {{ history.range }}</p>
+                                                    {{ history.start_date }} - {{ history.end_date }}
+                                                </p>
                                                 <p class="text-sm font-bold text-slate-800 mt-1 uppercase">{{
-                                                    history.type }}</p>
+                                                    history.leave_type }}</p>
                                             </div>
                                             <span
-                                                :class="['text-[8px] font-black uppercase px-2 py-1 rounded-lg tracking-tighter', history.statusClass]">
+                                                :class="['text-[8px] font-black uppercase px-2 py-1 rounded-lg', getStatusStyles(history.status)]">
                                                 {{ history.status }}
                                             </span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-
-                            <div class="mt-10 p-5 bg-rose-50 rounded-[1.5rem] border border-rose-100 flex gap-4">
-                                <AlertCircle class="size-5 text-rose-500 flex-shrink-0" />
-                                <p
-                                    class="text-[10px] font-medium text-rose-700 leading-relaxed uppercase tracking-tight">
-                                    Requests must be submitted at least 3 days in advance for approval.
-                                </p>
-                            </div>
                         </div>
                     </div>
-
                 </div>
             </div>
         </div>

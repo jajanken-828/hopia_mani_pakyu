@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\hrm\employee\AttendanceController;
+use App\Http\Controllers\hrm\employee\HrmstaffpayrollController;
 use App\Http\Controllers\hrm\employee\InterviewController;
 use App\Http\Controllers\hrm\employee\LeaveController;
 use App\Http\Controllers\hrm\employee\TrainingController;
@@ -17,6 +18,8 @@ use App\Http\Controllers\scm\employee\VerificationController;
 use App\Http\Controllers\scm\manager\AuditController;
 use App\Http\Controllers\scm\manager\CloseController;
 use App\Http\Controllers\scm\manager\SourcingController;
+use App\Http\Controllers\users\ClockController;
+use App\Http\Controllers\users\leaveController as UserLeaveController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -57,14 +60,18 @@ Route::middleware(['auth', 'position:staff,manager'])->prefix('dashboard/employe
     })->name('employee.ui.dashboard');
 
     // New Page: Schedule
-    Route::get('/clock', function () {
-        return inertia('Dashboard/USERS/clock');
-    })->name('employee.ui.clock');
+    // Updated to use the Controller for the GET request
+    Route::get('/clock', [ClockController::class, 'clock'])->name('employee.ui.clock');
+
+    // NEW: The POST route to handle the actual button click
+    Route::post('/clock/toggle', [ClockController::class, 'toggle'])->name('employee.attendance.toggle');
 
     // New Page: Tasks
-    Route::get('/leave', function () {
-        return inertia('Dashboard/USERS/leave');
-    })->name('employee.ui.leave');
+    // GET: Display the leave page and fetch history from the controller
+    Route::get('/leave', [UserLeaveController::class, 'leave'])->name('employee.ui.leave');
+
+    // POST: Submit the form and save to database
+    Route::post('/leave', [UserLeaveController::class, 'store'])->name('employee.leave.store');
 
     Route::get('/payslip', function () {
         return inertia('Dashboard/USERS/payslip');
@@ -115,9 +122,23 @@ Route::prefix('dashboard/hrm')->name('hrm.')->middleware(['auth', 'verified'])->
         ->middleware(['role:HRM', 'position:staff'])
         ->name('employee.leave');
 
+    // Route for Approve/Reject buttons (PATCH)
+    Route::patch('/leave/{leaveRequest}', [LeaveController::class, 'update'])->name('employee.leave.update');
+
+    // Route for the Manual Entry form (POST)
+    Route::post('/leave/manual', [LeaveController::class, 'store_manual'])->name('employee.leave.store_manual');
+
     Route::get('/attendance', [AttendanceController::class, 'attendance'])
         ->middleware(['role:HRM', 'position:staff'])
         ->name('employee.attendance');
+
+    // Inside web.php
+    Route::post('/attendance/toggle', [App\Http\Controllers\hrm\employee\AttendanceController::class, 'toggle'])
+        ->name('employee.attendance.toggle');
+
+    Route::post('/attendance/update-shift', [AttendanceController::class, 'updateShift'])
+        ->middleware(['role:HRM', 'position:staff'])
+        ->name('employee.attendance.update-shift');
 
     Route::get('/interview', [InterviewController::class, 'interview'])
         ->middleware(['role:HRM', 'position:staff'])
@@ -140,6 +161,10 @@ Route::prefix('dashboard/hrm')->name('hrm.')->middleware(['auth', 'verified'])->
     Route::get('/manager', [DashboardController::class, 'index'])
         ->middleware(['role:HRM', 'position:manager'])
         ->name('manager.dashboard');
+
+    Route::get('/hrmstaffpayroll', [HrmstaffpayrollController::class, 'hrmstaffpayroll'])
+        ->middleware(['role:HRM', 'position:staff'])
+        ->name('employee.hrmstaffpayroll');
 
     /**
      * FINALIZE PROMOTION ROUTE (Manager Side)

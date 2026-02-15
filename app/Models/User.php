@@ -4,6 +4,8 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -112,6 +114,44 @@ class User extends Authenticatable
     public function traineeGrade()
     {
         return $this->hasOne(TraineeGrade::class);
+    }
+
+    public function leaveRequests(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
+
+    /**
+     * Get all attendance logs for the user.
+     */
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(AttendanceLog::class);
+    }
+
+    /**
+     * Get the most recent attendance log (used in the Controller).
+     */
+    public function latestAttendance(): HasOne
+    {
+        return $this->hasOne(AttendanceLog::class)->latestOfMany('date');
+    }
+
+    /**
+     * Get the shifts assigned to the user.
+     */
+    public function shifts(): HasMany
+    {
+        return $this->hasMany(EmployeeShift::class);
+    }
+
+    /**
+     * Get the current active shift (used in the Controller).
+     */
+    public function currentShift(): HasOne
+    {
+        // This helps the 'with' query in your controller find today's shift
+        return $this->hasOne(EmployeeShift::class)->latestOfMany('effective_date');
     }
 
     /**
