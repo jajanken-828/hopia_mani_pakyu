@@ -71,7 +71,8 @@ const navItems = computed(() => {
                 { label: 'Interview', href: route('hrm.employee.interview'), icon: ClipboardList },
                 { label: 'Training & Development', href: route('hrm.employee.training'), icon: BicepsFlexed },
                 { label: 'Attendance', href: route('hrm.employee.attendance'), icon: FileUser },
-                { label: 'Leave Management', href: route('hrm.employee.leave'), icon: DoorOpen }
+                { label: 'Leave Management', href: route('hrm.employee.leave'), icon: DoorOpen },
+                { label: 'Payroll', href: route('hrm.employee.hrmstaffpayroll'), icon: HandCoins },
             );
         }
     }

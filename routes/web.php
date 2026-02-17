@@ -166,6 +166,20 @@ Route::prefix('dashboard/hrm')->name('hrm.')->middleware(['auth', 'verified'])->
         ->middleware(['role:HRM', 'position:staff'])
         ->name('employee.hrmstaffpayroll');
 
+    Route::post('/payroll/store', [hrmstaffpayrollController::class, 'store'])
+        ->name('hrm.employee.payroll.store');
+
+    // routes/web.php inside the hrm. prefix group
+
+    Route::patch('/payroll/{id}/approve', [HrmstaffpayrollController::class, 'approve'])
+        ->name('employee.payroll.approve');
+
+    Route::patch('/payroll/{id}/reject', [HrmstaffpayrollController::class, 'reject'])
+        ->name('employee.payroll.reject');
+
+    Route::post('/holidays/store', [hrmstaffpayrollController::class, 'storeHoliday'])
+        ->name('hrm.holidays.store');
+
     /**
      * FINALIZE PROMOTION ROUTE (Manager Side)
      * This allows the Manager to approve the suggestion and upgrade Trainee to Staff
