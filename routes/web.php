@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\eco\manager\BookController;
+use App\Http\Controllers\eco\manager\CreditController;
 use App\Http\Controllers\hrm\employee\AttendanceController;
 use App\Http\Controllers\hrm\employee\HrmstaffpayrollController;
 use App\Http\Controllers\hrm\employee\InterviewController;
@@ -348,6 +350,14 @@ Route::prefix('dashboard/eco')->name('eco.')->middleware(['auth', 'verified'])->
     Route::get('/manager', [DashboardController::class, 'index'])
         ->middleware(['role:ECO', 'position:manager'])
         ->name('manager.dashboard');
+
+    Route::get('/manager/book', [BookController::class, 'book'])
+        ->middleware(['role:ECO', 'position:manager'])
+        ->name('manager.book');
+
+    Route::get('/manager/credit', [CreditController::class, 'credit'])
+        ->middleware(['role:ECO', 'position:manager'])
+        ->name('manager.credit');
 
     Route::get('/staff', [DashboardController::class, 'index'])
         ->middleware(['role:ECO', 'position:staff'])

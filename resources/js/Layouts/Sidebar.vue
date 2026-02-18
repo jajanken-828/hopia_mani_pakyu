@@ -7,6 +7,7 @@ import {
     Package,
     LogOut,
     ChevronRight,
+    CreditCard,
     UserPlus,
     ClipboardList,
     ChartNoAxesCombined,
@@ -17,6 +18,7 @@ import {
     Truck,
     Wallet,
     Factory,
+    Book,
     Boxes,
     ShoppingCart,
     Warehouse,
@@ -142,7 +144,9 @@ const navItems = computed(() => {
 
     if (userRole === 'ECO') {
         if (userPosition === 'manager') {
-            items.push({ label: 'Store Management', href: route('eco.manager.dashboard'), icon: Globe });
+            // items.push({ label: 'Store Management', href: route('eco.manager.dashboard'), icon: Globe });
+            items.push({ label: 'Book Management', href: route('eco.manager.book'), icon: Book });
+            items.push({ label: 'Credit Management', href: route('eco.manager.credit'), icon: CreditCard });
         } else if (userPosition === 'staff') {
             items.push({ label: 'Online Store', href: route('eco.employee.dashboard'), icon: Globe });
         }
