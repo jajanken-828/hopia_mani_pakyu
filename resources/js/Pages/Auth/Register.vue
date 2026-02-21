@@ -29,6 +29,12 @@ const submit = () => {
         <Head title="Monti Textile - Register" />
 
         <div class="mb-8 text-center">
+            <Link href="/">
+                <div
+                    class="size-16 mb-4 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-inner transition hover:scale-105">
+                    <img src="/images/applogo.png" alt="Monti Logo" class="h-full w-full object-contain" />
+                </div>
+            </Link>
             <h1 class="text-3xl font-bold text-[#1E40AF] dark:text-blue-400">Monti Textile</h1>
             <p class="mt-2 text-gray-600 dark:text-gray-300">Create New Employee Account</p>
         </div>

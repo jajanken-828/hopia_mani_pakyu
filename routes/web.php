@@ -1,8 +1,17 @@
 <?php
 
+use App\Http\Controllers\Auth\ClientAuthController;
+use App\Http\Controllers\client\DashboardController as ClientDashboardController;
+use App\Http\Controllers\client\InvoicesController;
+use App\Http\Controllers\client\OrdersController;
+use App\Http\Controllers\client\SupportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\eco\manager\BookController;
+use App\Http\Controllers\eco\manager\ClientVerificationController;
 use App\Http\Controllers\eco\manager\CreditController;
+use App\Http\Controllers\eco\staff\CustomerController;
+use App\Http\Controllers\eco\staff\OrdermngController;
+use App\Http\Controllers\eco\staff\ProductsController;
 use App\Http\Controllers\hrm\employee\AttendanceController;
 use App\Http\Controllers\hrm\employee\HrmstaffpayrollController;
 use App\Http\Controllers\hrm\employee\InterviewController;
@@ -38,6 +47,13 @@ Route::get('/', function () {
         'phpVersion' => PHP_VERSION,
     ]);
 });
+
+Route::get('/apply', function () {
+    return inertia('Auth/apply');
+})->name('apply');
+
+// This route handles the actual form submission
+Route::post('/apply/store', [ApplicantController::class, 'store'])->name('applicants.public.store');
 
 Route::middleware(['auth'])->group(function () {
     // The main entry point that redirects based on user role/position
@@ -347,21 +363,53 @@ Route::prefix('dashboard/crm')->name('crm.')->middleware(['auth', 'verified'])->
 
 // E-Commerce (ECO)
 Route::prefix('dashboard/eco')->name('eco.')->middleware(['auth', 'verified'])->group(function () {
-    Route::get('/manager', [DashboardController::class, 'index'])
-        ->middleware(['role:ECO', 'position:manager'])
-        ->name('manager.dashboard');
 
-    Route::get('/manager/book', [BookController::class, 'book'])
-        ->middleware(['role:ECO', 'position:manager'])
-        ->name('manager.book');
+    // Manager Routes
+    Route::middleware(['role:ECO', 'position:manager'])->prefix('manager')->name('manager.')->group(function () {
+        Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/book', [BookController::class, 'book'])->name('book');
+        Route::get('/credit', [CreditController::class, 'credit'])->name('credit');
+        Route::get('/verification', [ClientVerificationController::class, 'index'])->name('verification.index');
+        Route::patch('/clients/{client}/status', [ClientVerificationController::class, 'updateStatus'])->name('clients.status.update');
+    });
 
-    Route::get('/manager/credit', [CreditController::class, 'credit'])
-        ->middleware(['role:ECO', 'position:manager'])
-        ->name('manager.credit');
+    // Staff / Employee Routes
+    Route::middleware(['role:ECO', 'position:staff'])->group(function () {
+        Route::get('/staff', [ClientDashboardController::class, 'index'])->name('employee.dashboard');
 
-    Route::get('/staff', [DashboardController::class, 'index'])
-        ->middleware(['role:ECO', 'position:staff'])
-        ->name('employee.dashboard');
+        // This resolves the "Target class does not exist" error
+        Route::get('/products', [ProductsController::class, 'products'])->name('employee.products');
+        Route::post('/products', [ProductsController::class, 'store'])->name('employee.products.store');
+        Route::get('/ordermng', [OrdermngController::class, 'ordermng'])->name('employee.ordermng');
+        Route::get('/customer', [CustomerController::class, 'customer'])->name('employee.customer');
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| B2B Client Authentication Routes (PUBLIC)
+|--------------------------------------------------------------------------
+*/
+Route::middleware('guest:client')->group(function () {
+    Route::get('client/register', [ClientAuthController::class, 'create'])->name('client.register');
+    Route::post('client/register', [ClientAuthController::class, 'store'])->name('client.register.store');
+    Route::get('client/login', [ClientAuthController::class, 'showLogin'])->name('client.login');
+    Route::post('client/login', [ClientAuthController::class, 'login'])->name('client.login.store');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Protected Client Routes (B2B PORTAL) – FIXED REDIRECT
+|--------------------------------------------------------------------------
+*/
+// Protected Client Routes (B2B PORTAL)
+Route::middleware('auth:client')->prefix('partner')->name('client.')->group(function () {
+    Route::get('/dashboard', [ClientDashboardController::class, 'index'])->name('dashboard');
+
+    // Ensure this matches the Controller and the View folder
+    Route::get('/orders', [OrdersController::class, 'orders'])->name('orders');
+    Route::get('/invoices', [InvoicesController::class, 'invoices'])->name('invoices');
+    Route::get('/support', [SupportController::class, 'support'])->name('support');
 });
 
 require __DIR__.'/auth.php';

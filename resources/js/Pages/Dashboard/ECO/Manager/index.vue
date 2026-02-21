@@ -1,232 +1,255 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { Head, router } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
 import {
-    PencilSquareIcon,
-    TrashIcon,
     MagnifyingGlassIcon,
-    FunnelIcon,
-    PlusIcon,
-    ArrowUpOnSquareIcon,
-    ArrowDownOnSquareIcon,
     BuildingOfficeIcon,
     CheckIcon,
     XMarkIcon,
     ClockIcon,
+    ShieldCheckIcon,
     UserGroupIcon,
     BanknotesIcon,
-    ShieldCheckIcon,
-    ArrowRightOnRectangleIcon
+    ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline';
 
-// Reactive Tab State
+const props = defineProps({
+    pendingCompanies: Array,
+    verifiedCompanies: Array
+});
+
+// --- Modal State ---
+const showModal = ref(false);
+const modalConfig = ref({
+    title: '',
+    message: '',
+    confirmText: '',
+    confirmColor: '',
+    action: null
+});
+
+const openConfirmation = (title, message, confirmText, color, action) => {
+    modalConfig.value = { title, message, confirmText, confirmColor: color, action };
+    showModal.value = true;
+};
+
+// --- Computed Lists ---
+const pendingList = computed(() => props.pendingCompanies || []);
+const verifiedList = computed(() => props.verifiedCompanies || []);
 const activeTab = ref('approvals');
 
-// B2B Company Data for Approval
-const pendingCompanies = [
-    { id: 1, name: 'TechLogistics Corp', contact: 'Juan Dela Cruz', mobile: '+63 915 234 5678', email: 'juan@techlog.ph', status: 'Pending', date: 'Feb 16, 2026' },
-    { id: 3, name: 'Cavite IT Solutions', contact: 'Mark Reyes', mobile: '+63 920 111 2233', email: 'mark@cavite-it.ph', status: 'Pending', date: 'Feb 17, 2026' },
-];
+// --- Database Operations ---
+const executeUpdate = (id, status) => {
+    router.patch(route('eco.manager.clients.status.update', id), {
+        status: status
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showModal.value = false;
+        }
+    });
+};
 
-// Data for Verified Companies
-const verifiedCompanies = [
-    { id: 2, name: 'Manila Build Supplies', contact: 'Maria Santos', mobile: '+63 917 555 1234', email: 'maria@mbs.com.ph', status: 'Approved', score: '98', joinDate: 'Jan 12, 2026' },
-    { id: 4, name: 'Cebu Textile Hub', contact: 'Robert Lim', mobile: '+63 932 444 5566', email: 'robert@cebutextile.ph', status: 'Approved', score: '95', joinDate: 'Jan 20, 2026' },
-];
+// --- Action Handlers (Triggers Modals) ---
+const handleApprove = (company) => {
+    openConfirmation(
+        'Approve Business',
+        `Are you sure you want to activate ${company.company_name}? They will gain full access to the B2B portal.`,
+        'Confirm Approval',
+        'bg-green-600',
+        () => executeUpdate(company.id, 'active')
+    );
+};
 
-const stats = [
-    { label: 'Total Clients', value: '2,000', icon: UserGroupIcon },
-    { label: 'Pending Approval', value: '12', icon: ClockIcon },
-    { label: 'Verified Partners', value: '1,800', icon: ShieldCheckIcon },
-    { label: 'Total B2B Rev', value: '₱4.2M', icon: BanknotesIcon },
-];
+const handleReject = (company) => {
+    openConfirmation(
+        'Reject Application',
+        `Are you sure you want to reject ${company.company_name}? This will deny their portal access.`,
+        'Reject Business',
+        'bg-red-600',
+        () => executeUpdate(company.id, 'rejected')
+    );
+};
 
-const handleApprove = (id) => console.log('Approved Company:', id);
-const handleReject = (id) => console.log('Rejected Company:', id);
+const handleToggleStatus = (company) => {
+    const isCurrentlyActive = company.status === 'active';
+    const nextStatus = isCurrentlyActive ? 'suspended' : 'active';
+    const actionLabel = isCurrentlyActive ? 'Suspend' : 'Activate';
+    const color = isCurrentlyActive ? 'bg-red-600' : 'bg-green-600';
+
+    openConfirmation(
+        `${actionLabel} Account`,
+        `Are you sure you want to ${actionLabel.toLowerCase()} ${company.company_name}?`,
+        `Confirm ${actionLabel}`,
+        color,
+        () => executeUpdate(company.id, nextStatus)
+    );
+};
+
+const stats = computed(() => [
+    { label: 'Pending Approval', value: pendingList.value.length, icon: ClockIcon, color: 'text-orange-500' },
+    { label: 'Verified Partners', value: verifiedList.value.length, icon: ShieldCheckIcon, color: 'text-green-600' },
+    { label: 'Total B2B Clients', value: pendingList.value.length + verifiedList.value.length, icon: UserGroupIcon, color: 'text-blue-600' },
+    { label: 'System Credit', value: '₱4.2M', icon: BanknotesIcon, color: 'text-purple-600' },
+]);
 </script>
 
 <template>
 
-    <Head title="Client Approval Dashboard" />
+    <Head title="Partner Verification" />
 
     <AuthenticatedLayout>
-
-
-        <div class="p-4 sm:p-6 lg:p-8 bg-[#F5F6FA] min-h-screen">
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-                <div v-for="stat in stats" :key="stat.label"
-                    class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between transition hover:shadow-md">
-                    <div>
-                        <p class="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-tighter">{{
-                            stat.label }}</p>
-                        <p class="text-xl sm:text-2xl font-black text-gray-800 mt-1">{{ stat.value }}</p>
+        <div class="max-w-[1600px] mx-auto space-y-8 p-4 lg:p-10">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div class="space-y-1">
+                    <div
+                        class="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-[0.2em]">
+                        <ShieldCheckIcon class="h-3.5 w-3.5" />
+                        ECO Manager Console
                     </div>
-                    <div class="p-2 sm:p-3 bg-purple-50 rounded-lg">
-                        <component :is="stat.icon" class="h-5 w-5 sm:h-6 sm:w-6 text-[#6E49CB]" />
+                    <h1 class="text-4xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">
+                        Partner <span class="text-indigo-600">Verification</span>
+                    </h1>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div v-for="stat in stats" :key="stat.label"
+                    class="p-7 rounded-[2.5rem] bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm transition-all hover:shadow-md">
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{{ stat.label }}</p>
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">{{
+                            stat.value }}</h3>
+                        <div :class="stat.color" class="p-2 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                            <component :is="stat.icon" class="h-6 w-6" />
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="flex overflow-x-auto space-x-4 mb-6 border-b border-gray-200 no-scrollbar">
-                <button @click="activeTab = 'approvals'"
-                    :class="[activeTab === 'approvals' ? 'bg-white border-t border-x border-gray-200 rounded-t-lg text-[#5D44A7] font-bold' : 'text-gray-400 font-medium hover:text-gray-600']"
-                    class="whitespace-nowrap px-4 sm:px-6 py-2 text-sm transition-all duration-200">
-                    Account Approvals
-                </button>
-                <button @click="activeTab = 'verified'"
-                    :class="[activeTab === 'verified' ? 'bg-white border-t border-x border-gray-200 rounded-t-lg text-[#5D44A7] font-bold' : 'text-gray-400 font-medium hover:text-gray-600']"
-                    class="whitespace-nowrap px-4 sm:px-6 py-2 text-sm transition-all duration-200">
-                    Verified Companies
-                </button>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6">
-                <div class="flex flex-col lg:flex-row lg:items-center justify-between mb-8 space-y-4 lg:space-y-0">
-                    <div class="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-3">
-                        <h1 class="text-xl sm:text-2xl font-bold text-gray-800 tracking-tight italic">
-                            {{ activeTab === 'approvals' ? 'Business Registrations' : 'Verified Business Partners' }}
-                        </h1>
-                        <div class="flex flex-wrap gap-2">
-                            <button
-                                class="flex items-center px-3 py-2 bg-[#6E49CB] text-white rounded-md text-xs sm:text-sm font-medium hover:bg-[#5D44A7] transition shadow-md">
-                                <PlusIcon class="h-4 w-4 mr-1 sm:mr-2" /> {{ activeTab === 'approvals' ?
-                                    'RegisterClient' : 'Add Partner' }}
-                            </button>
-                            <button
-                                class="flex items-center px-3 py-2 border border-gray-300 text-gray-600 rounded-md text-xs sm:text-sm font-medium hover:bg-gray-50 transition">
-                                <ArrowDownOnSquareIcon class="h-4 w-4 mr-1 sm:mr-2" /> Export Logs
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center justify-between lg:justify-end space-x-4 sm:space-x-6">
-                        <div
-                            class="text-right text-[10px] text-gray-400 font-bold uppercase tracking-widest hidden sm:block">
-                            <p>{{ activeTab === 'approvals' ? 'Verification Rate' : 'Total Active' }}: <span
-                                    class="text-[#6E49CB]">92%</span></p>
-                        </div>
-                        <button
-                            class="flex items-center px-4 sm:px-6 py-2 bg-[#6E49CB] text-white rounded-md text-xs sm:text-sm font-medium shadow-md">
-                            <FunnelIcon class="h-4 w-4 mr-2" /> Filter
+            <div
+                class="bg-white dark:bg-gray-900 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+                <div
+                    class="p-8 border-b border-gray-50 dark:border-gray-800 flex flex-col lg:flex-row justify-between items-center gap-6">
+                    <div class="flex p-1.5 bg-gray-50 dark:bg-gray-950 rounded-2xl">
+                        <button @click="activeTab = 'approvals'"
+                            :class="activeTab === 'approvals' ? 'bg-white dark:bg-gray-800 shadow-sm text-indigo-600' : 'text-gray-400'"
+                            class="px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                            Pending Reviews ({{ pendingList.length }})
+                        </button>
+                        <button @click="activeTab = 'verified'"
+                            :class="activeTab === 'verified' ? 'bg-white dark:bg-gray-800 shadow-sm text-indigo-600' : 'text-gray-400'"
+                            class="px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                            Verified Directory ({{ verifiedList.length }})
                         </button>
                     </div>
                 </div>
 
-                <div class="overflow-x-auto -mx-4 sm:mx-0">
-                    <div class="inline-block min-w-full align-middle px-4 sm:px-0">
-                        <table class="min-w-full text-left">
-                            <thead>
-                                <tr
-                                    class="text-gray-400 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.1em] border-b border-gray-100 bg-gray-50/50 italic">
-                                    <th class="p-3 sm:p-4 font-normal">Icon</th>
-                                    <th class="p-3 sm:p-4 font-normal text-gray-600 font-bold">Business Name</th>
-                                    <th class="p-3 sm:p-4 font-normal">Contact Person</th>
-                                    <th class="p-3 sm:p-4 font-normal hidden md:table-cell">
-                                        {{ activeTab === 'approvals' ? 'Contact No.' : 'Member Score' }}
-                                    </th>
-                                    <th class="p-3 sm:p-4 font-normal text-center sm:text-left">Status</th>
-                                    <th class="p-3 sm:p-4 font-normal hidden lg:table-cell">
-                                        {{ activeTab === 'approvals' ? 'Applied Date' : 'Verified Since' }}
-                                    </th>
-                                    <th class="p-3 sm:p-4 font-normal text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-50">
-                                <tr v-if="activeTab === 'approvals'" v-for="company in pendingCompanies"
-                                    :key="company.id" class="group hover:bg-gray-50 transition duration-150">
-                                    <td class="p-3 sm:p-4">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr
+                                class="bg-gray-50/50 dark:bg-gray-800/30 text-[10px] font-black uppercase text-gray-400 tracking-[0.15em]">
+                                <th class="px-8 py-5">Corporate Entity</th>
+                                <th class="px-8 py-5">Liaison</th>
+                                <th class="px-8 py-5">Status</th>
+                                <th class="px-8 py-5 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50 dark:divide-gray-800">
+                            <tr v-for="company in (activeTab === 'approvals' ? pendingList : verifiedList)"
+                                :key="company.id" class="group hover:bg-gray-50/30 transition-all">
+                                <td class="px-8 py-6">
+                                    <div class="flex items-center gap-4">
                                         <div
-                                            class="h-8 w-8 sm:h-10 sm:w-10 bg-purple-50 rounded-full flex items-center justify-center border border-purple-100 text-center mx-auto sm:mx-0">
-                                            <BuildingOfficeIcon class="h-5 w-5 sm:h-6 sm:w-6 text-[#6E49CB]" />
+                                            class="h-10 w-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center text-indigo-600 border border-indigo-100 dark:border-indigo-800/50 shadow-sm">
+                                            <BuildingOfficeIcon class="h-5 w-5" />
                                         </div>
-                                    </td>
-                                    <td
-                                        class="p-3 sm:p-4 font-bold text-gray-800 text-xs sm:text-sm italic whitespace-nowrap">
-                                        {{ company.name }}</td>
-                                    <td
-                                        class="p-3 sm:p-4 text-gray-600 text-xs sm:text-sm font-medium whitespace-nowrap">
-                                        {{ company.contact }}</td>
-                                    <td
-                                        class="p-3 sm:p-4 text-gray-500 text-[10px] sm:text-xs hidden md:table-cell whitespace-nowrap">
-                                        {{ company.mobile }}</td>
-                                    <td class="p-3 sm:p-4">
-                                        <span
-                                            class="px-2 sm:px-3 py-1 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-widest bg-orange-100 text-orange-600">
-                                            Pending
-                                        </span>
-                                    </td>
-                                    <td
-                                        class="p-3 sm:p-4 text-gray-400 text-[10px] sm:text-xs font-semibold hidden lg:table-cell whitespace-nowrap">
-                                        {{ company.date }}</td>
-                                    <td class="p-3 sm:p-4">
-                                        <div class="flex items-center justify-end space-x-1 sm:space-x-2">
-                                            <button @click="handleApprove(company.id)"
-                                                class="p-1.5 sm:p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition shadow-sm">
+                                        <div>
+                                            <p
+                                                class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tighter">
+                                                {{ company.company_name }}</p>
+                                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                                TIN: {{ company.tin_number || 'N/A' }}</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-8 py-6">
+                                    <p
+                                        class="text-xs font-black uppercase tracking-tight text-gray-800 dark:text-gray-200">
+                                        {{ company.contact_person }}</p>
+                                    <p class="text-[10px] font-bold text-indigo-500 uppercase">{{ company.email }}</p>
+                                </td>
+                                <td class="px-8 py-6">
+                                    <span :class="{
+                                        'bg-orange-50 text-orange-600 dark:bg-orange-950/30': company.status === 'pending',
+                                        'bg-green-50 text-green-600 dark:bg-green-950/30': company.status === 'active',
+                                        'bg-red-50 text-red-600 dark:bg-red-950/30': company.status === 'suspended'
+                                    }"
+                                        class="px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border border-current opacity-80">
+                                        {{ company.status }}
+                                    </span>
+                                </td>
+                                <td class="px-8 py-6 text-right">
+                                    <div class="flex justify-end gap-2">
+                                        <template v-if="activeTab === 'approvals'">
+                                            <button @click="handleApprove(company)"
+                                                class="p-2.5 rounded-xl bg-green-50 dark:bg-green-900/20 text-green-600 hover:scale-110 transition-transform">
                                                 <CheckIcon class="h-4 w-4" />
                                             </button>
-                                            <button @click="handleReject(company.id)"
-                                                class="p-1.5 sm:p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-500 hover:text-white transition shadow-sm">
+                                            <button @click="handleReject(company)"
+                                                class="p-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 hover:scale-110 transition-transform">
                                                 <XMarkIcon class="h-4 w-4" />
                                             </button>
-                                            <button
-                                                class="px-2 sm:px-4 py-1.5 bg-[#6E49CB] text-white rounded text-[9px] sm:text-[10px] font-bold uppercase hover:bg-[#5D44A7] transition italic">Review</button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                        </template>
+                                        <template v-else>
+                                            <button @click="handleToggleStatus(company)"
+                                                :class="company.status === 'active' ? 'bg-red-600 shadow-red-500/20' : 'bg-green-600 shadow-green-500/20'"
+                                                class="px-6 py-2.5 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg hover:brightness-110 transition-all">
+                                                {{ company.status === 'active' ? 'Suspend' : 'Activate' }}
+                                            </button>
+                                        </template>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
 
-                                <tr v-if="activeTab === 'verified'" v-for="company in verifiedCompanies"
-                                    :key="company.id" class="group hover:bg-gray-50 transition duration-150">
-                                    <td class="p-3 sm:p-4">
-                                        <div
-                                            class="h-8 w-8 sm:h-10 sm:w-10 bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100 text-center mx-auto sm:mx-0">
-                                            <ShieldCheckIcon class="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="p-3 sm:p-4 font-bold text-gray-800 text-xs sm:text-sm italic whitespace-nowrap">
-                                        {{ company.name }}</td>
-                                    <td
-                                        class="p-3 sm:p-4 text-gray-600 text-xs sm:text-sm font-medium whitespace-nowrap">
-                                        {{ company.contact }}</td>
-                                    <td class="p-3 sm:p-4 hidden md:table-cell">
-                                        <div class="flex items-center space-x-2">
-                                            <div class="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                                <div class="bg-emerald-500 h-full" :style="`width: ${company.score}%`">
-                                                </div>
-                                            </div>
-                                            <span class="text-[10px] font-bold text-emerald-600">{{ company.score
-                                            }}%</span>
-                                        </div>
-                                    </td>
-                                    <td class="p-3 sm:p-4">
-                                        <span
-                                            class="px-2 sm:px-3 py-1 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-widest bg-emerald-100 text-emerald-600">
-                                            Verified
-                                        </span>
-                                    </td>
-                                    <td
-                                        class="p-3 sm:p-4 text-gray-400 text-[10px] sm:text-xs font-semibold hidden lg:table-cell whitespace-nowrap">
-                                        {{ company.joinDate }}</td>
-                                    <td class="p-3 sm:p-4">
-                                        <div class="flex items-center justify-end space-x-1 sm:space-x-2">
-                                            <button
-                                                class="p-1.5 sm:p-2 text-gray-400 hover:text-[#6E49CB] hover:bg-purple-50 rounded-lg transition">
-                                                <PencilSquareIcon class="h-4 w-4" />
-                                            </button>
-                                            <button
-                                                class="p-1.5 sm:p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition">
-                                                <TrashIcon class="h-4 w-4" />
-                                            </button>
-                                            <button
-                                                class="flex items-center px-2 sm:px-4 py-1.5 bg-gray-900 text-white rounded text-[9px] sm:text-[10px] font-bold uppercase hover:bg-black transition italic">
-                                                <ArrowRightOnRectangleIcon class="h-3 w-3 mr-1" /> Login
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+        <div v-if="showModal"
+            class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity">
+            <div
+                class="bg-white dark:bg-gray-900 w-full max-w-md rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-2xl overflow-hidden transform transition-all scale-100">
+                <div class="p-8">
+                    <div class="flex items-center gap-4 mb-6">
+                        <div
+                            class="h-12 w-12 rounded-2xl bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center text-orange-500">
+                            <ExclamationTriangleIcon class="h-6 w-6" />
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">{{
+                                modalConfig.title }}</h3>
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">System Confirmation
+                                Required</p>
+                        </div>
+                    </div>
+
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-8 leading-relaxed font-medium">
+                        {{ modalConfig.message }}
+                    </p>
+
+                    <div class="flex gap-3">
+                        <button @click="showModal = false"
+                            class="flex-1 px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-800 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:bg-gray-100 transition-colors">
+                            Cancel
+                        </button>
+                        <button @click="modalConfig.action" :class="modalConfig.confirmColor"
+                            class="flex-1 px-6 py-4 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest shadow-lg hover:brightness-110 transition-all">
+                            {{ modalConfig.confirmText }}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -235,26 +258,7 @@ const handleReject = (id) => console.log('Rejected Company:', id);
 </template>
 
 <style scoped>
-input:focus {
-    outline: none;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-    display: none;
-}
-
-.no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-}
-
-::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #E5E7EB;
-    border-radius: 10px;
+.tracking-tighter {
+    letter-spacing: -0.05em;
 }
 </style>

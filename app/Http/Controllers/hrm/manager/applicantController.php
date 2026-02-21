@@ -15,7 +15,7 @@ use Inertia\Inertia;
 class ApplicantController extends Controller
 {
     /**
-     * Display a listing of applicants.
+     * Display a listing of applicants for Staff and Managers.
      */
     public function index()
     {
@@ -42,11 +42,12 @@ class ApplicantController extends Controller
                     'pagibig_file_url' => $a->pagibig_file ? Storage::url($a->pagibig_file) : null,
                     'has_interview' => $a->interview !== null,
                 ]),
-        ]); 
+        ]);
     }
 
     /**
-     * Store a newly created applicant and their interview schedule.
+     * Store a newly created applicant.
+     * Works for both Public "Apply Now" and Internal HRM "Add Applicant".
      */
     public function store(Request $request)
     {
@@ -58,17 +59,20 @@ class ApplicantController extends Controller
             'phone_number' => 'required|string',
             'position_applied' => 'required|string',
             'expected_salary' => 'nullable|numeric',
-            'notice_period' => 'required|string|in:immediate,15_days,30_days',
+            'notice_period' => 'required|string|in:immediate,15_days,30_days,60_days',
             'street_address' => 'required|string',
             'street_address_line2' => 'nullable|string',
             'city' => 'required|string',
             'state_province' => 'required|string',
             'postal_zip_code' => 'required|string',
-            'textile_experience' => 'required|string|in:yes,no',
+            // Adjusted to nullable to support public form if experience isn't a radio choice there
+            'textile_experience' => 'nullable|string',
             'status' => 'nullable|string',
+            // File validation
             'sss_file' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             'philhealth_file' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             'pagibig_file' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            // Internal Only Fields (Scheduling)
             'scheduled_at' => 'nullable|date',
             'interview_type' => 'nullable|string|in:phone,technical,behavioral,onsite,video',
             'duration' => 'nullable|integer|in:15,30,45,60',
@@ -78,16 +82,18 @@ class ApplicantController extends Controller
         ]);
 
         return DB::transaction(function () use ($request) {
-            $data = $request->except([
-                'sss_file', 'philhealth_file', 'pagibig_file',
-                'scheduled_at', 'interview_type', 'duration',
-                'interviewer', 'location', 'notes',
+            // Data for the Applicant Model
+            $data = $request->only([
+                'first_name', 'middle_name', 'last_name', 'email', 'phone_number',
+                'position_applied', 'expected_salary', 'notice_period', 'street_address',
+                'street_address_line2', 'city', 'state_province', 'postal_zip_code',
+                'textile_experience',
             ]);
 
-            if (! isset($data['status'])) {
-                $data['status'] = 'Pending';
-            }
+            // Default status to 'Pending' for new entries
+            $data['status'] = $request->status ?? 'Pending';
 
+            // Handle Government ID Uploads
             if ($request->hasFile('sss_file')) {
                 $data['sss_file'] = $request->file('sss_file')->store('applicants/ids', 'public');
             }
@@ -100,6 +106,7 @@ class ApplicantController extends Controller
 
             $applicant = Applicant::create($data);
 
+            // Handle Internal Interview Scheduling (if HRM user provided it in the modal)
             if ($request->filled('scheduled_at')) {
                 Interview::create([
                     'applicant_id' => $applicant->id,
@@ -110,6 +117,9 @@ class ApplicantController extends Controller
                     'location' => $request->location,
                     'notes' => $request->notes,
                 ]);
+
+                // If scheduled immediately, update status to Interview
+                $applicant->update(['status' => 'Interview']);
             }
 
             return back()->with('success', 'Applicant registered successfully.');
@@ -117,7 +127,7 @@ class ApplicantController extends Controller
     }
 
     /**
-     * Update the stage/status of an applicant.
+     * Update the stage/status of an applicant (Pipeline Management).
      */
     public function updateStage(Request $request, $id)
     {
@@ -146,7 +156,7 @@ class ApplicantController extends Controller
     }
 
     /**
-     * Create a system User account for the applicant (Promote to Trainee).
+     * Promote an Applicant to a Trainee System User.
      */
     public function createUser(Request $request, $id)
     {
@@ -158,21 +168,21 @@ class ApplicantController extends Controller
         ]);
 
         return DB::transaction(function () use ($applicant, $request) {
-            // Create the official User account
             $year = now()->year;
+
             User::create([
                 'name' => $applicant->first_name.' '.$applicant->last_name,
                 'email' => $applicant->email,
-                'password' => Hash::make('password'), // Set a default or generate one
+                'password' => Hash::make('password'),
                 'role' => $request->role,
-                'position' => $request->position, // Usually 'trainee'
-                'department' => $request->role, // Assuming role matches department
+                'position' => $request->position,
+                'department' => $request->role,
                 'join_date' => now(),
-                'is_active' => true,    
+                'is_active' => true,
                 'employee_id' => 'MONTI-'.$year.'-'.$request->role.'-'.str_pad(User::where('role', $request->role)->count() + 1, 4, '0', STR_PAD_LEFT),
             ]);
 
-            // Mark applicant as completed so they vanish from the pipeline
+            // Complete the applicant cycle
             $applicant->update(['status' => 'Account Created']);
 
             return back()->with('success', 'User account created successfully.');
@@ -180,7 +190,7 @@ class ApplicantController extends Controller
     }
 
     /**
-     * Schedule an interview for an existing applicant.
+     * Schedule an interview for an existing applicant in the pipeline.
      */
     public function scheduleInterview(Request $request, Applicant $applicant)
     {

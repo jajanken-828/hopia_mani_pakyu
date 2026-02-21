@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
-use App\Http\Controllers\Auth\ConfirmablePasswordController; // New Controller
+use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\EmployeeLoginController;
@@ -10,24 +10,28 @@ use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth; // Added for custom logout logic
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('guest')->group(function () {
-    // Existing Email/Password Login (Directs to Standard UI)
+// ✅ Updated to include both web and client guards
+// This prevents logged-in clients from being redirected to the employee login
+Route::middleware('guest:web,client')->group(function () {
+    // Existing Email/Password Login (Employees)
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
 
     Route::post('login', [AuthenticatedSessionController::class, 'store'])
         ->name('login.store');
 
-    // NEW: Employee ID Login (Directs to Employee UI)
+    // Employee ID Login
     Route::get('employee-login', [EmployeeLoginController::class, 'create'])
         ->name('employee.login');
 
     Route::post('employee-login', [EmployeeLoginController::class, 'store'])
         ->name('employee.login.store');
 
-    // Registration
+    // Registration (Internal Employees)
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
 
@@ -48,7 +52,8 @@ Route::middleware('guest')->group(function () {
         ->name('password.store');
 });
 
-Route::middleware('auth')->group(function () {
+// ✅ Updated to support both guards for authenticated actions
+Route::middleware('auth:web,client')->group(function () {
     // Email Verification
     Route::get('verify-email', EmailVerificationPromptController::class)
         ->name('verification.notice');
@@ -71,7 +76,18 @@ Route::middleware('auth')->group(function () {
     Route::put('password', [PasswordController::class, 'update'])
         ->name('password.update');
 
-    // Logout
-    Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
-        ->name('logout');
+    // ✅ Unified Logout Logic
+    // Detects which guard is active and logs out the correct user session
+    Route::post('logout', function (Request $request) {
+        if (Auth::guard('client')->check()) {
+            Auth::guard('client')->logout();
+        } else {
+            Auth::guard('web')->logout();
+        }
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect('/');
+    })->name('logout');
 });

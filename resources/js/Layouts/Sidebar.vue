@@ -11,6 +11,7 @@ import {
     UserPlus,
     ClipboardList,
     ChartNoAxesCombined,
+    ShoppingBasket,
     HandCoins,
     FileUser,
     DoorOpen,
@@ -22,24 +23,37 @@ import {
     Boxes,
     ShoppingCart,
     Warehouse,
-    Users,
     Globe,
-    // --- Added Missing Icons for Employee Portal ---
     Clock,
     CalendarDays,
     History,
-    Settings
+    Users,
+    Settings,
+    Receipt,
+    HelpCircle,
+    ShieldCheck
 } from 'lucide-vue-next'
 
 const page = usePage()
 const user = computed(() => page.props.auth.user)
+const client = computed(() => page.props.auth.client)
 const currentUrl = computed(() => page.url)
 
-// Determines if the user is currently within the Employee ID Portal routes
 const isEmployeePortal = computed(() => currentUrl.value.startsWith('/dashboard/employee-ui'))
+const isClient = computed(() => !!client.value)
 
 const navItems = computed(() => {
-    // --- Employee ID Specific Navigation ---
+    // --- Client Navigation (B2B) ---
+    if (isClient.value) {
+        return [
+            { label: 'Dashboard', href: route('client.dashboard'), icon: LayoutDashboard },
+            { label: 'Orders', href: route('client.orders'), icon: ShoppingCart },
+            { label: 'Invoices', href: route('client.invoices'), icon: Receipt },
+            { label: 'Support', href: route('client.support'), icon: HelpCircle },
+        ]
+    }
+
+    // --- Employee ID Portal Navigation ---
     if (isEmployeePortal.value) {
         return [
             { label: 'Employee Dashboard', href: route('employee.ui.dashboard'), icon: Clock },
@@ -49,13 +63,13 @@ const navItems = computed(() => {
         ]
     }
 
-    // --- Standard Corporate ERP Navigation ---
+    // --- Standard ERP Navigation ---
     const items = [
         { label: 'Main Dashboard', href: route('dashboard'), icon: LayoutDashboard },
     ]
 
-    const userRole = user.value?.role?.toUpperCase();
-    const userPosition = user.value?.position?.toLowerCase();
+    const userRole = user.value?.role?.toUpperCase()
+    const userPosition = user.value?.position?.toLowerCase()
 
     if (userRole === 'HRM') {
         if (userPosition === 'manager') {
@@ -63,17 +77,16 @@ const navItems = computed(() => {
                 { label: 'Onboarding', href: route('hrm.manager.onboarding'), icon: BarChart3 },
                 { label: 'Payroll', href: route('hrm.manager.payroll'), icon: HandCoins },
                 { label: 'Analytics', href: route('hrm.manager.analytics'), icon: ChartNoAxesCombined }
-            );
+            )
         } else if (userPosition === 'staff') {
             items.push(
                 { label: 'Recruitment', href: route('hrm.applicants.index'), icon: UserPlus },
                 { label: 'Interview', href: route('hrm.employee.interview'), icon: ClipboardList },
-                { label: 'Training & Development', href: route('hrm.employee.training'), icon: BicepsFlexed },
+                { label: 'Training', href: route('hrm.employee.training'), icon: BicepsFlexed },
                 { label: 'Attendance', href: route('hrm.employee.attendance'), icon: FileUser },
-                { label: 'Leave Management', href: route('hrm.employee.leave'), icon: DoorOpen },
-                { label: 'Payroll', href: route('hrm.employee.hrmstaffpayroll'), icon: HandCoins },
-
-            );
+                { label: 'Leave MGMT', href: route('hrm.employee.leave'), icon: DoorOpen },
+                { label: 'Payroll', href: route('hrm.employee.hrmstaffpayroll'), icon: HandCoins }
+            )
         }
     }
 
@@ -83,72 +96,52 @@ const navItems = computed(() => {
                 { label: 'Sourcing', href: route('scm.manager.sourcing'), icon: Truck },
                 { label: 'Audit', href: route('scm.manager.audit'), icon: ChartNoAxesCombined },
                 { label: 'Close', href: route('scm.manager.close'), icon: DoorOpen }
-            );
+            )
         } else if (userPosition === 'staff') {
             items.push(
                 { label: 'Inbound', href: route('scm.employee.inbound'), icon: Truck },
-                { label: 'Recieving', href: route('scm.employee.recieving'), icon: Truck },
-                { label: 'Inventory Management', href: route('scm.employee.inventory'), icon: Package },
+                { label: 'Receiving', href: route('scm.employee.recieving'), icon: Truck },
+                { label: 'Inventory', href: route('scm.employee.inventory'), icon: Package },
                 { label: 'Verifications', href: route('scm.employee.verification'), icon: HandCoins }
-            );
+            )
         }
     }
 
     if (userRole === 'FIN') {
-        if (userPosition === 'manager') {
-            items.push({ label: 'Finance Dashboard', href: route('fin.manager.dashboard'), icon: Wallet });
-        } else if (userPosition === 'staff') {
-            items.push({ label: 'Finance Portal', href: route('fin.employee.dashboard'), icon: Wallet });
-        }
+        items.push({ label: 'Finance', href: userPosition === 'manager' ? route('fin.manager.dashboard') : route('fin.employee.dashboard'), icon: Wallet })
     }
 
     if (userRole === 'MAN') {
-        if (userPosition === 'manager') {
-            items.push({ label: 'Manufacturing MGMT', href: route('man.manager.dashboard'), icon: Factory });
-        } else if (userPosition === 'staff') {
-            items.push({ label: 'Production Line', href: route('man.employee.dashboard'), icon: Factory });
-        }
+        items.push({ label: 'Manufacturing', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: Factory })
     }
 
     if (userRole === 'INV') {
-        if (userPosition === 'manager') {
-            items.push({ label: 'Inventory Dashboard', href: route('inv.manager.dashboard'), icon: Boxes });
-        } else if (userPosition === 'staff') {
-            items.push({ label: 'Stock Control', href: route('inv.employee.dashboard'), icon: Boxes });
-        }
+        items.push({ label: 'Inventory', href: userPosition === 'manager' ? route('inv.manager.dashboard') : route('inv.employee.dashboard'), icon: Boxes })
     }
 
     if (userRole === 'ORD') {
-        if (userPosition === 'manager') {
-            items.push({ label: 'Order Analytics', href: route('ord.manager.dashboard'), icon: ShoppingCart });
-        } else if (userPosition === 'staff') {
-            items.push({ label: 'Order Processing', href: route('ord.employee.dashboard'), icon: ShoppingCart });
-        }
+        items.push({ label: 'Orders', href: userPosition === 'manager' ? route('ord.manager.dashboard') : route('ord.employee.dashboard'), icon: ShoppingCart })
     }
 
     if (userRole === 'WAR') {
-        if (userPosition === 'manager') {
-            items.push({ label: 'Warehouse MGMT', href: route('war.manager.dashboard'), icon: Warehouse });
-        } else if (userPosition === 'staff') {
-            items.push({ label: 'Warehouse Floor', href: route('war.employee.dashboard'), icon: Warehouse });
-        }
+        items.push({ label: 'Warehouse', href: userPosition === 'manager' ? route('war.manager.dashboard') : route('war.employee.dashboard'), icon: Warehouse })
     }
 
     if (userRole === 'CRM') {
-        if (userPosition === 'manager') {
-            items.push({ label: 'Relations Dashboard', href: route('crm.manager.dashboard'), icon: Users });
-        } else if (userPosition === 'staff') {
-            items.push({ label: 'Customer Support', href: route('crm.employee.dashboard'), icon: Users });
-        }
+        items.push({ label: 'CRM', href: userPosition === 'manager' ? route('crm.manager.dashboard') : route('crm.employee.dashboard'), icon: Users })
     }
 
     if (userRole === 'ECO') {
         if (userPosition === 'manager') {
-            // items.push({ label: 'Store Management', href: route('eco.manager.dashboard'), icon: Globe });
-            items.push({ label: 'Book Management', href: route('eco.manager.book'), icon: Book });
-            items.push({ label: 'Credit Management', href: route('eco.manager.credit'), icon: CreditCard });
-        } else if (userPosition === 'staff') {
-            items.push({ label: 'Online Store', href: route('eco.employee.dashboard'), icon: Globe });
+            items.push(
+                { label: 'Book MGMT', href: route('eco.manager.book'), icon: Book },
+                { label: 'Credit MGMT', href: route('eco.manager.credit'), icon: CreditCard },
+                { label: 'Verification', href: route('eco.manager.verification.index'), icon: ShieldCheck }
+            )
+        } else {
+            items.push({ label: 'Online Store', href: route('eco.employee.products'), icon: Globe })
+            items.push({ label: 'Order Management', href: route('eco.employee.ordermng'), icon: ShoppingBasket })
+            items.push({ label: 'Customer Insights', href: route('eco.employee.customer'), icon: Users })
         }
     }
 
@@ -161,67 +154,107 @@ const isActive = (href) => {
 </script>
 
 <template>
-    <aside class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-50">
+    <aside class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-50 transition-all duration-300">
         <div
-            class="flex flex-col flex-grow bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 shadow-sm">
+            class="flex flex-col flex-grow bg-slate-50 dark:bg-gray-950 border-r border-gray-200/60 dark:border-gray-800/60 shadow-xl">
 
-            <div class="flex items-center h-20 flex-shrink-0 px-5 border-b border-gray-50 dark:border-gray-800">
-                <div class="h-10 w-10 flex-shrink-0 mr-3">
-                    <img src="/images/applogo.png" alt="Monti Textile Logo" class="h-full w-full object-contain" />
-                </div>
-                <div class="flex flex-col">
-                    <h2 class="text-md font-bold text-gray-900 dark:text-white leading-tight">
-                        Monti <span class="text-blue-600">Textile</span>
-                    </h2>
-                    <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
-                        {{ isEmployeePortal ? 'Employee Portal' : 'ERP System' }}
-                    </span>
+            <div class="flex items-center h-20 flex-shrink-0 px-4">
+                <div
+                    class="flex items-center gap-2.5 p-2 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 w-full">
+                    <div
+                        class="h-9 w-9 flex-shrink-0 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
+                        <img src="/images/applogo.png" alt="Logo" class="h-6 w-6 object-contain brightness-0 invert" />
+                    </div>
+                    <div class="flex flex-col overflow-hidden">
+                        <h2
+                            class="text-[13px] font-black text-gray-900 dark:text-white leading-tight tracking-tight uppercase">
+                            Monti <span class="text-blue-600">Textile</span>
+                        </h2>
+                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">
+                            {{ isClient ? 'Partner' : (isEmployeePortal ? 'Employee' : 'System') }}
+                        </span>
+                    </div>
                 </div>
             </div>
 
-            <div class="flex-1 flex flex-col overflow-y-auto py-6">
-                <nav class="flex-1 px-3 space-y-1.5">
+            <div class="flex-1 flex flex-col overflow-y-auto px-3 py-4 custom-scrollbar">
+                <div class="mb-3 px-2">
+                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em]">Main Menu</p>
+                </div>
+                <nav class="space-y-1">
                     <Link v-for="item in navItems" :key="item.label" :href="item.href" :class="[
                         isActive(item.href)
-                            ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 ring-1 ring-blue-100 dark:ring-blue-900/30'
-                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-white'
+                            ? 'bg-white dark:bg-gray-900 text-blue-600 shadow-sm ring-1 ring-gray-200/50 dark:ring-gray-800'
+                            : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-900/50 hover:text-gray-900 dark:hover:text-white'
                     ]"
-                        class="group flex items-center justify-between px-3 py-2.5 text-sm font-bold rounded-xl transition-all duration-200">
-                        <div class="flex items-center">
-                            <component :is="item.icon"
-                                :class="[isActive(item.href) ? 'text-blue-600' : 'text-gray-400']"
-                                class="mr-3 h-5 w-5 flex-shrink-0" />
-                            <span class="truncate">{{ item.label }}</span>
+                        class="group relative flex items-center justify-between px-3 py-2.5 text-[13px] font-bold rounded-xl transition-all duration-300">
+                        <div v-if="isActive(item.href)"
+                            class="absolute left-0 top-1/4 bottom-1/4 w-0.5 bg-blue-600 rounded-r-full"></div>
+
+                        <div class="flex items-center relative z-10">
+                            <div :class="[
+                                isActive(item.href) ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300'
+                            ]" class="p-1.5 rounded-lg transition-colors duration-300 mr-2.5">
+                                <component :is="item.icon" class="h-4.5 w-4.5 flex-shrink-0" />
+                            </div>
+                            <span class="truncate tracking-tight">{{ item.label }}</span>
                         </div>
-                        <ChevronRight v-if="isActive(item.href)" class="h-4 w-4 flex-shrink-0" />
+
+                        <ChevronRight v-if="isActive(item.href)" class="h-3.5 w-3.5 text-blue-600/40" />
                     </Link>
                 </nav>
             </div>
 
-            <div
-                class="flex-shrink-0 border-t border-gray-100 dark:border-gray-800 p-4 bg-gray-50/50 dark:bg-gray-900/50">
-                <div class="flex items-center group p-1.5 rounded-2xl">
-                    <div class="flex-shrink-0">
-                        <div
-                            class="h-9 w-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold shadow-md">
-                            {{ user?.name?.charAt(0) }}
+            <div class="p-3 mt-auto">
+                <div
+                    class="bg-white dark:bg-gray-900 rounded-2xl p-2.5 border border-gray-100 dark:border-gray-800 shadow-lg group">
+                    <div class="flex items-center gap-2.5 relative z-10">
+                        <div class="relative">
+                            <div
+                                class="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white text-xs font-black shadow-lg shadow-blue-500/30 uppercase">
+                                {{ isClient ? client?.company_name?.charAt(0) : user?.name?.charAt(0) }}
+                            </div>
+                            <div
+                                class="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full">
+                            </div>
                         </div>
-                    </div>
-                    <div class="ml-3 flex-1 min-w-0">
-                        <p class="text-xs font-bold text-gray-900 dark:text-white truncate uppercase tracking-tight">
-                            {{ user?.name }}
-                        </p>
-                        <div class="flex items-center text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase">
-                            {{ isEmployeePortal ? (user?.employee_id || 'STAFF') : (user?.role + ' • ' + user?.position)
-                            }}
+
+                        <div class="flex-1 min-w-0">
+                            <p
+                                class="text-[11px] font-black text-gray-900 dark:text-white truncate uppercase tracking-tighter">
+                                {{ isClient ? client?.company_name : user?.name }}
+                            </p>
+                            <div class="flex items-center gap-1">
+                                <ShieldCheck class="h-2.5 w-2.5 text-blue-500" />
+                                <span class="text-[8px] font-black text-gray-400 uppercase truncate">
+                                    {{ isEmployeePortal ? (user?.employee_id || 'Staff') : (isClient ? 'Partner' :
+                                        user?.position) }}
+                                </span>
+                            </div>
                         </div>
+
+                        <Link :href="route('logout')" method="post" as="button"
+                            class="p-2 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-300">
+                            <LogOut class="h-3.5 w-3.5" />
+                        </Link>
                     </div>
-                    <Link :href="route('logout')" method="post" as="button"
-                        class="ml-2 p-2 rounded-lg text-gray-400 hover:text-red-600 transition-all">
-                        <LogOut class="h-4 w-4" />
-                    </Link>
                 </div>
             </div>
         </div>
     </aside>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+    width: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.2);
+    border-radius: 10px;
+}
+</style>
