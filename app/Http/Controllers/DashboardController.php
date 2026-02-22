@@ -2,7 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Client;
+use App\Models\Product;
+use App\Models\PurchaseOrder;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -248,15 +252,35 @@ class DashboardController extends Controller
 
     private function handleEcoDashboard(string $position)
     {
+        // Use the same base view for both Manager and Employee if you want a shared UI,
+        // but here we maintain your directory structure
         $view = $position === 'manager' ? 'Dashboard/ECO/Manager/index' : 'Dashboard/ECO/Employee/index';
+
+        // 1. Calculate Revenue Metrics
+        $todaySales = PurchaseOrder::where('status', 'approved')
+            ->whereDate('created_at', Carbon::today())
+            ->sum('total_amount');
+
+        $monthlyRevenue = PurchaseOrder::where('status', 'approved')
+            ->whereMonth('created_at', Carbon::now()->month)
+            ->sum('total_amount');
+
+        // 2. Fetch Partner Verification Data (Redundant logic from ClientVerificationController)
+        $pendingCompanies = Client::whereIn('status', ['pending', 'Pending'])->latest()->get();
+        $verifiedCompanies = Client::whereNotIn('status', ['pending', 'Pending'])->latest()->get();
 
         return Inertia::render($view, [
             'user' => Auth::user(),
-            'onlineSales' => [],
+            'pendingCompanies' => $pendingCompanies, // Connects verification logic
+            'verifiedCompanies' => $verifiedCompanies,
+            'onlineSales' => PurchaseOrder::with('client')->latest()->take(5)->get(),
             'stats' => [
-                'todaySales' => 0,
-                'monthlyRevenue' => 0,
-                'activeProducts' => 0,
+                'todaySales' => number_format($todaySales, 2),
+                'monthlyRevenue' => number_format($monthlyRevenue, 2),
+                'activeProducts' => Product::where('status', 'published')->count(),
+                'pendingApprovals' => $pendingCompanies->count(), // Real-time badge count
+                'pendingCredit' => PurchaseOrder::where('status', 'credit_review')->count(),
+                'pendingTiering' => PurchaseOrder::where('status', 'tier_assignment')->count(),
             ],
         ]);
     }

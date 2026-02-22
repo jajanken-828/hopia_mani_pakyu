@@ -18,7 +18,10 @@ import {
     Archive,
     Zap,
     ChevronRight,
-    ArrowUpRight
+    ArrowUpRight,
+    ShoppingBag,
+    Clock,
+    ShieldCheck
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -26,12 +29,30 @@ const props = defineProps({
         type: Object,
         default: () => ({ data: [], links: [], meta: {} }),
     },
+    // Live data from DashboardController
+    stats: {
+        type: Object,
+        default: () => ({
+            todaySales: '0.00',
+            monthlyRevenue: '0.00',
+            activeProducts: 0,
+            lowStockCount: 0,
+            activeTiers: 0,
+            pendingCredit: 0,
+            pendingTiering: 0
+        })
+    },
+    onlineSales: {
+        type: Array,
+        default: () => []
+    },
     filters: { type: Object, default: () => ({ search: '' }) },
 });
 
 // Tab State
 const activeTab = ref('inventory');
 
+// Search Logic
 const search = ref(props.filters.search);
 let searchTimeout;
 const updateSearch = () => {
@@ -41,234 +62,229 @@ const updateSearch = () => {
     }, 300);
 };
 
-// Data
-const catalogItems = [
-    { id: 1, name: 'Industrial Grade Silk', sku: 'TEX-SILK-001', stock: 1200, category: 'Raw Materials', bulk_min: 50, price: '1,200', unit: 'kg' },
-    { id: 2, name: 'Premium Cotton Roll', sku: 'TEX-COT-042', stock: 450, category: 'Fabrics', bulk_min: 20, price: '850', unit: 'roll' },
-];
-
-const stats = computed(() => [
-    { label: 'Total SKUs', value: '142', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-    { label: 'Low Stock', value: '05', icon: Archive, color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/20' },
-    { label: 'Active Tiers', value: '12', icon: Layers, color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
-    { label: 'Pending', value: '03', icon: ClipboardList, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+// --- Dashboard Stats Grid ---
+const statsData = computed(() => [
+    {
+        label: 'Today Sales',
+        value: `₱${props.stats.todaySales}`,
+        icon: Zap,
+        color: 'text-blue-600',
+        bg: 'bg-blue-50 dark:bg-blue-900/20'
+    },
+    {
+        label: 'Low Stock',
+        value: props.stats.lowStockCount,
+        icon: Archive,
+        color: 'text-rose-600',
+        bg: 'bg-rose-50 dark:bg-rose-900/20'
+    },
+    {
+        label: 'Active SKUs',
+        value: props.stats.activeProducts,
+        icon: Package,
+        color: 'text-indigo-600',
+        bg: 'bg-indigo-50 dark:bg-indigo-900/20'
+    },
+    {
+        label: 'Monthly Rev.',
+        value: `₱${props.stats.monthlyRevenue}`,
+        icon: BarChart3,
+        color: 'text-amber-600',
+        bg: 'bg-amber-50 dark:bg-amber-900/20'
+    },
 ]);
+
+// Helper for status styling
+const getStatusStyles = (status) => {
+    switch (status) {
+        case 'approved': return 'bg-emerald-50 text-emerald-600';
+        case 'credit_review': return 'bg-orange-50 text-orange-600';
+        case 'tier_assignment': return 'bg-blue-50 text-blue-600';
+        default: return 'bg-gray-50 text-gray-500';
+    }
+};
 </script>
 
 <template>
 
-    <Head title="Catalog Management" />
+    <Head title="ECO Dashboard - Catalog Master" />
 
     <AuthenticatedLayout>
-        <div class="max-w-[1400px] mx-auto space-y-8">
+        <div class="max-w-[1600px] mx-auto space-y-10 p-4 lg:p-10">
 
             <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
                 <div class="space-y-1">
                     <div
                         class="flex items-center gap-2 text-blue-600 font-black text-[10px] uppercase tracking-[0.2em]">
                         <Zap class="h-3 w-3 fill-current" />
-                        E-Commerce Operations
+                        Infrastructure Live
                     </div>
                     <h1 class="text-4xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">
                         Catalog <span class="text-blue-600">Master</span>
                     </h1>
-                    <p class="text-sm font-bold text-gray-400 uppercase tracking-tight">
-                        Managing Wholesale Infrastructure & Pricing
-                    </p>
                 </div>
 
                 <div class="flex items-center gap-3">
                     <button
-                        class="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm text-[11px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300 hover:bg-gray-50 transition-all">
+                        class="px-6 py-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-[11px] font-black uppercase tracking-widest text-gray-600 hover:bg-gray-50 transition-all">
                         <ArrowDownToLine class="h-4 w-4" />
-                        Export CSV
+                        Export
                     </button>
                     <button
-                        class="flex items-center gap-2 px-6 py-3 rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/20 text-[11px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95">
+                        class="px-6 py-3 rounded-2xl bg-blue-600 text-white shadow-lg text-[11px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all">
                         <Plus class="h-4 w-4" />
-                        Add New Item
+                        New SKU
                     </button>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div v-for="stat in stats" :key="stat.label"
-                    class="group bg-white dark:bg-gray-900 p-6 rounded-[2rem] border border-gray-100 dark:border-gray-800 flex items-center justify-between transition-all hover:shadow-xl hover:-translate-y-1">
+                <div v-for="stat in statsData" :key="stat.label"
+                    class="bg-white dark:bg-gray-900 p-7 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm flex items-center justify-between hover:shadow-md transition-all">
                     <div>
                         <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">{{ stat.label }}</p>
-                        <p class="text-3xl font-black text-gray-900 dark:text-white mt-1">{{ stat.value }}</p>
+                        <p class="text-3xl font-black text-gray-900 dark:text-white mt-1 italic tracking-tighter">{{
+                            stat.value }}</p>
                     </div>
-                    <div :class="[stat.bg, stat.color]"
-                        class="h-14 w-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110">
+                    <div :class="[stat.bg, stat.color]" class="h-14 w-14 rounded-2xl flex items-center justify-center">
                         <component :is="stat.icon" class="h-7 w-7" />
                     </div>
                 </div>
             </div>
 
-            <div
-                class="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-gray-100 dark:border-gray-800 pb-2">
-                <div class="flex items-center gap-8">
-                    <button @click="activeTab = 'inventory'"
-                        :class="[activeTab === 'inventory' ? 'text-blue-600 after:w-full' : 'text-gray-400 after:w-0 hover:text-gray-600']"
-                        class="relative pb-4 text-[11px] font-black uppercase tracking-widest transition-all after:absolute after:bottom-0 after:left-0 after:h-1 after:bg-blue-600 after:rounded-t-full after:transition-all">
-                        Inventory List
-                    </button>
-                    <button @click="activeTab = 'bulk-pricing'"
-                        :class="[activeTab === 'bulk-pricing' ? 'text-blue-600 after:w-full' : 'text-gray-400 after:w-0 hover:text-gray-600']"
-                        class="relative pb-4 text-[11px] font-black uppercase tracking-widest transition-all after:absolute after:bottom-0 after:left-0 after:h-1 after:bg-blue-600 after:rounded-t-full after:transition-all">
-                        Bulk Pricing Rules
-                    </button>
-                </div>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-                <div class="flex items-center gap-4 mb-4">
-                    <div class="relative w-64 group">
-                        <Search
-                            class="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
-                        <input v-model="search" @input="updateSearch" type="text" placeholder="Search Master SKU..."
-                            class="w-full pl-11 pr-4 py-3 rounded-2xl bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 text-xs font-bold focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all shadow-sm">
+                <div class="lg:col-span-8 space-y-6">
+                    <div class="flex items-center justify-between border-b border-gray-50 pb-4">
+                        <div class="flex gap-8">
+                            <button @click="activeTab = 'inventory'"
+                                :class="activeTab === 'inventory' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-400'"
+                                class="pb-2 text-[11px] font-black uppercase tracking-widest">Inventory Ledger</button>
+                            <button @click="activeTab = 'pipeline'"
+                                :class="activeTab === 'pipeline' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-400'"
+                                class="pb-2 text-[11px] font-black uppercase tracking-widest">Department
+                                Pipeline</button>
+                        </div>
+                        <div class="relative w-64 group">
+                            <Search
+                                class="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
+                            <input v-model="search" @input="updateSearch" type="text"
+                                placeholder="Search live catalog..."
+                                class="w-full pl-11 pr-4 py-3 rounded-2xl bg-white dark:bg-gray-900 border-gray-100 text-xs font-bold shadow-sm">
+                        </div>
                     </div>
-                    <button
-                        class="p-3 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-gray-400 hover:text-blue-600 transition-all">
-                        <Filter class="h-5 w-5" />
-                    </button>
-                </div>
-            </div>
 
-            <div
-                class="bg-white dark:bg-gray-900 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table v-if="activeTab === 'inventory'" class="w-full text-left">
-                        <thead>
-                            <tr
-                                class="bg-gray-50/50 dark:bg-gray-800/30 text-[10px] font-black uppercase text-gray-400 tracking-[0.15em]">
-                                <th class="px-8 py-5">Product Master</th>
-                                <th class="px-8 py-5">Global SKU</th>
-                                <th class="px-8 py-5">Department</th>
-                                <th class="px-8 py-5">Stock Analysis</th>
-                                <th class="px-8 py-5 text-right px-8">Unit Price</th>
-                                <th class="px-8 py-5 text-center">Operations</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-50 dark:divide-gray-800">
-                            <tr v-for="item in catalogItems" :key="item.id"
-                                class="group hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-all">
-                                <td class="px-8 py-6">
-                                    <div class="flex items-center gap-4">
-                                        <div
-                                            class="h-12 w-12 rounded-[1.25rem] bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 border border-blue-100 dark:border-blue-800/50">
-                                            <Boxes class="h-6 w-6" />
+                    <div
+                        class="bg-white dark:bg-gray-900 rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+                        <table v-if="activeTab === 'inventory'" class="w-full text-left">
+                            <thead
+                                class="bg-gray-50/50 text-[10px] font-black uppercase text-gray-400 tracking-[0.15em]">
+                                <tr>
+                                    <th class="px-8 py-5">Product Master</th>
+                                    <th class="px-8 py-5">Stock Analysis</th>
+                                    <th class="px-8 py-5 text-right px-8">Unit Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-50">
+                                <tr v-for="item in products.data" :key="item.id"
+                                    class="group hover:bg-gray-50/30 transition-all">
+                                    <td class="px-8 py-6">
+                                        <div class="flex items-center gap-4">
+                                            <div
+                                                class="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shadow-sm">
+                                                <Boxes class="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <p class="text-sm font-black text-gray-900 dark:text-white uppercase">{{
+                                                    item.name }}</p>
+                                                <p class="text-[9px] font-bold text-gray-400 font-mono italic">{{
+                                                    item.sku }}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p
-                                                class="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tighter">
-                                                {{ item.name }}</p>
-                                            <p
-                                                class="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic">
-                                                Industrial Grade</p>
+                                    </td>
+                                    <td class="px-8 py-6 w-64">
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <span class="text-[10px] font-black uppercase"
+                                                :class="item.stock < 50 ? 'text-rose-500' : 'text-gray-500'">{{
+                                                item.stock }} In Stock</span>
                                         </div>
-                                    </div>
-                                </td>
-                                <td class="px-8 py-6 text-[11px] font-black text-gray-500 font-mono tracking-tighter">{{
-                                    item.sku }}</td>
-                                <td class="px-8 py-6">
-                                    <span
-                                        class="px-3 py-1 rounded-lg bg-slate-100 dark:bg-gray-800 text-[9px] font-black text-gray-500 uppercase tracking-widest">
-                                        {{ item.category }}
-                                    </span>
-                                </td>
-                                <td class="px-8 py-6">
-                                    <div class="flex flex-col gap-1.5 w-32">
-                                        <span
-                                            class="text-[11px] font-black text-gray-900 dark:text-white uppercase tracking-tighter">{{
-                                            item.stock }} Units</span>
-                                        <div
-                                            class="h-1.5 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                            <div :class="item.stock < 500 ? 'bg-rose-500' : 'bg-blue-600'"
+                                        <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                                            <div :class="item.stock < 50 ? 'bg-rose-500' : 'bg-blue-600'"
                                                 class="h-full transition-all duration-1000"
-                                                :style="`width: ${Math.min((item.stock / 1500) * 100, 100)}%`"></div>
+                                                :style="`width: ${Math.min((item.stock / 500) * 100, 100)}%`"></div>
                                         </div>
-                                    </div>
-                                </td>
-                                <td class="px-8 py-6 text-right">
-                                    <p class="text-sm font-black text-blue-600 tracking-tighter">₱{{ item.price }}</p>
-                                    <p class="text-[9px] font-bold text-gray-400 uppercase">per {{ item.unit }}</p>
-                                </td>
-                                <td class="px-8 py-6">
-                                    <div class="flex items-center justify-center gap-2">
-                                        <button
-                                            class="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-blue-600 transition-all shadow-sm">
-                                            <Pencil class="h-4 w-4" />
-                                        </button>
-                                        <button
-                                            class="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all active:scale-95 shadow-md">
-                                            Edit Specs
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                                    </td>
+                                    <td class="px-8 py-6 text-right font-black text-indigo-600 italic">₱{{
+                                        parseFloat(item.price).toLocaleString() }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
 
-                    <table v-if="activeTab === 'bulk-pricing'" class="w-full text-left">
-                        <thead>
-                            <tr
-                                class="bg-gray-50/50 dark:bg-gray-800/30 text-[10px] font-black uppercase text-gray-400 tracking-[0.15em]">
-                                <th class="px-8 py-5">Item Name</th>
-                                <th class="px-8 py-5">Minimum Threshold</th>
-                                <th class="px-8 py-5">Bulk Tier Rate</th>
-                                <th class="px-8 py-5 text-right px-8">Status</th>
-                                <th class="px-8 py-5 text-center">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-50 dark:divide-gray-800">
-                            <tr v-for="item in catalogItems" :key="item.id + 'bulk'"
-                                class="group hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-all">
-                                <td
-                                    class="px-8 py-6 font-black text-sm text-gray-900 dark:text-white uppercase tracking-tighter">
-                                    {{ item.name }}</td>
-                                <td class="px-8 py-6">
-                                    <div class="flex items-center gap-2 text-[11px] font-black text-gray-500 uppercase">
-                                        <Layers class="h-3.5 w-3.5 text-blue-600" />
-                                        {{ item.bulk_min }} {{ item.unit }}s
-                                    </div>
-                                </td>
-                                <td class="px-8 py-6 font-black text-emerald-600 tracking-tighter text-sm">
-                                    ₱{{ (parseFloat(item.price.replace(',', '')) * 0.9).toLocaleString() }}
-                                    <span
-                                        class="ml-2 text-[9px] font-black bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg">10%
-                                        OFF</span>
-                                </td>
-                                <td class="px-8 py-6 text-right">
-                                    <span
-                                        class="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-1 rounded-lg">Active
-                                        Rule</span>
-                                </td>
-                                <td class="px-8 py-6 text-center">
-                                    <button
-                                        class="text-[10px] font-black uppercase text-blue-600 hover:underline flex items-center justify-center gap-1 mx-auto group">
-                                        Configure Rules
-                                        <ArrowUpRight
-                                            class="h-3 w-3 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                        <div v-if="activeTab === 'pipeline'" class="p-8 grid grid-cols-2 gap-6">
+                            <div class="p-6 bg-orange-50 rounded-[2rem] border border-orange-100">
+                                <div class="flex justify-between items-center mb-4">
+                                    <Clock class="h-6 w-6 text-orange-600" />
+                                    <span class="text-2xl font-black text-orange-600">{{ props.stats.pendingCredit
+                                        }}</span>
+                                </div>
+                                <h4 class="text-xs font-black uppercase text-orange-900">Awaiting Credit Review</h4>
+                                <p class="text-[9px] font-bold text-orange-700/60 uppercase italic">ECO Manager Queue
+                                </p>
+                            </div>
+                            <div class="p-6 bg-indigo-50 rounded-[2rem] border border-indigo-100">
+                                <div class="flex justify-between items-center mb-4">
+                                    <Layers class="h-6 w-6 text-indigo-600" />
+                                    <span class="text-2xl font-black text-indigo-600">{{ props.stats.pendingTiering
+                                        }}</span>
+                                </div>
+                                <h4 class="text-xs font-black uppercase text-indigo-900">Awaiting Bulk Tiering</h4>
+                                <p class="text-[9px] font-bold text-indigo-700/60 uppercase italic">HR Manager Queue</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <div
-                class="flex items-center justify-between p-8 rounded-[2.5rem] bg-blue-600 text-white shadow-xl shadow-blue-500/20 relative overflow-hidden">
-                <div class="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-white/10 to-transparent"></div>
-                <div class="relative z-10">
-                    <h4 class="text-sm font-black uppercase tracking-tight">Need to update mass pricing?</h4>
-                    <p class="text-[11px] font-bold opacity-80 uppercase tracking-wide">Use the bulk upload feature to
-                        update over 100+ SKUs at once.</p>
+                <div class="lg:col-span-4 space-y-6">
+                    <div class="flex items-center gap-2 px-2">
+                        <ShoppingBag class="h-4 w-4 text-blue-600" />
+                        <h3 class="text-xs font-black uppercase tracking-widest text-gray-500">Live Order Stream</h3>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div v-for="sale in onlineSales" :key="sale.id"
+                            class="p-5 bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-100 shadow-sm hover:border-blue-200 transition-all group">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <p
+                                        class="text-xs font-black text-gray-900 dark:text-white uppercase tracking-tighter">
+                                        {{ sale.client?.company_name }}</p>
+                                    <p class="text-[9px] font-bold text-gray-400 uppercase italic">#{{ sale.po_number }}
+                                    </p>
+                                </div>
+                                <span :class="getStatusStyles(sale.status)"
+                                    class="px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border border-current">
+                                    {{ sale.status.replace('_', ' ') }}
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-end border-t border-gray-50 pt-3">
+                                <span class="text-sm font-black text-blue-600">₱{{
+                                    parseFloat(sale.total_amount).toLocaleString() }}</span>
+                                <Link :href="route('eco.employee.ordermng')"
+                                    class="text-[9px] font-black text-gray-400 uppercase group-hover:text-blue-600 flex items-center gap-1">
+                                    Analyze
+                                    <ChevronRight class="h-3 w-3" />
+                                </Link>
+                            </div>
+                        </div>
+
+                        <div v-if="!onlineSales.length"
+                            class="text-center py-10 bg-gray-50/50 rounded-[2rem] border border-dashed border-gray-200">
+                            <Archive class="h-8 w-8 text-gray-200 mx-auto mb-2" />
+                            <p class="text-[10px] font-black text-gray-300 uppercase tracking-widest italic">No recent
+                                transactions</p>
+                        </div>
+                    </div>
                 </div>
-                <button
-                    class="relative z-10 px-6 py-3 bg-white text-blue-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all active:scale-95">
-                    Bulk Import Tool
-                </button>
             </div>
         </div>
     </AuthenticatedLayout>
@@ -277,14 +293,5 @@ const stats = computed(() => [
 <style scoped>
 .tracking-tighter {
     letter-spacing: -0.05em;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-    display: none;
-}
-
-.no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
 }
 </style>

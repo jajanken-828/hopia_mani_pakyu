@@ -368,8 +368,15 @@ Route::prefix('dashboard/eco')->name('eco.')->middleware(['auth', 'verified'])->
     Route::middleware(['role:ECO', 'position:manager'])->prefix('manager')->name('manager.')->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/book', [BookController::class, 'book'])->name('book');
+        Route::post('/book/store', [BookController::class, 'store'])->name('book.store');
+        Route::post('/book/apply-tier/{po}', [BookController::class, 'applyTier'])->name('book.apply-tier');
         Route::get('/credit', [CreditController::class, 'credit'])->name('credit');
+        Route::post('/credit', [CreditController::class, 'store'])->name('credit.store');
+        Route::post('/credit/verify/{po}', [CreditController::class, 'verifyOrder'])->name('credit.verify');
+        Route::patch('/credit/{account}/toggle', [CreditController::class, 'toggleStatus'])->name('credit.toggle-status');
+        Route::delete('/credit/{account}', [CreditController::class, 'destroy'])->name('credit.destroy');
         Route::get('/verification', [ClientVerificationController::class, 'index'])->name('verification.index');
+
         Route::patch('/clients/{client}/status', [ClientVerificationController::class, 'updateStatus'])->name('clients.status.update');
     });
 
@@ -408,6 +415,8 @@ Route::middleware('auth:client')->prefix('partner')->name('client.')->group(func
 
     // Ensure this matches the Controller and the View folder
     Route::get('/orders', [OrdersController::class, 'orders'])->name('orders');
+    Route::post('/purchase-order', [ClientDashboardController::class, 'placeOrder'])->name('purchase-order.store');
+    Route::post('/quotation/{po}/accept', [ClientDashboardController::class, 'acceptQuotation'])->name('quotation.accept');
     Route::get('/invoices', [InvoicesController::class, 'invoices'])->name('invoices');
     Route::get('/support', [SupportController::class, 'support'])->name('support');
 });

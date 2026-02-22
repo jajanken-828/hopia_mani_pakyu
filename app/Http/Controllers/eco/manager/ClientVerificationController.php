@@ -9,15 +9,30 @@ use Inertia\Inertia;
 
 class ClientVerificationController extends Controller
 {
+    /**
+     * Display the partner verification dashboard.
+     */
     public function index()
     {
-        // Path MUST match your screenshot: Dashboard/ECO/Manager/index
+        // Fetch pending applicants (case-insensitive)
+        $pending = Client::whereIn('status', ['pending', 'PENDING', 'Pending'])
+            ->latest()
+            ->get();
+
+        // Fetch everyone else (Active, Suspended, Rejected) to populate the directory
+        $verified = Client::whereNotIn('status', ['pending', 'PENDING', 'Pending'])
+            ->latest()
+            ->get();
+
         return Inertia::render('Dashboard/ECO/Manager/index', [
-            'pendingCompanies' => Client::where('status', 'pending')->latest()->get(),
-            'verifiedCompanies' => Client::whereIn('status', ['active', 'suspended'])->latest()->get(),
+            'pendingCompanies' => $pending,
+            'verifiedCompanies' => $verified,
         ]);
     }
 
+    /**
+     * Update a client's status (active / suspended / rejected).
+     */
     public function updateStatus(Request $request, Client $client)
     {
         $request->validate([

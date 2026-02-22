@@ -134,9 +134,10 @@ const navItems = computed(() => {
     if (userRole === 'ECO') {
         if (userPosition === 'manager') {
             items.push(
-                { label: 'Book MGMT', href: route('eco.manager.book'), icon: Book },
                 { label: 'Credit MGMT', href: route('eco.manager.credit'), icon: CreditCard },
-                { label: 'Verification', href: route('eco.manager.verification.index'), icon: ShieldCheck }
+                { label: 'Book MGMT', href: route('eco.manager.book'), icon: Book },
+
+                // { label: 'Verification', href: route('eco.manager.verification.index'), icon: ShieldCheck }
             )
         } else {
             items.push({ label: 'Online Store', href: route('eco.employee.products'), icon: Globe })
