@@ -5,6 +5,12 @@ use App\Http\Controllers\client\DashboardController as ClientDashboardController
 use App\Http\Controllers\client\InvoicesController;
 use App\Http\Controllers\client\OrdersController;
 use App\Http\Controllers\client\SupportController;
+use App\Http\Controllers\crm\manager\ApprovalController;
+use App\Http\Controllers\crm\manager\OversightController;
+use App\Http\Controllers\crm\manager\StrategyController;
+use App\Http\Controllers\crm\staff\CustomerprofileController;
+use App\Http\Controllers\crm\staff\LeadController;
+use App\Http\Controllers\crm\staff\StaffDayController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\eco\manager\BookController;
 use App\Http\Controllers\eco\manager\ClientVerificationController;
@@ -29,6 +35,10 @@ use App\Http\Controllers\scm\employee\VerificationController;
 use App\Http\Controllers\scm\manager\AuditController;
 use App\Http\Controllers\scm\manager\CloseController;
 use App\Http\Controllers\scm\manager\SourcingController;
+use App\Http\Controllers\trainee\TraineeAttendanceController;
+use App\Http\Controllers\trainee\TraineePayslipController;
+use App\Http\Controllers\trainee\TraineeTimeKeepingController;
+use App\Http\Controllers\users\AppController;
 use App\Http\Controllers\users\ClockController;
 use App\Http\Controllers\users\leaveController as UserLeaveController;
 use Illuminate\Support\Facades\Route;
@@ -59,6 +69,7 @@ Route::middleware(['auth'])->group(function () {
     // The main entry point that redirects based on user role/position
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
     // NEW: Specific route for the Employee Login UI (pointing to USERS/app.vue)
     // routes/web.php
@@ -73,9 +84,7 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth', 'position:staff,manager'])->prefix('dashboard/employee-ui')->group(function () {
 
     // Your main app.vue page
-    Route::get('/', function () {
-        return inertia('Dashboard/USERS/app');
-    })->name('employee.ui.dashboard');
+    Route::get('/', [AppController::class, 'index'])->name('employee.ui.dashboard');
 
     // New Page: Schedule
     // Updated to use the Controller for the GET request
@@ -105,6 +114,17 @@ Route::middleware(['auth', 'position:staff,manager'])->prefix('dashboard/employe
 Route::prefix('dashboard/trainee')->middleware(['auth', 'verified', 'position:trainee'])->group(function () {
     // Unified dashboard for all trainees regardless of role (HRM, SCM, etc.)
     Route::get('/', [DashboardController::class, 'index'])->name('trainee.dashboard');
+
+    // Time Keeping / Clock In/Out
+    Route::get('/timekeeping', [TraineeTimeKeepingController::class, 'index'])->name('trainee.timekeeping');
+    Route::post('/timekeeping/clock', [TraineeTimeKeepingController::class, 'clockInOut'])->name('trainee.timekeeping.clock');
+
+    // Attendance Records
+    Route::get('/attendance', [TraineeAttendanceController::class, 'index'])->name('trainee.attendance');
+
+    // Payslips
+    Route::get('/payslip', [TraineePayslipController::class, 'index'])->name('trainee.payslip');
+    Route::get('/payslip/{payroll}', [TraineePayslipController::class, 'show'])->name('trainee.payslip.show');
 });
 
 /*
@@ -350,15 +370,34 @@ Route::prefix('dashboard/war')->name('war.')->middleware(['auth', 'verified'])->
         ->name('employee.dashboard');
 });
 
-// CRM
+// Inside the CRM group
 Route::prefix('dashboard/crm')->name('crm.')->middleware(['auth', 'verified'])->group(function () {
     Route::get('/manager', [DashboardController::class, 'index'])
         ->middleware(['role:CRM', 'position:manager'])
         ->name('manager.dashboard');
 
+    Route::get('/approval', [ApprovalController::class, 'approval'])->name('approval');
+    Route::post('/approval/{id}/process', [ApprovalController::class, 'process'])->name('approval.process');
+    Route::get('/oversight', [OversightController::class, 'oversight'])->name('oversight');
+    Route::get('/strategy', [StrategyController::class, 'strategy'])->name('strategy');
+
     Route::get('/staff', [DashboardController::class, 'index'])
         ->middleware(['role:CRM', 'position:staff'])
         ->name('employee.dashboard');
+    Route::get('/my-day', [StaffDayController::class, 'index'])->name('staff.day');
+    Route::get('/lead', [LeadController::class, 'lead'])->name('lead');
+    Route::post('/lead/store', [LeadController::class, 'store'])->name('lead.store');
+    Route::patch('/lead/{id}/status', [LeadController::class, 'updateStatus'])->name('lead.status');
+
+    Route::post('/lead/convert', [LeadController::class, 'convertToClient'])->name('lead.convert');
+
+    // Customer profile – optional ID
+    Route::get('/customerprofile/{id?}', [CustomerprofileController::class, 'customerprofile'])
+        ->name('customerprofile');
+
+    // Store interaction (one definition only)
+    Route::post('/interaction/store', [CustomerprofileController::class, 'storeInteraction'])
+        ->name('interaction.store');
 });
 
 // E-Commerce (ECO)

@@ -33,7 +33,7 @@ const selectedRole = ref('HRM') // Default selection
 const pendingMove = ref(null)
 const selectedApplicant = ref(null)
 
-const roles = ['HRM', 'SCM', 'FIN', 'MAN', 'INV', 'ORD', 'WAR', 'CRM', 'ECO']
+const roles = ['HRM', 'SCM', 'FIN', 'CRM', 'ECO']
 
 const triggerToast = (msg) => {
     toastMessage.value = msg;

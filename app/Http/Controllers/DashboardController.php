@@ -3,9 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+// Added for CRM dashboard stats
 use App\Models\Product;
 use App\Models\PurchaseOrder;
-use App\Models\User;
+use App\Models\User; // Added for CRM integration
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -237,15 +238,43 @@ class DashboardController extends Controller
 
     private function handleCrmDashboard(string $position)
     {
-        $view = $position === 'manager' ? 'Dashboard/CRM/Manager/index' : 'Dashboard/CRM/Employee/index';
+        if ($position === 'manager') {
+            $totalLeads = \App\Models\CrmLead::count();
+            $wonLeads = \App\Models\CrmLead::where('status', 'Closed-Won')->count();
+            $conversionRate = $totalLeads > 0 ? round(($wonLeads / $totalLeads) * 100) : 0;
 
-        return Inertia::render($view, [
+            return Inertia::render('Dashboard/CRM/Manager/index', [
+                'user' => Auth::user(),
+                'stats' => [
+                    'totalPipelineValue' => (float) \App\Models\CrmLead::whereNotIn('status', ['Closed-Won', 'Lost'])
+                        ->sum('estimated_value'),
+                    'activeInquiries' => \App\Models\CrmLead::where('status', 'Inquiry')->count(),
+                    'pendingApprovals' => \App\Models\PurchaseOrder::whereIn('status', ['credit_review', 'tier_assignment'])
+                        ->count(),
+                    'conversionRate' => (int) $conversionRate,
+                ],
+                'dailyActivityCount' => \App\Models\CrmInteraction::whereDate('created_at', \Carbon\Carbon::today())->count(),
+                'leaderboard' => \App\Models\User::where('role', 'CRM')
+                    ->where('position', 'staff')
+                    ->withCount(['leads as won_deals' => function ($query) {
+                        $query->where('status', 'Closed-Won');
+                    }])
+                    ->orderBy('won_deals', 'desc')
+                    ->get()
+                    ->map(fn ($user) => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'won_deals' => $user->won_deals,
+                    ]),
+            ]);
+        }
+
+        return Inertia::render('Dashboard/CRM/Employee/index', [
             'user' => Auth::user(),
-            'customers' => [],
             'stats' => [
-                'totalCustomers' => 0,
-                'newThisMonth' => 0,
-                'satisfactionRate' => 0,
+                'myLeads' => Auth::user()->leads()->count(),
+                'myActivities' => \App\Models\CrmInteraction::where('user_id', Auth::id())->count(),
             ],
         ]);
     }

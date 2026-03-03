@@ -1,6 +1,7 @@
 <script setup>
 import { usePage, Link } from '@inertiajs/vue3'
-import { computed } from 'vue'
+import { route } from 'ziggy-js';
+import { computed, ref } from 'vue'
 import {
     LayoutDashboard,
     BarChart3,
@@ -39,6 +40,12 @@ const user = computed(() => page.props.auth.user)
 const client = computed(() => page.props.auth.client)
 const currentUrl = computed(() => page.url)
 
+// State for the Workforce dropdown
+const isWorkforceOpen = ref(false)
+const toggleWorkforce = () => {
+    isWorkforceOpen.value = !isWorkforceOpen.value
+}
+
 const isEmployeePortal = computed(() => currentUrl.value.startsWith('/dashboard/employee-ui'))
 const isClient = computed(() => !!client.value)
 
@@ -71,6 +78,16 @@ const navItems = computed(() => {
     const userRole = user.value?.role?.toUpperCase()
     const userPosition = user.value?.position?.toLowerCase()
 
+    // --- Trainee Navigation ---
+    if (userPosition === 'trainee') {
+        items.push(
+            { label: 'Time In/Out', href: route('trainee.timekeeping'), icon: Clock },
+            { label: 'Attendance', href: route('trainee.attendance'), icon: CalendarDays },
+            { label: 'Payslips', href: route('trainee.payslip'), icon: HandCoins }
+        );
+        return items;
+    }
+
     if (userRole === 'HRM') {
         if (userPosition === 'manager') {
             items.push(
@@ -83,8 +100,16 @@ const navItems = computed(() => {
                 { label: 'Recruitment', href: route('hrm.applicants.index'), icon: UserPlus },
                 { label: 'Interview', href: route('hrm.employee.interview'), icon: ClipboardList },
                 { label: 'Training', href: route('hrm.employee.training'), icon: BicepsFlexed },
-                { label: 'Attendance', href: route('hrm.employee.attendance'), icon: FileUser },
-                { label: 'Leave MGMT', href: route('hrm.employee.leave'), icon: DoorOpen },
+                // Updated Workforce Management as a Dropdown
+                {
+                    label: 'Workforce Management',
+                    icon: Users,
+                    isDropdown: true,
+                    children: [
+                        { label: 'Attendance', href: route('hrm.employee.attendance'), icon: FileUser },
+                        { label: 'Leave MGMT', href: route('hrm.employee.leave'), icon: DoorOpen },
+                    ]
+                },
                 { label: 'Payroll', href: route('hrm.employee.hrmstaffpayroll'), icon: HandCoins }
             )
         }
@@ -128,16 +153,23 @@ const navItems = computed(() => {
     }
 
     if (userRole === 'CRM') {
-        items.push({ label: 'CRM', href: userPosition === 'manager' ? route('crm.manager.dashboard') : route('crm.employee.dashboard'), icon: Users })
+        if (userPosition === 'manager') {
+            items.push(
+                { label: 'Quality Oversight', href: route('crm.oversight'), icon: Clock },
+                { label: 'Strategic Analytics', href: route('crm.strategy'), icon: ChartNoAxesCombined }
+            )
+        } else {
+            items.push(
+                { label: 'Lead & Deals', href: route('crm.lead'), icon: FileUser },
+                { label: 'Customer Profiles', href: route('crm.customerprofile'), icon: Users }
+            )
+        }
     }
-
     if (userRole === 'ECO') {
         if (userPosition === 'manager') {
             items.push(
                 { label: 'Credit MGMT', href: route('eco.manager.credit'), icon: CreditCard },
                 { label: 'Book MGMT', href: route('eco.manager.book'), icon: Book },
-
-                // { label: 'Verification', href: route('eco.manager.verification.index'), icon: ShieldCheck }
             )
         } else {
             items.push({ label: 'Online Store', href: route('eco.employee.products'), icon: Globe })
@@ -183,26 +215,51 @@ const isActive = (href) => {
                     <p class="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em]">Main Menu</p>
                 </div>
                 <nav class="space-y-1">
-                    <Link v-for="item in navItems" :key="item.label" :href="item.href" :class="[
-                        isActive(item.href)
-                            ? 'bg-white dark:bg-gray-900 text-blue-600 shadow-sm ring-1 ring-gray-200/50 dark:ring-gray-800'
-                            : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-900/50 hover:text-gray-900 dark:hover:text-white'
-                    ]"
-                        class="group relative flex items-center justify-between px-3 py-2.5 text-[13px] font-bold rounded-xl transition-all duration-300">
-                        <div v-if="isActive(item.href)"
-                            class="absolute left-0 top-1/4 bottom-1/4 w-0.5 bg-blue-600 rounded-r-full"></div>
+                    <template v-for="item in navItems" :key="item.label">
+                        <div v-if="item.isDropdown" class="space-y-1">
+                            <button @click="toggleWorkforce" :class="[
+                                isWorkforceOpen ? 'text-blue-600 bg-white/50 dark:bg-gray-900/50' : 'text-gray-500 dark:text-gray-400',
+                                'group w-full flex items-center justify-between px-3 py-2.5 text-[13px] font-bold rounded-xl hover:bg-white/50 dark:hover:bg-gray-900/50 transition-all duration-300'
+                            ]">
+                                <div class="flex items-center">
+                                    <div :class="[isWorkforceOpen ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-gray-400']"
+                                        class="p-1.5 rounded-lg mr-2.5 transition-colors duration-300">
+                                        <component :is="item.icon" class="h-4.5 w-4.5" />
+                                    </div>
+                                    <span class="truncate tracking-tight">{{ item.label }}</span>
+                                </div>
+                                <ChevronRight
+                                    :class="['h-3.5 w-3.5 transition-transform duration-300', isWorkforceOpen ? 'rotate-90' : 'text-gray-400']" />
+                            </button>
 
-                        <div class="flex items-center relative z-10">
-                            <div :class="[
-                                isActive(item.href) ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300'
-                            ]" class="p-1.5 rounded-lg transition-colors duration-300 mr-2.5">
-                                <component :is="item.icon" class="h-4.5 w-4.5 flex-shrink-0" />
+                            <div v-show="isWorkforceOpen" class="pl-10 space-y-1 mt-1 transition-all">
+                                <Link v-for="subItem in item.children" :key="subItem.label" :href="subItem.href" :class="[
+                                    isActive(subItem.href) ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                                ]" class="flex items-center py-2 text-[12px] font-bold transition-colors">
+                                    <component :is="subItem.icon" class="h-3.5 w-3.5 mr-2.5" />
+                                    {{ subItem.label }}
+                                </Link>
                             </div>
-                            <span class="truncate tracking-tight">{{ item.label }}</span>
                         </div>
 
-                        <ChevronRight v-if="isActive(item.href)" class="h-3.5 w-3.5 text-blue-600/40" />
-                    </Link>
+                        <Link v-else :href="item.href" :class="[
+                            isActive(item.href)
+                                ? 'bg-white dark:bg-gray-900 text-blue-600 shadow-sm ring-1 ring-gray-200/50 dark:ring-gray-800'
+                                : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-900/50 hover:text-gray-900 dark:hover:text-white'
+                        ]"
+                            class="group relative flex items-center justify-between px-3 py-2.5 text-[13px] font-bold rounded-xl transition-all duration-300">
+                            <div v-if="isActive(item.href)"
+                                class="absolute left-0 top-1/4 bottom-1/4 w-0.5 bg-blue-600 rounded-r-full"></div>
+                            <div class="flex items-center relative z-10">
+                                <div :class="[isActive(item.href) ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300']"
+                                    class="p-1.5 rounded-lg transition-colors duration-300 mr-2.5">
+                                    <component :is="item.icon" class="h-4.5 w-4.5 flex-shrink-0" />
+                                </div>
+                                <span class="truncate tracking-tight">{{ item.label }}</span>
+                            </div>
+                            <ChevronRight v-if="isActive(item.href)" class="h-3.5 w-3.5 text-blue-600/40" />
+                        </Link>
+                    </template>
                 </nav>
             </div>
 
@@ -219,7 +276,6 @@ const isActive = (href) => {
                                 class="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full">
                             </div>
                         </div>
-
                         <div class="flex-1 min-w-0">
                             <p
                                 class="text-[11px] font-black text-gray-900 dark:text-white truncate uppercase tracking-tighter">
@@ -229,11 +285,11 @@ const isActive = (href) => {
                                 <ShieldCheck class="h-2.5 w-2.5 text-blue-500" />
                                 <span class="text-[8px] font-black text-gray-400 uppercase truncate">
                                     {{ isEmployeePortal ? (user?.employee_id || 'Staff') : (isClient ? 'Partner' :
-                                        user?.position) }}
+                                    user?.position)
+                                    }}
                                 </span>
                             </div>
                         </div>
-
                         <Link :href="route('logout')" method="post" as="button"
                             class="p-2 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-300">
                             <LogOut class="h-3.5 w-3.5" />

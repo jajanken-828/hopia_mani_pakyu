@@ -6,5 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class PricingTier extends Model
 {
-    protected $fillable = ['name', 'discount_percentage', 'min_bulk_quantity', 'status'];
+    protected $fillable = [
+        'name',
+        'discount_percentage',
+        'min_quantity',
+        'status'];
 }

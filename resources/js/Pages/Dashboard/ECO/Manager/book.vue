@@ -2,7 +2,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
-// FIXED: Standardized all icons to lucide-vue-next
 import {
     Plus,
     Search,
@@ -15,7 +14,7 @@ import {
     ClipboardCheck,
     Zap,
     AlertCircle,
-    AlertTriangle // Replaced ExclamationTriangle for compatibility
+    AlertTriangle
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -39,7 +38,7 @@ const search = ref(props.filters.search);
 // --- Form Logic: Create New Tier ---
 const createForm = useForm({
     name: '',
-    min_bulk_quantity: '',
+    min_quantity: '', // FIXED: Matches PricingTier model and Controller validation
     discount_percentage: '',
 });
 
@@ -62,7 +61,7 @@ const confirmConfig = ref({
 const handleApplyTier = (order) => {
     confirmConfig.value = {
         title: 'Apply Pricing Tier',
-        message: `Analyze order for ${order.client?.company_name}? The system will automatically apply Gold (10%), Silver (5%), or Normal (0%) rates based on item count.`,
+        message: `Analyze order for ${order.client?.company_name}? The system will automatically apply the best qualified discount based on the ${order.items_sum_quantity} items in this order.`,
         action: () => router.post(route('eco.manager.book.apply-tier', order.id), {}, {
             onSuccess: () => showConfirmModal.value = false
         })
@@ -80,13 +79,12 @@ const updateSearch = () => {
 };
 
 const stats = computed(() => {
-    // Safety check for priceBooks data
     const tiersCount = props.priceBooks?.data?.length || 0;
     return [
         { label: 'Pending Tiering', value: props.pendingTiering.length, icon: Zap, color: 'text-orange-500', bg: 'bg-orange-50' },
         { label: 'Active Tiers', value: tiersCount, icon: Tag, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { label: 'System Reach', value: '42 Partners', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-        { label: 'Average Save', value: '7.4%', icon: Percent, color: 'text-amber-600', bg: 'bg-amber-50' },
+        { label: 'System Reach', value: 'Active', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { label: 'Average Save', value: 'Dynamic', icon: Percent, color: 'text-amber-600', bg: 'bg-amber-50' },
     ];
 });
 </script>
@@ -127,7 +125,7 @@ const stats = computed(() => {
                         <h3 class="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter italic">
                             {{ stat.value }}
                         </h3>
-                        <div :class="stat.bg" class="p-2.5 rounded-xl transition-colors">
+                        <div :class="stat.bg" class="p-2.5 rounded-xl">
                             <component :is="stat.icon" :class="stat.color" class="h-6 w-6" />
                         </div>
                     </div>
@@ -140,8 +138,9 @@ const stats = computed(() => {
                     <div>
                         <h2 class="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tighter italic">
                             Orders Awaiting Tiering</h2>
-                        <p class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Logic: Gold (1000+),
-                            Silver (100+), Normal (Default)</p>
+                        <p class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest italic">
+                            The system will apply tiers based on the highest qualified item threshold.
+                        </p>
                     </div>
                 </div>
 
@@ -160,7 +159,7 @@ const stats = computed(() => {
                                 </h4>
                                 <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                                     Sub: ₱{{ parseFloat(order.subtotal).toLocaleString() }} • Qty: {{
-                                        order.items_sum_quantity || order.items?.length }}
+                                    order.items_sum_quantity || 0 }} Items
                                 </p>
                             </div>
                         </div>
@@ -185,7 +184,7 @@ const stats = computed(() => {
                     </div>
                     <div class="relative flex-1 lg:w-80 group">
                         <Search
-                            class="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-indigo-600 transition-colors" />
+                            class="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-indigo-600" />
                         <input v-model="search" @input="updateSearch" type="text" placeholder="Search pricing logic..."
                             class="w-full pl-11 pr-4 py-3.5 rounded-2xl border-gray-100 dark:bg-gray-950 text-[10px] font-black uppercase tracking-widest">
                     </div>
@@ -219,20 +218,13 @@ const stats = computed(() => {
                                     -{{ book.discount_percentage }}%
                                 </td>
                                 <td class="px-8 py-6 text-[10px] font-black text-gray-500 uppercase">
-                                    {{ (book.min_bulk_quantity || 0).toLocaleString() }}+ Items
+                                    {{ (book.min_quantity || 0).toLocaleString() }}+ Items
                                 </td>
                                 <td class="px-8 py-6 text-right px-10">
                                     <button
-                                        class="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-indigo-600 transition-colors">
+                                        class="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-indigo-600">
                                         <Pencil class="h-4 w-4" />
                                     </button>
-                                </td>
-                            </tr>
-                            <tr v-if="!priceBooks.data?.length">
-                                <td colspan="4" class="px-8 py-20 text-center">
-                                    <AlertCircle class="h-8 w-8 text-gray-200 mx-auto mb-2" />
-                                    <p class="text-xs font-black text-gray-300 uppercase tracking-widest italic">No
-                                        pricing tiers defined</p>
                                 </td>
                             </tr>
                         </tbody>
@@ -259,8 +251,9 @@ const stats = computed(() => {
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="text-[10px] font-black uppercase text-gray-400 block mb-2">Min. Items</label>
-                            <input v-model="createForm.min_bulk_quantity" type="number"
+                            <label class="text-[10px] font-black uppercase text-gray-400 block mb-2">Min. Items
+                                Threshold</label>
+                            <input v-model="createForm.min_quantity" type="number"
                                 class="w-full rounded-xl border-gray-100 dark:bg-gray-950 text-xs font-bold" required>
                         </div>
                         <div>
@@ -270,7 +263,7 @@ const stats = computed(() => {
                         </div>
                     </div>
                     <button type="submit" :disabled="createForm.processing"
-                        class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg hover:brightness-110">
+                        class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg hover:brightness-110 transition-all">
                         Finalize Configuration
                     </button>
                 </form>
@@ -300,9 +293,3 @@ const stats = computed(() => {
         </div>
     </AuthenticatedLayout>
 </template>
-
-<style scoped>
-.tracking-tighter {
-    letter-spacing: -0.05em;
-}
-</style>

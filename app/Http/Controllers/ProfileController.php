@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -25,19 +26,42 @@ class ProfileController extends Controller
     }
 
     /**
-     * Update the user's profile information.
+     * Update the user's profile information, including photo.
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $user = $request->user();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        // 1. Fill the user model with validated data (name/email)
+        $user->fill($request->validated());
+
+        // 2. Handle Profile Photo Upload
+        if ($request->hasFile('photo')) {
+            // Delete the old photo from storage if it exists to save space
+            if ($user->profile_photo_path) {
+                Storage::disk('public')->delete($user->profile_photo_path);
+            }
+
+            // Store the new file in 'profile-photos' folder within 'public' disk
+            $path = $request->file('photo')->store('profile-photos', 'public');
+
+            // Save the path to the database column
+            $user->profile_photo_path = $path;
         }
 
-        $request->user()->save();
+        // 3. Reset email verification if email changed
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
+        }
 
-        return Redirect::route('profile.edit');
+        // 4. Save all changes to the database
+        $user->save();
+
+        /**
+         * Redirect back to the dashboard.
+         * This allows the app.vue modal's onSuccess callback to close the modal.
+         */
+        return Redirect::back()->with('status', 'profile-updated');
     }
 
     /**

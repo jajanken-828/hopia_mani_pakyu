@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'role',
         'position',
+        'profile_photo_path',
         'employee_id',
         'department',
         'join_date',
@@ -152,6 +153,16 @@ class User extends Authenticatable
     {
         // This helps the 'with' query in your controller find today's shift
         return $this->hasOne(EmployeeShift::class)->latestOfMany('effective_date');
+    }
+
+    public function leads()
+    {
+        return $this->hasMany(CrmLead::class, 'assigned_staff_id');
+    }
+
+    public function interactions()
+    {
+        return $this->hasMany(CrmInteraction::class);
     }
 
     /**

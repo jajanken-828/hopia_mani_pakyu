@@ -12,57 +12,60 @@ class BookController extends Controller
 {
     /**
      * Display the Pricing Architect dashboard.
-     * Fetches existing tiers and orders awaiting tier assignment.
      */
     public function book()
     {
         return Inertia::render('Dashboard/ECO/Manager/book', [
-            // Returns the list of tiers for the management table
             'priceBooks' => [
-                'data' => PricingTier::orderBy('min_bulk_quantity', 'desc')->get(),
+                // Sorted by quantity to show the highest thresholds first in the UI
+                'data' => PricingTier::orderBy('min_quantity', 'desc')->get(),
             ],
-            // Orders that passed ECO Manager credit review and need pricing
+            // Eager load client/items and pre-calculate item sum for the "Run Analysis" UI
             'pendingTiering' => PurchaseOrder::with(['client', 'items'])
                 ->where('status', 'tier_assignment')
+                ->withSum('items as items_sum_quantity', 'quantity')
                 ->latest()
                 ->get(),
         ]);
     }
 
     /**
-     * Store a new pricing tier threshold (e.g., 1000+ for Gold).
-     * Connects to the 'New Tier' modal in your Vue frontend.
+     * Store a new pricing tier threshold.
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'min_bulk_quantity' => 'required|integer|min:0',
+            'name' => 'required|string|max:50',
+            'min_quantity' => 'required|integer|min:1',
             'discount_percentage' => 'required|numeric|min:0|max:100',
         ]);
 
-        PricingTier::create($validated);
+        PricingTier::create([
+            'name' => $validated['name'],
+            'min_quantity' => $validated['min_quantity'],
+            'discount_percentage' => $validated['discount_percentage'],
+            'status' => 'active', // Matches your schema preference
+        ]);
 
-        return back()->with('success', "New tier '{$request->name}' successfully configured.");
+        return back()->with('success', "New tier '{$validated['name']}' successfully configured.");
     }
 
     /**
      * Workflow Step: Analyze order quantity and apply the matching tier.
-     * Fixed: Correctly calculates discount_amount using DB tier rules.
      */
     public function applyTier(Request $request, PurchaseOrder $po)
     {
         // 1. Calculate total items in the bulk order
-        $totalItems = $po->items->sum('quantity');
+        $totalItems = $po->items()->sum('quantity');
 
-        // 2. Find matching tier based on quantity rules from the database
-        // Finds the highest qualified tier (e.g., 1000+ for Gold, 100+ for Silver)
-        $tier = PricingTier::where('min_bulk_quantity', '<=', $totalItems)
-            ->where('status', 1) // Ensures the tier is active
-            ->orderBy('min_bulk_quantity', 'desc')
+        // 2. Find matching tier based on quantity rules.
+        // We check for 'active' status to match the store method above.
+        $tier = PricingTier::where('min_quantity', '<=', $totalItems)
+            ->where('status', 'active')
+            ->orderBy('min_quantity', 'desc')
             ->first();
 
-        // 3. Define the values based on the tier found (Default to Normal/0% if none)
+        // 3. Define the values based on the tier found (Default to Normal if none)
         $tierName = $tier ? $tier->name : 'Normal';
         $discountPercent = $tier ? (float) $tier->discount_percentage : 0;
 
@@ -76,10 +79,10 @@ class BookController extends Controller
             'tier_level' => $tierName,
             'discount_amount' => $discountAmount,
             'total_amount' => $finalTotal,
-            'status' => 'pending_client_approval', // Moves back to client dashboard for acceptance
+            'status' => 'pending_client_approval', // Moves to client portal for acceptance
             'notes' => "Automated Tiering: Applied {$tierName} (-{$discountPercent}%) based on {$totalItems} items.",
         ]);
 
-        return back()->with('success', "Tier {$tierName} (-{$discountPercent}%) applied. Quotation sent to client.");
+        return back()->with('success', "Analysis Complete: {$tierName} tier applied to {$po->po_number}.");
     }
 }

@@ -11,12 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('pricing_tiers', function (Blueprint $table) {
+        Schema::create('crm_interactions', function (Blueprint $table) {
             $table->id();
-            $table->string('name'); // Gold, Silver, Normal
-            $table->decimal('discount_percentage', 5, 2); // e.g., 15.00 for 15%
-            $table->integer('min_bulk_quantity'); // Minimum items to qualify
-            $table->boolean('status')->default(true);
+            $table->morphs('contactable'); // Links to either crm_leads or clients
+            $table->foreignId('user_id')->constrained('users'); // The staff member
+            $table->enum('type', ['Call', 'Email', 'Meeting', 'System']);
+            $table->text('note');
             $table->timestamps();
         });
     }
@@ -26,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('pricing_tiers');
+        Schema::dropIfExists('crm_interactions');
     }
 };
