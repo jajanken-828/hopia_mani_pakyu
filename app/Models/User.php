@@ -165,6 +165,16 @@ class User extends Authenticatable
         return $this->hasMany(CrmInteraction::class);
     }
 
+    public function performedLogs()
+    {
+        return $this->hasMany(AuditLog::class, 'admin_id');
+    }
+
+    public function receivedLogs()
+    {
+        return $this->hasMany(AuditLog::class, 'target_id');
+    }
+
     /**
      * Get appropriate dashboard path based on department and position
      */

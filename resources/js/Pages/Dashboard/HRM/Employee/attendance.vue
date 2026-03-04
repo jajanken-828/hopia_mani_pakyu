@@ -17,9 +17,7 @@ import {
     ArrowRight,
     Wand2,
     CalendarCheck,
-    UserCheck,
     ListChecks,
-    Search,
     AlertCircle,
     UserX
 } from 'lucide-vue-next'
@@ -112,6 +110,23 @@ const getShiftRange = (type) => {
         default: return '08:00 AM - 05:00 PM';
     }
 }
+
+// --- COMPUTED: shifts grouped by date for calendar display ---
+const shiftsByDate = computed(() => {
+    const map = {}
+    props.monthly_shifts.forEach(shift => {
+        if (!map[shift.effective_date]) {
+            map[shift.effective_date] = new Set()
+        }
+        map[shift.effective_date].add(shift.shift_type)
+    })
+    // Convert Set to array for each date
+    const result = {}
+    Object.keys(map).forEach(date => {
+        result[date] = Array.from(map[date])
+    })
+    return result
+})
 
 // --- SHIFT MANAGEMENT ---
 const form = useForm({
@@ -223,6 +238,16 @@ const getEmployeesInMonthlyShift = (type) => {
     return uniqueIds.map(id => props.employee_attendance.find(emp => emp.id === id))
         .filter(emp => emp && (emp.dept || emp.role || '').toString().toUpperCase() === autoScheduleDept.value.toUpperCase())
 }
+
+// Shift icon mapping
+const shiftIcon = (type) => {
+    switch (type) {
+        case 'Morning': return Sunrise
+        case 'Afternoon': return Sunset
+        case 'Graveyard': return Moon
+        default: return Clock
+    }
+}
 </script>
 
 <template>
@@ -288,6 +313,11 @@ const getEmployeesInMonthlyShift = (type) => {
                 </div>
             </div>
         </div>
+        <div class="pb-3 p-2 bg-blue-200 rounded-xl mb-5 text-blue-900 text-center text-sm font-bold">
+            <h2 class="">MONTITEXTILE SHIFT SCHEDULE - GRAVEYARD:12AM TO 9AM | MORNING: 8AM TO 5PM |
+                AFTERNOON: 4PM
+                TO 1AM</h2>
+        </div>
 
         <Transition mode="out-in" enter-active-class="transition duration-300 ease-out"
             enter-from-class="opacity-0 translate-y-4" enter-to-class="opacity-100 translate-y-0"
@@ -307,7 +337,22 @@ const getEmployeesInMonthlyShift = (type) => {
                             <span v-if="item.day"
                                 class="text-lg font-black text-slate-300 dark:text-slate-600 group-hover:text-blue-600 transition-colors">{{
                                     item.day }}</span>
-                            <div v-if="item.date" class="mt-4 flex flex-wrap gap-1">
+
+                            <!-- Dynamic shift icons based on actual assignments -->
+                            <div v-if="item.date && shiftsByDate[item.date]" class="mt-4 flex flex-wrap gap-2">
+                                <div v-for="shift in shiftsByDate[item.date]" :key="shift"
+                                    class="flex items-center gap-1 px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-wider"
+                                    :class="{
+                                        'bg-amber-100 text-amber-700': shift === 'Morning',
+                                        'bg-blue-100 text-blue-700': shift === 'Afternoon',
+                                        'bg-indigo-100 text-indigo-700': shift === 'Graveyard'
+                                    }" :title="getShiftRange(shift)">
+                                    <component :is="shiftIcon(shift)" class="h-3 w-3" />
+                                    <span class="hidden sm:inline">{{ shift }}</span>
+                                </div>
+                            </div>
+                            <!-- Fallback dots if no shifts assigned (optional) -->
+                            <div v-else-if="item.date" class="mt-4 flex flex-wrap gap-1 opacity-20">
                                 <div class="h-1.5 w-1.5 rounded-full bg-amber-400"></div>
                                 <div class="h-1.5 w-1.5 rounded-full bg-blue-400"></div>
                                 <div class="h-1.5 w-1.5 rounded-full bg-indigo-400"></div>
@@ -441,6 +486,7 @@ const getEmployeesInMonthlyShift = (type) => {
             </div>
         </Transition>
 
+        <!-- Monthly Pipeline Modal (unchanged, already shows shift times) -->
         <Transition enter-active-class="duration-300 ease-out" enter-from-class="opacity-0 scale-95"
             enter-to-class="opacity-100 scale-100" leave-active-class="duration-200 ease-in"
             leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
@@ -488,7 +534,13 @@ const getEmployeesInMonthlyShift = (type) => {
                                             :is="shiftType === 'Morning' ? Sunrise : (shiftType === 'Afternoon' ? Sunset : Moon)"
                                             class="h-4 w-4" />
                                     </div>
-                                    <span class="font-black text-xs uppercase tracking-widest">{{ shiftType }}</span>
+                                    <div class="flex flex-col">
+                                        <span class="font-black text-xs uppercase tracking-widest">{{ shiftType
+                                        }}</span>
+                                        <span
+                                            class="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">{{
+                                                getShiftRange(shiftType) }}</span>
+                                    </div>
                                 </div>
                                 <button
                                     @click="activeMonthlySelectorShift = activeMonthlySelectorShift === shiftType ? null : shiftType"
@@ -524,9 +576,14 @@ const getEmployeesInMonthlyShift = (type) => {
                                 <div v-if="activeMonthlySelectorShift === shiftType"
                                     class="absolute top-20 left-0 right-0 z-[70] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-2xl p-4 max-h-[300px] overflow-y-auto custom-scroll">
                                     <div class="flex items-center justify-between mb-4 px-2">
-                                        <span
-                                            class="text-[9px] font-black uppercase tracking-widest text-blue-600">Assign
-                                            Monthly {{ shiftType }}</span>
+                                        <div class="flex flex-col">
+                                            <span
+                                                class="text-[9px] font-black uppercase tracking-widest text-blue-600">Assign
+                                                Monthly {{ shiftType }}</span>
+                                            <span
+                                                class="text-[8px] font-bold text-slate-400 uppercase tracking-tight">{{
+                                                    getShiftRange(shiftType) }}</span>
+                                        </div>
                                         <button @click="activeMonthlySelectorShift = null">
                                             <X class="h-4 w-4 text-slate-400" />
                                         </button>
@@ -538,9 +595,14 @@ const getEmployeesInMonthlyShift = (type) => {
                                             <div
                                                 class="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-700 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center text-[9px] font-black">
                                                 {{ emp.name.charAt(0) }}</div>
-                                            <span
-                                                class="text-xs font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 uppercase">{{
-                                                    emp.name }}</span>
+                                            <div class="flex flex-col items-start">
+                                                <span
+                                                    class="text-xs font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 uppercase">{{
+                                                        emp.name }}</span>
+                                                <span
+                                                    class="text-[8px] font-bold text-slate-400 uppercase group-hover:text-blue-400">{{
+                                                        getShiftRange(shiftType) }}</span>
+                                            </div>
                                         </button>
                                     </div>
                                 </div>
@@ -563,6 +625,7 @@ const getEmployeesInMonthlyShift = (type) => {
             </div>
         </Transition>
 
+        <!-- Daily Shift Modal (unchanged, already shows shift times) -->
         <Transition enter-active-class="duration-300 ease-out" enter-from-class="opacity-0 scale-95"
             enter-to-class="opacity-100 scale-100" leave-active-class="duration-200 ease-in"
             leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
@@ -610,7 +673,13 @@ const getEmployeesInMonthlyShift = (type) => {
                                             :is="shiftType === 'Morning' ? Sunrise : (shiftType === 'Afternoon' ? Sunset : Moon)"
                                             class="h-4 w-4" />
                                     </div>
-                                    <span class="font-black text-xs uppercase tracking-widest">{{ shiftType }}</span>
+                                    <div class="flex flex-col">
+                                        <span class="font-black text-xs uppercase tracking-widest">{{ shiftType
+                                        }}</span>
+                                        <span
+                                            class="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">{{
+                                                getShiftRange(shiftType) }}</span>
+                                    </div>
                                 </div>
                                 <button
                                     @click="activeSelectorShift = activeSelectorShift === shiftType ? null : shiftType"
@@ -644,9 +713,14 @@ const getEmployeesInMonthlyShift = (type) => {
                                 <div v-if="activeSelectorShift === shiftType"
                                     class="absolute top-20 left-0 right-0 z-[70] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-2xl p-4 max-h-[300px] overflow-y-auto custom-scroll">
                                     <div class="flex items-center justify-between mb-4 px-2">
-                                        <span
-                                            class="text-[9px] font-black uppercase tracking-widest text-blue-600">Assign
-                                            to {{ shiftType }}</span>
+                                        <div class="flex flex-col">
+                                            <span
+                                                class="text-[9px] font-black uppercase tracking-widest text-blue-600">Assign
+                                                to {{ shiftType }}</span>
+                                            <span
+                                                class="text-[8px] font-bold text-slate-400 uppercase tracking-tight">{{
+                                                    getShiftRange(shiftType) }}</span>
+                                        </div>
                                         <button @click="activeSelectorShift = null">
                                             <X class="h-4 w-4 text-slate-400" />
                                         </button>
@@ -658,9 +732,14 @@ const getEmployeesInMonthlyShift = (type) => {
                                             <div
                                                 class="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-700 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center text-[9px] font-black transition-colors">
                                                 {{ emp.name.charAt(0) }}</div>
-                                            <span
-                                                class="text-xs font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 uppercase">{{
-                                                    emp.name }}</span>
+                                            <div class="flex flex-col items-start">
+                                                <span
+                                                    class="text-xs font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 uppercase">{{
+                                                        emp.name }}</span>
+                                                <span
+                                                    class="text-[8px] font-bold text-slate-400 uppercase group-hover:text-blue-400">{{
+                                                        getShiftRange(shiftType) }}</span>
+                                            </div>
                                         </button>
                                     </div>
                                 </div>

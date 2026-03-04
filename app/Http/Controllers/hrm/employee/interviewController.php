@@ -40,7 +40,7 @@ class InterviewController extends Controller
                     'notes' => $i->notes,
                 ]),
 
-            // Upcoming Schedule: Added email and phone for the "View" functionality
+            // Upcoming Schedule
             'upcoming_applicants' => Interview::with('applicant')
                 ->whereDate('scheduled_at', '>', $today)
                 ->whereHas('applicant', function ($query) {
@@ -54,29 +54,25 @@ class InterviewController extends Controller
                     'email' => $i->applicant->email,
                     'phone' => $i->applicant->phone_number,
                     'date' => $i->scheduled_at->format('M d, Y'),
-                    'raw_date' => $i->scheduled_at->format('Y-m-d'), // For date input
-                    'raw_time' => $i->scheduled_at->format('H:i'),   // For time input
+                    'raw_date' => $i->scheduled_at->format('Y-m-d'),
+                    'raw_time' => $i->scheduled_at->format('H:i'),
                     'position' => $i->applicant->position_applied,
                     'type' => $i->interview_type,
                     'status' => $i->applicant->status,
                 ]),
 
+            // ✅ Fixed: Only applicants who passed the initial interview appear here
             'past_interviews' => Applicant::with('interview')
-                ->whereHas('interview', function ($query) {
-                    $query->whereHas('applicant', function ($q) {
-                        $q->whereIn('status', ['Passed', 'Rejected']);
-                    });
-                })
+                ->where('status', 'Passed')  // 🔥 Only passed applicants
                 ->orderBy('updated_at', 'desc')
                 ->take(10)
                 ->get()
-                ->map(fn ($i) => [
-                    'id' => $i->id,
-                    'name' => $i->first_name.' '.$i->last_name,
-                    'position' => $i->position_applied,
-                    'status' => $i->status,
-                    // 'email' => $i->email,
-                    'evaluated_date' => $i->updated_at->format('M d, Y'),
+                ->map(fn ($a) => [
+                    'id' => $a->id,
+                    'name' => $a->first_name.' '.$a->last_name,
+                    'position' => $a->position_applied,
+                    'status' => $a->status,
+                    'evaluated_date' => $a->updated_at->format('M d, Y'),
                 ]),
         ]);
     }
@@ -115,8 +111,6 @@ class InterviewController extends Controller
 
     public function submitStatus(Request $request)
     {
-        // dd($request->all());
-
         $request->validate([
             'id' => 'required|exists:applicants,id',
             'status' => 'required|string',
@@ -124,9 +118,6 @@ class InterviewController extends Controller
 
         Applicant::where('id', $request->id)
             ->update(['status' => $request->status]);
-
-        // Interview::where('applicant_id', $request->id)
-        //     ->update(['status' => $request->status]);
 
         return back()->with('success', 'Status updated successfully!');
     }

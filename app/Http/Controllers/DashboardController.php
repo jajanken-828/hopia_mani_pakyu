@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Client;
+use App\Models\AuditLog;
 // Added for CRM dashboard stats
-use App\Models\Product;
-use App\Models\PurchaseOrder;
-use App\Models\User; // Added for CRM integration
+use App\Models\Client;
+use App\Models\Product; // Added for CRM integration
+use App\Models\PurchaseOrder; // Added for HRM audit logs
+use App\Models\User; // Added for ECO dashboard stats
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -78,19 +79,102 @@ class DashboardController extends Controller
             ]);
         }
 
-        // HRM Staff / Employee View: Displays all users from the table
+        $employees = User::all()->map(function ($user) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'position' => $user->position,
+                'is_active' => $user->is_active,
+                'department' => $user->department,
+                'employee_id' => $user->employee_id,
+                'profile_photo_path' => $user->profile_photo_path,
+                // Full URL for the profile photo
+                'profile_photo_url' => $user->profile_photo_path
+                    ? asset('storage/'.$user->profile_photo_path)
+                    : null,
+            ];
+        });
+
+        $auditLogs = AuditLog::orderBy('created_at', 'desc')->take(50)->get()->map(function ($log) {
+            return [
+                'id' => $log->id,
+                'target_name' => $log->target_name,
+                'action' => $log->action,
+                'reason' => $log->reason,
+                'created_at' => $log->created_at->format('M d, Y h:i A'),
+            ];
+        });
+
         return Inertia::render('Dashboard/HRM/Employee/Index', [
-            'employees' => User::all(), // Fetches all data from users table
+            'employees' => $employees, // Use the mapped variable here
+            'auditLogs' => $auditLogs,
             'stats' => [
                 'total' => User::count(),
                 'present' => User::where('is_active', true)->count(),
-                'on_leave' => 0, // Placeholder: Integrate with your leave table logic later
+                'on_leave' => 0,
                 'assignedTasks' => 4,
                 'leaveBalance' => 15,
                 'trainingModules' => 2,
             ],
             'user' => Auth::user(),
         ]);
+    }
+
+    public function destroy(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
+
+        if (Auth::id() == $user->id) {
+            return redirect()->back()->with('message', 'You cannot modify your own account status.');
+        }
+
+        $newStatus = $user->is_active ? 0 : 1;
+        $action = $newStatus ? 'reactivate' : 'deactivate';
+
+        $user->update(['is_active' => $newStatus]);
+
+        // Save the action to your new AuditLog table
+        \App\Models\AuditLog::create([
+            'admin_id' => Auth::id(),
+            'target_id' => $user->id,
+            'target_name' => $user->name,
+            'action' => $action,
+            'reason' => $request->reason ?? ($newStatus ? 'Account Reactivation' : 'No reason provided'),
+        ]);
+
+        $statusText = $newStatus ? 'reactivated' : 'deactivated';
+
+        return redirect()->back()->with('message', "Employee {$user->name} has been successfully {$statusText}.");
+    }
+
+    /**
+     * Update the specified employee's details.
+     */
+    public function updateEmployee(Request $request, $id)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,'.$id,
+            'role' => 'required|in:HRM,SCM,FIN,MAN,INV,ORD,WAR,CRM,ECO',
+            'position' => 'required|in:manager,staff,trainee',
+            'department' => 'nullable|string|max:255',
+            'is_active' => 'required|boolean',
+        ]);
+
+        $employee = User::findOrFail($id);
+
+        $employee->update([
+            'name' => $request->name,
+            'email' => $request->email,
+            'role' => $request->role,
+            'position' => $request->position,
+            'department' => $request->department,
+            'is_active' => $request->is_active,
+        ]);
+
+        return redirect()->back()->with('message', "Information for {$employee->name} updated successfully.");
     }
 
     /**
@@ -281,11 +365,20 @@ class DashboardController extends Controller
 
     private function handleEcoDashboard(string $position)
     {
-        // Use the same base view for both Manager and Employee if you want a shared UI,
-        // but here we maintain your directory structure
         $view = $position === 'manager' ? 'Dashboard/ECO/Manager/index' : 'Dashboard/ECO/Employee/index';
 
-        // 1. Calculate Revenue Metrics
+        // 1. Fetch Real Product Data (Crucial for the Ledger)
+        // We use paginate(10) so that 'products.data' is available in Vue
+        $products = Product::orderBy('name', 'asc')->paginate(10);
+
+        $pendingCompanies = Client::whereIn('status', ['pending', 'Pending'])->latest()->get();
+        $verifiedCompanies = Client::whereNotIn('status', ['pending', 'Pending'])->latest()->get();
+
+        // 2. Calculate Real-time Pipeline counts
+        $pendingCreditCount = PurchaseOrder::where('status', 'credit_review')->count();
+        $pendingTieringCount = PurchaseOrder::where('status', 'tier_assignment')->count();
+
+        // 3. Revenue Metrics
         $todaySales = PurchaseOrder::where('status', 'approved')
             ->whereDate('created_at', Carbon::today())
             ->sum('total_amount');
@@ -294,22 +387,25 @@ class DashboardController extends Controller
             ->whereMonth('created_at', Carbon::now()->month)
             ->sum('total_amount');
 
-        // 2. Fetch Partner Verification Data (Redundant logic from ClientVerificationController)
-        $pendingCompanies = Client::whereIn('status', ['pending', 'Pending'])->latest()->get();
-        $verifiedCompanies = Client::whereNotIn('status', ['pending', 'Pending'])->latest()->get();
+        $pipelineDetails = PurchaseOrder::with('client')
+            ->whereIn('status', ['credit_review', 'tier_assignment'])
+            ->latest()
+            ->get();
 
         return Inertia::render($view, [
             'user' => Auth::user(),
-            'pendingCompanies' => $pendingCompanies, // Connects verification logic
+            'products' => $products, // This populates the Inventory Ledger
+            'pendingCompanies' => $pendingCompanies,
             'verifiedCompanies' => $verifiedCompanies,
             'onlineSales' => PurchaseOrder::with('client')->latest()->take(5)->get(),
+            'pipelineDetails' => $pipelineDetails,
             'stats' => [
                 'todaySales' => number_format($todaySales, 2),
                 'monthlyRevenue' => number_format($monthlyRevenue, 2),
                 'activeProducts' => Product::where('status', 'published')->count(),
-                'pendingApprovals' => $pendingCompanies->count(), // Real-time badge count
-                'pendingCredit' => PurchaseOrder::where('status', 'credit_review')->count(),
-                'pendingTiering' => PurchaseOrder::where('status', 'tier_assignment')->count(),
+                'lowStockCount' => Product::where('stock', '<', 50)->count(),
+                'pendingCredit' => $pendingCreditCount, // For Department Pipeline
+                'pendingTiering' => $pendingTieringCount, // For Department Pipeline
             ],
         ]);
     }

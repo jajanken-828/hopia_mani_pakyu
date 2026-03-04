@@ -85,4 +85,17 @@ class BookController extends Controller
 
         return back()->with('success', "Analysis Complete: {$tierName} tier applied to {$po->po_number}.");
     }
+
+    public function update(Request $request, \App\Models\PricingTier $tier)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:50',
+            'min_quantity' => 'required|integer|min:1',
+            'discount_percentage' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $tier->update($validated);
+
+        return back()->with('success', "Tier '{$tier->name}' successfully updated.");
+    }
 }

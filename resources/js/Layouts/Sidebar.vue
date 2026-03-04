@@ -32,7 +32,8 @@ import {
     Settings,
     Receipt,
     HelpCircle,
-    ShieldCheck
+    ShieldCheck,
+    Building2 // Added for department icon
 } from 'lucide-vue-next'
 
 const page = usePage()
@@ -100,7 +101,6 @@ const navItems = computed(() => {
                 { label: 'Recruitment', href: route('hrm.applicants.index'), icon: UserPlus },
                 { label: 'Interview', href: route('hrm.employee.interview'), icon: ClipboardList },
                 { label: 'Training', href: route('hrm.employee.training'), icon: BicepsFlexed },
-                // Updated Workforce Management as a Dropdown
                 {
                     label: 'Workforce Management',
                     icon: Users,
@@ -174,7 +174,6 @@ const navItems = computed(() => {
         } else {
             items.push({ label: 'Online Store', href: route('eco.employee.products'), icon: Globe })
             items.push({ label: 'Order Management', href: route('eco.employee.ordermng'), icon: ShoppingBasket })
-            items.push({ label: 'Customer Insights', href: route('eco.employee.customer'), icon: Users })
         }
     }
 
@@ -281,11 +280,17 @@ const isActive = (href) => {
                                 class="text-[11px] font-black text-gray-900 dark:text-white truncate uppercase tracking-tighter">
                                 {{ isClient ? client?.company_name : user?.name }}
                             </p>
+                            <div class="flex items-center gap-1 mb-0.5">
+                                <Building2 class="h-2.5 w-2.5 text-gray-400" />
+                                <span class="text-[8px] font-black text-blue-600 uppercase truncate">
+                                    {{ isClient ? client?.business_type : user?.role }} Department
+                                </span>
+                            </div>
                             <div class="flex items-center gap-1">
                                 <ShieldCheck class="h-2.5 w-2.5 text-blue-500" />
                                 <span class="text-[8px] font-black text-gray-400 uppercase truncate">
                                     {{ isEmployeePortal ? (user?.employee_id || 'Staff') : (isClient ? 'Partner' :
-                                    user?.position)
+                                        user?.position)
                                     }}
                                 </span>
                             </div>

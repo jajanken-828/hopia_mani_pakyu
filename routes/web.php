@@ -139,6 +139,9 @@ Route::prefix('dashboard/hrm')->name('hrm.')->middleware(['auth', 'verified'])->
         ->middleware(['role:HRM', 'position:staff'])
         ->name('employee.dashboard');
 
+    Route::post('/employee/{id}/update', [DashboardController::class, 'updateEmployee'])->name('employees.update');
+    Route::delete('/employee/{id}', [DashboardController::class, 'destroy'])->name('employees.destroy');
+
     Route::get('/training', [TrainingController::class, 'training'])
         ->middleware(['role:HRM', 'position:staff'])
         ->name('employee.training');
@@ -408,6 +411,7 @@ Route::prefix('dashboard/eco')->name('eco.')->middleware(['auth', 'verified'])->
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('/book', [BookController::class, 'book'])->name('book');
         Route::post('/book/store', [BookController::class, 'store'])->name('book.store');
+        Route::patch('/book/{tier}/update', [BookController::class, 'update'])->name('book.update');
         Route::post('/book/apply-tier/{po}', [BookController::class, 'applyTier'])->name('book.apply-tier');
         Route::get('/credit', [CreditController::class, 'credit'])->name('credit');
         Route::post('/credit', [CreditController::class, 'store'])->name('credit.store');
@@ -421,11 +425,15 @@ Route::prefix('dashboard/eco')->name('eco.')->middleware(['auth', 'verified'])->
 
     // Staff / Employee Routes
     Route::middleware(['role:ECO', 'position:staff'])->group(function () {
-        Route::get('/staff', [ClientDashboardController::class, 'index'])->name('employee.dashboard');
+        Route::get('/staff', [DashboardController::class, 'index'])->name('employee.dashboard');
 
         // This resolves the "Target class does not exist" error
         Route::get('/products', [ProductsController::class, 'products'])->name('employee.products');
         Route::post('/products', [ProductsController::class, 'store'])->name('employee.products.store');
+
+        Route::post('/products/{product}/update', [ProductsController::class, 'update'])->name('employee.products.update');
+        Route::patch('/products/{product}/toggle', [ProductsController::class, 'toggleStatus'])->name('employee.products.toggle');
+
         Route::get('/ordermng', [OrdermngController::class, 'ordermng'])->name('employee.ordermng');
         Route::get('/customer', [CustomerController::class, 'customer'])->name('employee.customer');
     });

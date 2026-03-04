@@ -10,7 +10,6 @@ import {
 } from 'lucide-vue-next'
 
 const props = defineProps({
-    // Data coming from InterviewController.php
     todays_interviews: Array,
     upcoming_applicants: Array,
     past_interviews: Array
@@ -21,17 +20,8 @@ const showScoreModal = ref(false)
 const showConfirmModal = ref(false)
 const showDetailsModal = ref(false)
 const showRescheduleModal = ref(false)
-const showStatusConfirmModal = ref(false) // New state for status confirmation
+const showStatusConfirmModal = ref(false)
 const selectedInterview = ref(null)
-
-// function submitStatus(item) {
-//     item.status = 'onboard';
-
-//     router.post('/InterviewController/update-status', {
-//         id: item.id,
-//         status: item.status
-//     });
-// }
 
 // Opens the confirmation modal for status update
 const confirmStatusUpdate = (item) => {
@@ -44,7 +34,7 @@ function submitStatus() {
     const item = selectedInterview.value;
     router.post('InterviewController/update-status', {
         id: item.id,
-        status: 'final' // Hardcoding here instead of mutating the item immediately
+        status: 'final'
     }, {
         onSuccess: () => {
             console.log('Update successful!');
@@ -57,19 +47,15 @@ function submitStatus() {
     });
 }
 
-
 const form = useForm({
     notes: '',
     status: 'Pending',
-    // Fields for Reschedule
     new_date: '',
     new_time: '',
 })
 
-// Filter upcoming: In your SQL logic, these are already filtered by date > today
 const filteredUpcomingApplicants = computed(() => props.upcoming_applicants)
 
-// Open evaluation workflow
 const openConfirmModal = (interview) => {
     selectedInterview.value = interview
     showConfirmModal.value = true
@@ -82,7 +68,6 @@ const openDetailsModal = (interview) => {
 
 const openRescheduleModal = (interview) => {
     selectedInterview.value = interview
-    // Pre-populate if the backend provides raw date/time strings
     form.new_date = interview.raw_date || ''
     form.new_time = interview.raw_time || ''
     showRescheduleModal.value = true
@@ -90,7 +75,6 @@ const openRescheduleModal = (interview) => {
 
 const startInterview = () => {
     showConfirmModal.value = false
-    // Pre-fill form if needed
     form.notes = selectedInterview.value.notes || ''
     showScoreModal.value = true
 }
@@ -106,7 +90,6 @@ const submitEvaluation = () => {
 }
 
 const submitReschedule = () => {
-    // Submitting to the new reschedule route defined in web.php
     form.post(route('hrm.employee.interview.reschedule', selectedInterview.value.id), {
         onSuccess: () => {
             showRescheduleModal.value = false
@@ -119,6 +102,7 @@ const submitReschedule = () => {
 // Utility for UI consistency
 const getStatusBadgeClass = (status) => {
     switch (status) {
+        case 'Passed': return 'bg-emerald-50 text-emerald-600 border-emerald-100'   // ✅ added
         case 'Hired': return 'bg-emerald-50 text-emerald-600 border-emerald-100'
         case 'Rejected': return 'bg-rose-50 text-rose-600 border-rose-100'
         case 'Interview': return 'bg-blue-50 text-blue-600 border-blue-100'
@@ -188,7 +172,7 @@ const getInterviewTypeIcon = (type) => {
                                     </div>
                                     <div>
                                         <h4 class="text-sm font-bold text-slate-900 dark:text-white">{{ interview.name
-                                            }}</h4>
+                                        }}</h4>
                                         <p class="text-[10px] text-slate-400 font-medium">{{ interview.position }}</p>
                                     </div>
                                 </div>
@@ -276,7 +260,7 @@ const getInterviewTypeIcon = (type) => {
                                     </td>
                                     <td class="px-8 py-5">
                                         <span class="text-[10px] font-black text-slate-400 uppercase">{{ applicant.type
-                                            }}</span>
+                                        }}</span>
                                     </td>
                                     <td class="px-8 py-5 text-right">
                                         <div class="flex justify-end gap-2">
@@ -338,7 +322,7 @@ const getInterviewTypeIcon = (type) => {
                                     class="group hover:bg-slate-50/50 transition-all">
                                     <td class="px-8 py-5">
                                         <span class="text-sm font-bold text-slate-900 dark:text-white">{{ evalItem.name
-                                            }}</span>
+                                        }}</span>
                                     </td>
                                     <td class="px-8 py-5">
                                         <span class="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{{
@@ -359,7 +343,9 @@ const getInterviewTypeIcon = (type) => {
                                             class="ml-2 px-3 py-1 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-blue-700 transition-all">
                                             <ClipboardPlus class="h-4 w-4" />
                                         </button>
-                                        <button @click="confirmStatusUpdate(evalItem)"
+                                        <!-- ✅ Only show "Pass to Final" button for passed candidates -->
+                                        <button v-if="evalItem.status === 'Passed'"
+                                            @click="confirmStatusUpdate(evalItem)"
                                             class="ml-2 px-3 py-1 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-emerald-600 transition-all">
                                             <CheckCheck class="h-4 w-4" />
                                         </button>
@@ -382,7 +368,7 @@ const getInterviewTypeIcon = (type) => {
                 <h3 class="text-xl font-black text-slate-900 dark:text-white mb-2">Passed to HR Manager for Final
                     Interview?</h3>
                 <p class="text-sm text-slate-500 mb-8">Are you sure you want to mark <b>{{ selectedInterview?.name
-                }}</b>'s status as final? This action will update the recruitment records.</p>
+                        }}</b>'s status as final? This action will update the recruitment records.</p>
                 <div class="flex gap-3">
                     <button @click="showStatusConfirmModal = false"
                         class="flex-1 py-4 text-[10px] font-black uppercase text-slate-400 hover:text-slate-600">Cancel</button>
@@ -422,7 +408,7 @@ const getInterviewTypeIcon = (type) => {
                         <div>
                             <p class="text-[10px] font-black text-slate-400 uppercase">Target Position</p>
                             <p class="text-sm font-bold text-slate-900 dark:text-white">{{ selectedInterview?.position
-                            }}</p>
+                                }}</p>
                         </div>
                     </div>
                     <div class="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl">
@@ -522,7 +508,7 @@ const getInterviewTypeIcon = (type) => {
                         <div
                             class="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
                             <p class="text-sm font-bold text-slate-900 dark:text-white mb-1">{{ selectedInterview?.name
-                                }}</p>
+                            }}</p>
                             <p class="text-[10px] text-slate-400">{{ selectedInterview?.position }}</p>
                         </div>
                     </div>
@@ -555,3 +541,7 @@ const getInterviewTypeIcon = (type) => {
         </div>
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+/* Add any custom styles if needed */
+</style>

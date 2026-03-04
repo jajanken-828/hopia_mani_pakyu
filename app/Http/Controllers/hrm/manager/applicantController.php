@@ -25,10 +25,12 @@ class ApplicantController extends Controller
                 ->get()
                 ->map(fn ($a) => [
                     'id' => $a->id,
+                    'name' => $a->first_name.' '.$a->last_name, // ✅ Added for frontend display
                     'first_name' => $a->first_name,
                     'last_name' => $a->last_name,
                     'email' => $a->email,
                     'phone_number' => $a->phone_number,
+                    'position' => $a->position_applied, // ✅ Alias for template
                     'position_applied' => $a->position_applied,
                     'status' => $a->status,
                     'created_at' => $a->created_at,
@@ -65,14 +67,11 @@ class ApplicantController extends Controller
             'city' => 'required|string',
             'state_province' => 'required|string',
             'postal_zip_code' => 'required|string',
-            // Adjusted to nullable to support public form if experience isn't a radio choice there
             'textile_experience' => 'nullable|string',
             'status' => 'nullable|string',
-            // File validation
-            'sss_file' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'sss_file' => 'nullable|image|mimes:jpeg,png,jpg,jfif|max:2048',
             'philhealth_file' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             'pagibig_file' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-            // Internal Only Fields (Scheduling)
             'scheduled_at' => 'nullable|date',
             'interview_type' => 'nullable|string|in:phone,technical,behavioral,onsite,video',
             'duration' => 'nullable|integer|in:15,30,45,60',
@@ -82,7 +81,6 @@ class ApplicantController extends Controller
         ]);
 
         return DB::transaction(function () use ($request) {
-            // Data for the Applicant Model
             $data = $request->only([
                 'first_name', 'middle_name', 'last_name', 'email', 'phone_number',
                 'position_applied', 'expected_salary', 'notice_period', 'street_address',
@@ -90,10 +88,8 @@ class ApplicantController extends Controller
                 'textile_experience',
             ]);
 
-            // Default status to 'Pending' for new entries
             $data['status'] = $request->status ?? 'Pending';
 
-            // Handle Government ID Uploads
             if ($request->hasFile('sss_file')) {
                 $data['sss_file'] = $request->file('sss_file')->store('applicants/ids', 'public');
             }
@@ -106,7 +102,6 @@ class ApplicantController extends Controller
 
             $applicant = Applicant::create($data);
 
-            // Handle Internal Interview Scheduling (if HRM user provided it in the modal)
             if ($request->filled('scheduled_at')) {
                 Interview::create([
                     'applicant_id' => $applicant->id,
@@ -118,7 +113,6 @@ class ApplicantController extends Controller
                     'notes' => $request->notes,
                 ]);
 
-                // If scheduled immediately, update status to Interview
                 $applicant->update(['status' => 'Interview']);
             }
 
@@ -138,7 +132,6 @@ class ApplicantController extends Controller
             'position' => 'nullable|string',
         ]);
 
-        // Map frontend pipeline stages to database status values
         $statusMap = [
             'FOR INTERVIEW' => 'Interview',
             'FINAL INTERVIEW' => 'final',
@@ -182,7 +175,6 @@ class ApplicantController extends Controller
                 'employee_id' => 'MONTI-'.$year.'-'.$request->role.'-'.str_pad(User::where('role', $request->role)->count() + 1, 4, '0', STR_PAD_LEFT),
             ]);
 
-            // Complete the applicant cycle
             $applicant->update(['status' => 'Account Created']);
 
             return back()->with('success', 'User account created successfully.');

@@ -32,7 +32,8 @@ import {
     Settings,
     // Client Icons
     Receipt,
-    HelpCircle
+    HelpCircle,
+    Building2 // Added for department icon
 } from 'lucide-vue-next'
 
 const isOpen = ref(false)
@@ -53,8 +54,8 @@ const navItems = computed(() => {
         return [
             { label: 'Dashboard', href: route('client.dashboard'), icon: LayoutDashboard },
             { label: 'Orders', href: route('client.orders'), icon: ShoppingCart },
-            { label: 'Invoices', href: '#', icon: Receipt },
-            { label: 'Support', href: '#', icon: HelpCircle },
+            { label: 'Invoices', href: route('client.invoices'), icon: Receipt },
+            { label: 'Support', href: route('client.support'), icon: HelpCircle },
         ]
     }
 
@@ -221,10 +222,9 @@ const closeSidebar = () => {
                                 <h2 class="text-xl font-bold text-gray-900 dark:text-white leading-tight">
                                     Monti <span class="text-blue-600">Textile</span>
                                 </h2>
-                                <!-- FIXED: moved string to one line -->
                                 <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                                     {{ isClient ? 'Partner Portal' : (isEmployeePortal ? 'Employee Portal' :
-                                    'ERPSystem') }}
+                                        'ERPSystem') }}
                                 </span>
                             </div>
                         </div>
@@ -236,14 +236,21 @@ const closeSidebar = () => {
                                 {{ isClient ? client?.company_name?.charAt(0) : user?.name?.charAt(0) }}
                             </div>
                             <div class="ml-3 overflow-hidden">
-                                <p class="text-sm font-bold text-gray-900 dark:text-white truncate uppercase">
+                                <p class="text-sm font-bold text-gray-900 dark:text-white truncate uppercase mb-0.5">
                                     {{ isClient ? client?.company_name : user?.name }}
                                 </p>
+
                                 <div
-                                    class="flex items-center text-[10px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                                    <ShieldCheck class="h-3 w-3 mr-1" />
+                                    class="flex items-center text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-tight mb-0.5">
+                                    <Building2 class="h-2.5 w-2.5 mr-1 text-gray-400" />
+                                    {{ isClient ? client?.business_type : user?.role }} Department
+                                </div>
+
+                                <div
+                                    class="flex items-center text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    <ShieldCheck class="h-3 w-3 mr-1 text-blue-500" />
                                     {{ isClient ? 'Business Client' : (isEmployeePortal ? (user?.employee_id || 'STAFF')
-                                        : (user?.role + ' • ' + user?.position)) }}
+                                        : (user?.position)) }}
                                 </div>
                             </div>
                         </div>

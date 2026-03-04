@@ -88,15 +88,12 @@ const scheduleForm = useForm({
 });
 
 // --- Computed ---
-// FIXED: Added defensive checks to prevent white screen on null/undefined data
 const filteredApplicants = computed(() => {
     const list = props.applicants ?? [];
     return list.filter(person => {
-        // Safe check for status
         const status = person?.status?.toLowerCase() ?? 'pending';
         const isPending = status === 'pending';
 
-        // Safe check for search fields
         const name = person?.name?.toLowerCase() ?? '';
         const position = person?.position?.toLowerCase() ?? '';
         const email = person?.email?.toLowerCase() ?? '';
@@ -202,6 +199,7 @@ const submitForm = () => {
     form.post(route('hrm.applicants.store'), {
         forceFormData: true,
         preserveScroll: true,
+        preserveState: false, // 🔥 Force fresh component state after submission
         onSuccess: () => {
             isModalOpen.value = false;
             form.reset();
@@ -234,10 +232,11 @@ const submitSchedule = () => {
 
     scheduleForm.post(route('hrm.applicants.schedule', selectedApplicant.value.id), {
         preserveScroll: true,
+        preserveState: false, // 🔥 Force fresh component state
         onSuccess: () => {
             closeScheduleModal();
             triggerToast('Interview scheduled successfully!');
-            router.reload({ only: ['applicants'] });
+            router.reload({ only: ['applicants'] }); // extra safety reload
         },
         onError: (errors) => {
             console.error('Schedule submission errors:', errors);
@@ -368,6 +367,7 @@ const formatNoticePeriod = (period) => {
             </div>
         </div>
 
+        <!-- Image Viewer Modal -->
         <div v-if="isImageViewerOpen" class="fixed inset-0 z-[80] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/90 backdrop-blur-md" @click="closeImageViewer"></div>
             <div class="relative w-full max-w-6xl max-h-[90vh] flex flex-col">
@@ -390,6 +390,7 @@ const formatNoticePeriod = (period) => {
             </div>
         </div>
 
+        <!-- View Details Modal -->
         <div v-if="isViewModalOpen" class="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6">
             <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeViewModal"></div>
             <div
@@ -398,7 +399,8 @@ const formatNoticePeriod = (period) => {
                     class="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between sticky top-0 bg-white dark:bg-slate-900 z-20">
                     <div>
                         <h2 class="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Applicant
-                            <span class="text-blue-600">Details</span></h2>
+                            <span class="text-blue-600">Details</span>
+                        </h2>
                         <p class="text-xs text-slate-500 font-medium tracking-tight">Application ID: #{{
                             viewingApplicant?.id }}</p>
                     </div>
@@ -439,7 +441,7 @@ const formatNoticePeriod = (period) => {
                                             Address</p>
                                         <p class="text-xs font-medium text-slate-900 dark:text-white">
                                             {{ viewingApplicant?.street_address }}, {{ viewingApplicant?.city }}, {{
-                                            viewingApplicant?.state_province }} {{ viewingApplicant?.postal_zip_code }}
+                                                viewingApplicant?.state_province }} {{ viewingApplicant?.postal_zip_code }}
                                         </p>
                                     </div>
                                 </div>
@@ -519,6 +521,7 @@ const formatNoticePeriod = (period) => {
             </div>
         </div>
 
+        <!-- Schedule Interview Modal -->
         <div v-if="isScheduleModalOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeScheduleModal"></div>
             <div class="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl">
@@ -536,8 +539,7 @@ const formatNoticePeriod = (period) => {
                     <div class="space-y-4">
                         <div>
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Interview
-                                Type
-                                *</label>
+                                Type *</label>
                             <select v-model="scheduleForm.interview_type" required
                                 class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-emerald-500">
                                 <option value="">Select type</option>
@@ -596,6 +598,7 @@ const formatNoticePeriod = (period) => {
             </div>
         </div>
 
+        <!-- Add Applicant Modal -->
         <div v-if="isModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
             <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="isModalOpen = false"></div>
             <div

@@ -32,21 +32,47 @@ const props = defineProps({
 // --- State Management ---
 const activeTab = ref('tiers');
 const showCreateModal = ref(false);
+const showEditModal = ref(false); // NEW: Edit Modal State
 const showConfirmModal = ref(false);
 const search = ref(props.filters.search);
 
 // --- Form Logic: Create New Tier ---
 const createForm = useForm({
     name: '',
-    min_quantity: '', // FIXED: Matches PricingTier model and Controller validation
+    min_quantity: '',
     discount_percentage: '',
 });
+
+// --- Form Logic: Edit Existing Tier ---
+const editForm = useForm({
+    id: null,
+    name: '',
+    min_quantity: '',
+    discount_percentage: '',
+});
+
+const openEditModal = (tier) => {
+    editForm.id = tier.id;
+    editForm.name = tier.name;
+    editForm.min_quantity = tier.min_quantity;
+    editForm.discount_percentage = tier.discount_percentage;
+    showEditModal.value = true;
+};
 
 const submitCreate = () => {
     createForm.post(route('eco.manager.book.store'), {
         onSuccess: () => {
             showCreateModal.value = false;
             createForm.reset();
+        }
+    });
+};
+
+const submitUpdate = () => {
+    editForm.patch(route('eco.manager.book.update', editForm.id), {
+        onSuccess: () => {
+            showEditModal.value = false;
+            editForm.reset();
         }
     });
 };
@@ -159,7 +185,7 @@ const stats = computed(() => {
                                 </h4>
                                 <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                                     Sub: ₱{{ parseFloat(order.subtotal).toLocaleString() }} • Qty: {{
-                                    order.items_sum_quantity || 0 }} Items
+                                        order.items_sum_quantity || 0 }} Items
                                 </p>
                             </div>
                         </div>
@@ -221,8 +247,8 @@ const stats = computed(() => {
                                     {{ (book.min_quantity || 0).toLocaleString() }}+ Items
                                 </td>
                                 <td class="px-8 py-6 text-right px-10">
-                                    <button
-                                        class="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-indigo-600">
+                                    <button @click="openEditModal(book)"
+                                        class="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-indigo-600 transition-all">
                                         <Pencil class="h-4 w-4" />
                                     </button>
                                 </td>
@@ -270,6 +296,43 @@ const stats = computed(() => {
             </div>
         </div>
 
+        <div v-if="showEditModal"
+            class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-950/60 backdrop-blur-md p-4">
+            <div
+                class="bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 dark:border-gray-800">
+                <div class="px-8 py-6 bg-indigo-600 text-white flex justify-between items-center">
+                    <h3 class="font-black text-sm uppercase tracking-widest italic">Edit Tier Configuration</h3>
+                    <button @click="showEditModal = false">
+                        <X class="h-6 w-6" />
+                    </button>
+                </div>
+                <form @submit.prevent="submitUpdate" class="p-8 space-y-6">
+                    <div>
+                        <label class="text-[10px] font-black uppercase text-gray-400 block mb-2">Tier Name</label>
+                        <input v-model="editForm.name" type="text"
+                            class="w-full rounded-xl border-gray-100 dark:bg-gray-950 text-xs font-bold" required>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-[10px] font-black uppercase text-gray-400 block mb-2">Min. Items
+                                Threshold</label>
+                            <input v-model="editForm.min_quantity" type="number"
+                                class="w-full rounded-xl border-gray-100 dark:bg-gray-950 text-xs font-bold" required>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black uppercase text-gray-400 block mb-2">Discount %</label>
+                            <input v-model="editForm.discount_percentage" type="number" step="0.01"
+                                class="w-full rounded-xl border-gray-100 dark:bg-gray-950 text-xs font-bold" required>
+                        </div>
+                    </div>
+                    <button type="submit" :disabled="editForm.processing"
+                        class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg hover:brightness-110 transition-all">
+                        Update Configuration
+                    </button>
+                </form>
+            </div>
+        </div>
+
         <div v-if="showConfirmModal"
             class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div
@@ -293,3 +356,9 @@ const stats = computed(() => {
         </div>
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+.tracking-tighter {
+    letter-spacing: -0.05em;
+}
+</style>

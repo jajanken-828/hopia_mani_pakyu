@@ -80,11 +80,11 @@ const stats = computed(() => [
                     <button @click="activeTab = 'approvals'"
                         :class="activeTab === 'approvals' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500'"
                         class="px-6 py-2 rounded-xl text-[10px] font-black uppercase">Pending ({{
-                        pendingCompanies.length }})</button>
+                            pendingCompanies.length }})</button>
                     <button @click="activeTab = 'verified'"
                         :class="activeTab === 'verified' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500'"
                         class="px-6 py-2 rounded-xl text-[10px] font-black uppercase">Directory ({{
-                        verifiedCompanies.length }})</button>
+                            verifiedCompanies.length }})</button>
                 </div>
 
                 <div class="overflow-x-auto">
@@ -153,7 +153,7 @@ const stats = computed(() => [
                         class="flex-1 py-4 bg-gray-100 rounded-2xl text-[10px] font-black uppercase">Cancel</button>
                     <button @click="modalConfig.action" :class="modalConfig.confirmColor"
                         class="flex-1 py-4 text-white rounded-2xl text-[10px] font-black uppercase">{{
-                        modalConfig.confirmText }}</button>
+                            modalConfig.confirmText }}</button>
                 </div>
             </div>
         </div>

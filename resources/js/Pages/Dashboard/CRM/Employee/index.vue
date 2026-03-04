@@ -107,7 +107,7 @@ const stats = computed(() => [
                             </div>
                             <p class="text-xs text-gray-500 dark:text-gray-400 font-medium italic">
                                 Total approved revenue for current fiscal year: ₱{{ (personalRevenue ??
-                                0).toLocaleString() }}.
+                                    0).toLocaleString() }}.
                                 Goal: ₱{{ (target ?? 0).toLocaleString() }}.
                             </p>
                             <Link :href="route('crm.lead')"
