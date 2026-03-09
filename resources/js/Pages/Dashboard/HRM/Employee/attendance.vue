@@ -19,26 +19,30 @@ import {
     CalendarCheck,
     ListChecks,
     AlertCircle,
-    UserX
+    UserX,
+    Trash2,
+    Sparkles,
+    Edit3,
+    Lock,
+    ShieldCheck,
+    ThumbsUp,
+    ThumbsDown
 } from 'lucide-vue-next'
 
 const props = defineProps({
-    attendance_status: {
-        type: Object,
-        default: () => ({ is_clocked_in: false, last_action: '08:45 AM', total_hours_today: '0h 0m' })
-    },
-    employee_attendance: {
-        type: Array,
-        default: () => []
-    },
-    monthly_shifts: {
-        type: Array,
-        default: () => []
-    }
+    attendance_status: Object,
+    employee_attendance: Array,
+    monthly_shifts: Array,
+    holidays: Array,
+    pending_shifts: Array,     // Aligned with AttendanceController
+    pending_holidays: Array,   // Aligned with AttendanceController
+    is_manager: Boolean,       // Aligned with AttendanceController
+    current_month: Number,     // Server-provided month for viewDate sync
+    current_year: Number       // Server-provided year for viewDate sync
 })
 
 // --- UI STATE TOGGLE ---
-const activeView = ref('scheduler') // 'scheduler' or 'attendance'
+const activeView = ref('scheduler')
 
 // --- LIVE CLOCK ---
 const currentTime = ref(new Date().toLocaleTimeString())
@@ -51,17 +55,42 @@ onMounted(() => {
 onUnmounted(() => clearInterval(timerInterval))
 
 // --- CALENDAR & MODAL LOGIC ---
-const viewDate = ref(new Date())
+const viewDate = ref(
+    props.current_month && props.current_year
+        ? new Date(props.current_year, props.current_month - 1, 1)
+        : new Date()
+)
 const selectedDate = ref(null)
 const isModalOpen = ref(false)
 const isAutoScheduleModalOpen = ref(false)
+const isHolidayModalOpen = ref(false)
 const selectedDept = ref('HRM')
 const autoScheduleDept = ref('HRM')
 const activeSelectorShift = ref(null)
 const activeMonthlySelectorShift = ref(null)
 const showSuccessToast = ref(false)
 const toastMessage = ref('Staff Assigned to Shift')
+const toastIsError = ref(false)
 const departments = ['HRM', 'SCM', 'FIN', 'MAN', 'INV', 'ORD', 'WAR', 'CRM', 'ECO']
+
+// --- DATE RULES ---
+const todayStr = computed(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+})
+
+const isPastDate = (date) => {
+    if (!date) return false
+    return date < todayStr.value
+}
+
+const isEntireMonthPast = computed(() => {
+    const y = viewDate.value.getFullYear()
+    const m = viewDate.value.getMonth() + 1
+    const lastDay = new Date(y, m, 0).getDate()
+    const lastDateStr = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    return lastDateStr < todayStr.value
+})
 
 const calendarDays = computed(() => {
     const year = viewDate.value.getFullYear()
@@ -79,7 +108,26 @@ const calendarDays = computed(() => {
 
 const monthName = computed(() => viewDate.value.toLocaleString('default', { month: 'long', year: 'numeric' }))
 
-// Navigation logic
+// --- Holiday helpers ---
+const holidaysByDate = computed(() => {
+    const map = {}
+    props.holidays.forEach(h => {
+        map[h.date] = h
+    })
+    return map
+})
+
+const isNonWorkingDay = (date) => {
+    const h = holidaysByDate.value[date]
+    if (!h) return false
+    return h.type === 'regular' || h.type === 'special_non_working'
+}
+
+const getHolidayInfo = (date) => {
+    return holidaysByDate.value[date] || null
+}
+
+// Navigation
 const fetchMonthData = () => {
     router.get(route('hrm.employee.attendance'), {
         month: viewDate.value.getMonth() + 1,
@@ -87,7 +135,7 @@ const fetchMonthData = () => {
     }, {
         preserveState: true,
         preserveScroll: true,
-        only: ['monthly_shifts']
+        only: ['monthly_shifts', 'holidays', 'pending_shifts', 'pending_holidays']
     })
 }
 
@@ -114,13 +162,16 @@ const getShiftRange = (type) => {
 // --- COMPUTED: shifts grouped by date for calendar display ---
 const shiftsByDate = computed(() => {
     const map = {}
+    // Approved shifts
     props.monthly_shifts.forEach(shift => {
-        if (!map[shift.effective_date]) {
-            map[shift.effective_date] = new Set()
-        }
+        if (!map[shift.effective_date]) { map[shift.effective_date] = new Set() }
         map[shift.effective_date].add(shift.shift_type)
     })
-    // Convert Set to array for each date
+    // Pending shifts (mark them as pending for visual differentiation)
+    props.pending_shifts.forEach(shift => {
+        if (!map[shift.effective_date]) { map[shift.effective_date] = new Set() }
+        map[shift.effective_date].add(shift.shift_type + '_PENDING')
+    })
     const result = {}
     Object.keys(map).forEach(date => {
         result[date] = Array.from(map[date])
@@ -128,7 +179,7 @@ const shiftsByDate = computed(() => {
     return result
 })
 
-// --- SHIFT MANAGEMENT ---
+// --- FORMS ---
 const form = useForm({
     user_id: null,
     shift_type: '',
@@ -140,27 +191,70 @@ const form = useForm({
     year: null
 })
 
+const holidayForm = useForm({
+    holiday_date: '',
+    holiday_name: '',
+    holiday_type: 'regular',
+    premium_rate: null
+})
+
+// --- MODAL ACTIONS ---
 const openDayModal = (date) => {
     if (!date) return
+    if (isPastDate(date)) {
+        triggerToast('Cannot schedule past dates.', true)
+        return
+    }
     selectedDate.value = date
     isModalOpen.value = true
     activeSelectorShift.value = null
 }
 
+const openHolidayModal = (date = null) => {
+    if (date) {
+        const existing = getHolidayInfo(date)
+        if (existing) {
+            holidayForm.holiday_date = existing.date
+            holidayForm.holiday_name = existing.name
+            holidayForm.holiday_type = existing.type
+            holidayForm.premium_rate = existing.premium_rate
+        } else {
+            holidayForm.reset()
+            holidayForm.holiday_date = date
+        }
+    } else {
+        holidayForm.reset()
+    }
+    isHolidayModalOpen.value = true
+}
+
 const closeModal = () => {
     isModalOpen.value = false
     isAutoScheduleModalOpen.value = false
+    isHolidayModalOpen.value = false
     activeSelectorShift.value = null
     activeMonthlySelectorShift.value = null
+    holidayForm.reset()
 }
 
-const triggerToast = (msg) => {
+const triggerToast = (msg, isError = false) => {
     toastMessage.value = msg
+    toastIsError.value = isError
     showSuccessToast.value = true
-    setTimeout(() => showSuccessToast.value = false, 3000)
+    setTimeout(() => showSuccessToast.value = false, 4000)
 }
+
+// --- CONTROLLER ALIGNMENT METHODS ---
 
 const updateShift = (employeeId, type) => {
+    if (isPastDate(selectedDate.value)) {
+        triggerToast('Cannot assign shifts on past dates.', true)
+        return
+    }
+    if (isNonWorkingDay(selectedDate.value)) {
+        triggerToast('Cannot assign shift on a non-working holiday', true)
+        return
+    }
     form.is_bulk = false
     form.user_id = employeeId
     form.shift_type = type
@@ -171,17 +265,17 @@ const updateShift = (employeeId, type) => {
     form.post(route('hrm.employee.attendance.update-shift'), {
         preserveScroll: true,
         onSuccess: () => {
-            triggerToast('Staff Assigned to Shift')
+            triggerToast(props.is_manager ? 'Staff Assigned to Shift' : 'Shift Request Sent for Approval')
             activeSelectorShift.value = null
-            router.reload({
-                only: ['monthly_shifts'],
-                data: { month: viewDate.value.getMonth() + 1, year: viewDate.value.getFullYear() }
-            })
         }
     })
 }
 
 const setEmployeeMonthlySchedule = (employeeId, shiftType) => {
+    if (isEntireMonthPast.value) {
+        triggerToast('Cannot schedule for a past month.', true)
+        return
+    }
     form.is_bulk = true
     form.user_id = employeeId
     form.shift_type = shiftType
@@ -193,14 +287,54 @@ const setEmployeeMonthlySchedule = (employeeId, shiftType) => {
     form.post(route('hrm.employee.attendance.update-shift'), {
         preserveScroll: true,
         onSuccess: () => {
-            triggerToast(`Employee scheduled for the whole month`)
+            triggerToast(props.is_manager ? 'Employee scheduled for the whole month' : 'Monthly request sent for approval')
             activeMonthlySelectorShift.value = null
-            router.reload({
-                only: ['monthly_shifts'],
-                data: { month: viewDate.value.getMonth() + 1, year: viewDate.value.getFullYear() }
-            })
+            fetchMonthData()
         }
     })
+}
+
+const handleApproval = (id, type, action) => {
+    const routeName = action === 'approve'
+        ? `hrm.employee.attendance.approve-${type}`
+        : `hrm.employee.attendance.reject-${type}`;
+
+    router.post(route(routeName), { id }, {
+        preserveScroll: true,
+        onSuccess: () => triggerToast(`${type.charAt(0).toUpperCase() + type.slice(1)} ${action}d`)
+    })
+}
+
+const removeShift = (employeeId, date) => {
+    if (confirm('Remove this shift assignment?')) {
+        router.delete(route('hrm.employee.attendance.destroy-shift'), {
+            data: { user_id: employeeId, effective_date: date },
+            preserveScroll: true,
+            onSuccess: () => triggerToast('Shift successfully removed')
+        })
+    }
+}
+
+const submitHoliday = () => {
+    const existing = getHolidayInfo(holidayForm.holiday_date)
+    if (existing) {
+        holidayForm.put(route('hrm.employee.holidays.update', existing.id), {
+            onSuccess: () => { triggerToast('Holiday updated'); closeModal(); fetchMonthData(); }
+        })
+    } else {
+        holidayForm.post(route('hrm.employee.holidays.store'), {
+            onSuccess: () => { triggerToast('Holiday saved'); closeModal(); fetchMonthData(); }
+        })
+    }
+}
+
+const deleteHoliday = (date) => {
+    const holiday = getHolidayInfo(date)
+    if (holiday && confirm(`Delete holiday "${holiday.name}"?`)) {
+        router.delete(route('hrm.employee.holidays.destroy', holiday.id), {
+            onSuccess: () => { triggerToast('Holiday removed'); closeModal(); fetchMonthData(); }
+        })
+    }
 }
 
 // --- COMPUTED HELPERS ---
@@ -239,9 +373,8 @@ const getEmployeesInMonthlyShift = (type) => {
         .filter(emp => emp && (emp.dept || emp.role || '').toString().toUpperCase() === autoScheduleDept.value.toUpperCase())
 }
 
-// Shift icon mapping
 const shiftIcon = (type) => {
-    switch (type) {
+    switch (type.replace('_PENDING', '')) {
         case 'Morning': return Sunrise
         case 'Afternoon': return Sunset
         case 'Graveyard': return Moon
@@ -259,9 +392,10 @@ const shiftIcon = (type) => {
             enter-from-class="translate-y-[-100%] opacity-0" enter-to-class="translate-y-0 opacity-100"
             leave-active-class="transition duration-200 ease-in" leave-from-class="opacity-100"
             leave-to-class="opacity-0">
-            <div v-if="showSuccessToast"
-                class="fixed top-6 right-6 z-[100] bg-emerald-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
-                <CheckCircle2 class="h-5 w-5" />
+            <div v-if="showSuccessToast" :class="toastIsError ? 'bg-rose-500' : 'bg-emerald-500'"
+                class="fixed top-6 right-6 z-[100] text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
+                <CheckCircle2 v-if="!toastIsError" class="h-5 w-5" />
+                <AlertCircle v-else class="h-5 w-5" />
                 <span class="font-bold text-sm">{{ toastMessage }}</span>
             </div>
         </Transition>
@@ -276,16 +410,28 @@ const shiftIcon = (type) => {
                 </div>
                 <div
                     class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700">
-                    <button @click="isAutoScheduleModalOpen = true"
-                        class="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-blue-500/20 active:scale-95">
-                        <Wand2 class="h-3.5 w-3.5" />
-                        Set Monthly
+                    <button
+                        @click="isEntireMonthPast ? triggerToast('Cannot schedule for a past month.', true) : (isAutoScheduleModalOpen = true)"
+                        :class="isEntireMonthPast ? 'opacity-50 cursor-not-allowed bg-slate-400' : 'bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-500/20'"
+                        class="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95">
+                        <Wand2 class="h-3.5 w-3.5" /> Set Monthly
                     </button>
-                    <button @click="activeView = activeView === 'scheduler' ? 'attendance' : 'scheduler'"
-                        :class="activeView === 'attendance' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
+                    <button @click="activeView = 'scheduler'"
+                        :class="activeView === 'scheduler' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
                         class="flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 ml-1">
-                        <ListChecks class="h-3.5 w-3.5" />
-                        {{ activeView === 'scheduler' ? 'Attendance' : 'Calendar' }}
+                        Calendar
+                    </button>
+                    <button @click="activeView = 'attendance'"
+                        :class="activeView === 'attendance' ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'"
+                        class="flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95">
+                        Attendance
+                    </button>
+                    <button v-if="is_manager" @click="activeView = 'approvals'"
+                        :class="activeView === 'approvals' ? 'bg-white dark:bg-slate-700 text-rose-600 shadow-sm' : 'text-slate-500'"
+                        class="relative flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95">
+                        <ShieldCheck class="h-3.5 w-3.5" /> Approvals
+                        <span v-if="pending_shifts.length > 0 || pending_holidays.length > 0"
+                            class="absolute -top-1 -right-1 h-3 w-3 bg-rose-500 rounded-full border-2 border-white"></span>
                     </button>
                 </div>
             </div>
@@ -313,10 +459,10 @@ const shiftIcon = (type) => {
                 </div>
             </div>
         </div>
-        <div class="pb-3 p-2 bg-blue-200 rounded-xl mb-5 text-blue-900 text-center text-sm font-bold">
-            <h2 class="">MONTITEXTILE SHIFT SCHEDULE - GRAVEYARD:12AM TO 9AM | MORNING: 8AM TO 5PM |
-                AFTERNOON: 4PM
-                TO 1AM</h2>
+
+        <div
+            class="pb-3 p-2 bg-blue-200 rounded-xl mb-5 text-blue-900 text-center text-sm font-bold uppercase tracking-widest">
+            <h2>Montitextile Shift Schedule - Graveyard: 12AM to 9AM | Morning: 8AM to 5PM | Afternoon: 4PM to 1AM</h2>
         </div>
 
         <Transition mode="out-in" enter-active-class="transition duration-300 ease-out"
@@ -331,38 +477,54 @@ const shiftIcon = (type) => {
                         <div v-for="day in ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']" :key="day"
                             class="text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] pb-6">{{
                                 day }}</div>
-                        <div v-for="(item, index) in calendarDays" :key="index" @click="openDayModal(item.date)"
-                            :class="[item.date ? 'hover:border-blue-500 cursor-pointer bg-slate-50/50 dark:bg-slate-900/30' : 'bg-transparent border-transparent', item.date === new Date().toISOString().split('T')[0] ? 'ring-2 ring-blue-500 bg-blue-50/30' : '']"
-                            class="min-h-[140px] p-4 rounded-[2rem] border border-slate-100 dark:border-slate-800 transition-all group relative overflow-hidden">
-                            <span v-if="item.day"
-                                class="text-lg font-black text-slate-300 dark:text-slate-600 group-hover:text-blue-600 transition-colors">{{
-                                    item.day }}</span>
 
-                            <!-- Dynamic shift icons based on actual assignments -->
-                            <div v-if="item.date && shiftsByDate[item.date]" class="mt-4 flex flex-wrap gap-2">
+                        <div v-for="(item, index) in calendarDays" :key="index" @click="openDayModal(item.date)" :class="[
+                            item.date ? (isPastDate(item.date) ? 'cursor-not-allowed' : 'cursor-pointer') : '',
+                            item.date === todayStr ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-500/20' : '',
+                            isPastDate(item.date) ? 'opacity-50' : ''
+                        ]" class="min-h-[140px] p-4 rounded-[2rem] border border-slate-100 dark:border-slate-800 transition-all group relative overflow-hidden"
+                            :style="item.date && isNonWorkingDay(item.date) ? 'background-color: #fee2e2; border-color: #f87171;' : (item.date && isPastDate(item.date) ? 'background-color: #f8fafc;' : '')">
+
+                            <span v-if="item.day" class="text-lg font-black transition-colors"
+                                :class="isPastDate(item.date) ? 'text-slate-300 dark:text-slate-700' : 'text-slate-300 dark:text-slate-600 group-hover:text-blue-600'">
+                                {{ item.day }}
+                            </span>
+                            <Lock v-if="item.date && isPastDate(item.date)"
+                                class="absolute top-2 right-2 h-3 w-3 text-slate-300 dark:text-slate-600" />
+
+                            <div v-if="item.date && getHolidayInfo(item.date)"
+                                class="mt-1 text-[8px] font-black uppercase truncate" :class="{
+                                    'text-red-600': getHolidayInfo(item.date).type.includes('regular'),
+                                    'text-amber-600': getHolidayInfo(item.date).type === 'special_non_working',
+                                    'text-green-600': getHolidayInfo(item.date).type === 'special_working'
+                                }">
+                                {{ getHolidayInfo(item.date).name }}
+                            </div>
+
+                            <div v-if="item.date && shiftsByDate[item.date]" class="mt-2 flex flex-wrap gap-2">
                                 <div v-for="shift in shiftsByDate[item.date]" :key="shift"
-                                    class="flex items-center gap-1 px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-wider"
-                                    :class="{
-                                        'bg-amber-100 text-amber-700': shift === 'Morning',
-                                        'bg-blue-100 text-blue-700': shift === 'Afternoon',
-                                        'bg-indigo-100 text-indigo-700': shift === 'Graveyard'
-                                    }" :title="getShiftRange(shift)">
+                                    class="flex items-center gap-1 px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-wider transition-all"
+                                    :class="[
+                                        shift.includes('PENDING') ? 'border border-dashed border-amber-400 opacity-60' : '',
+                                        shift.includes('Morning') ? 'bg-amber-100 text-amber-700' :
+                                            shift.includes('Afternoon') ? 'bg-blue-100 text-blue-700' : 'bg-indigo-100 text-indigo-700'
+                                    ]">
                                     <component :is="shiftIcon(shift)" class="h-3 w-3" />
-                                    <span class="hidden sm:inline">{{ shift }}</span>
+                                    <span class="hidden sm:inline">{{ shift.replace('_PENDING', '') }}</span>
                                 </div>
                             </div>
-                            <!-- Fallback dots if no shifts assigned (optional) -->
-                            <div v-else-if="item.date" class="mt-4 flex flex-wrap gap-1 opacity-20">
-                                <div class="h-1.5 w-1.5 rounded-full bg-amber-400"></div>
-                                <div class="h-1.5 w-1.5 rounded-full bg-blue-400"></div>
-                                <div class="h-1.5 w-1.5 rounded-full bg-indigo-400"></div>
-                            </div>
+
+                            <button v-if="item.date && is_manager" @click.stop="openHolidayModal(item.date)"
+                                class="absolute p-1 bg-white dark:bg-slate-800 rounded-full shadow opacity-0 group-hover:opacity-100 transition"
+                                :class="isPastDate(item.date) ? 'top-5 right-1' : 'top-1 right-1'">
+                                <Sparkles class="h-3 w-3 text-purple-500" />
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div v-else key="attendance" class="space-y-6">
+            <div v-else-if="activeView === 'attendance'" key="attendance" class="space-y-6">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div
                         class="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-6">
@@ -449,33 +611,27 @@ const shiftIcon = (type) => {
                                                     emp.name }}</span>
                                         </div>
                                     </td>
-                                    <td class="px-8 py-5">
-                                        <span
+                                    <td class="px-8 py-5"><span
                                             class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-[9px] font-black text-slate-500 uppercase tracking-tighter">{{
-                                                emp.dept }}</span>
-                                    </td>
+                                                emp.dept }}</span></td>
                                     <td class="px-8 py-5">
-                                        <div class="flex flex-col">
-                                            <span class="text-xs font-bold text-slate-700 dark:text-slate-200">{{
-                                                emp.shift }}</span>
-                                            <span class="text-[9px] font-bold text-slate-400 uppercase">{{
-                                                getShiftRange(emp.shift) }}</span>
-                                        </div>
+                                        <div class="flex flex-col"><span
+                                                class="text-xs font-bold text-slate-700 dark:text-slate-200">{{
+                                                    emp.shift }}</span><span
+                                                class="text-[9px] font-bold text-slate-400 uppercase">{{
+                                                    getShiftRange(emp.shift) }}</span></div>
                                     </td>
-                                    <td class="px-8 py-5">
-                                        <span class="text-xs font-mono font-bold"
+                                    <td class="px-8 py-5"><span class="text-xs font-mono font-bold"
                                             :class="emp.clock_in !== '---' ? 'text-blue-600' : 'text-slate-300'">{{
-                                                emp.clock_in }}</span>
-                                    </td>
+                                                emp.clock_in }}</span></td>
                                     <td class="px-8 py-5">
                                         <div class="flex items-center gap-2">
                                             <div class="h-1.5 w-1.5 rounded-full"
                                                 :class="{ 'bg-emerald-500': emp.status === 'On-Time', 'bg-amber-500': emp.status === 'Late', 'bg-slate-300': emp.status === 'Absent' }">
                                             </div>
                                             <span class="text-[10px] font-black uppercase tracking-widest"
-                                                :class="{ 'text-emerald-600': emp.status === 'On-Time', 'text-amber-600': emp.status === 'Late', 'text-slate-400': emp.status === 'Absent' }">
-                                                {{ emp.status }}
-                                            </span>
+                                                :class="{ 'text-emerald-600': emp.status === 'On-Time', 'text-amber-600': emp.status === 'Late', 'text-slate-400': emp.status === 'Absent' }">{{
+                                                    emp.status }}</span>
                                         </div>
                                     </td>
                                 </tr>
@@ -484,9 +640,129 @@ const shiftIcon = (type) => {
                     </div>
                 </div>
             </div>
+
+            <div v-else-if="activeView === 'approvals' && is_manager" key="approvals" class="space-y-8">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div
+                        class="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm p-10">
+                        <div class="flex items-center gap-4 mb-8">
+                            <div class="p-3 bg-rose-100 text-rose-600 rounded-2xl">
+                                <ShieldCheck class="h-6 w-6" />
+                            </div>
+                            <h2 class="text-lg font-black uppercase tracking-widest">Pending Shifts</h2>
+                        </div>
+                        <div class="space-y-4 max-h-[600px] overflow-y-auto custom-scroll pr-4">
+                            <div v-if="pending_shifts.length === 0"
+                                class="text-center py-20 opacity-30 font-black uppercase tracking-widest">No pending
+                                shifts</div>
+                            <div v-for="ps in pending_shifts" :key="ps.id"
+                                class="p-6 border rounded-3xl bg-slate-50 dark:bg-slate-950 flex items-center justify-between">
+                                <div>
+                                    <p class="text-[10px] font-black text-blue-600 uppercase">{{ ps.shift_type }} Shift
+                                    </p>
+                                    <p class="font-black text-sm uppercase tracking-tighter">{{ ps.user?.name || 'Staff'
+                                    }}</p>
+                                    <p class="text-[10px] text-slate-400 font-bold">{{ ps.effective_date }}</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button @click="handleApproval(ps.id, 'shift', 'approve')"
+                                        class="p-3 bg-emerald-500 text-white rounded-xl hover:scale-105 transition">
+                                        <ThumbsUp class="h-4 w-4" />
+                                    </button>
+                                    <button @click="handleApproval(ps.id, 'shift', 'reject')"
+                                        class="p-3 bg-rose-500 text-white rounded-xl hover:scale-105 transition">
+                                        <ThumbsDown class="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div
+                        class="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm p-10">
+                        <div class="flex items-center gap-4 mb-8">
+                            <div class="p-3 bg-purple-100 text-purple-600 rounded-2xl">
+                                <Sparkles class="h-6 w-6" />
+                            </div>
+                            <h2 class="text-lg font-black uppercase tracking-widest">Pending Holidays</h2>
+                        </div>
+                        <div class="space-y-4">
+                            <div v-if="pending_holidays.length === 0"
+                                class="text-center py-20 opacity-30 font-black uppercase tracking-widest">No pending
+                                holidays</div>
+                            <div v-for="ph in pending_holidays" :key="ph.id"
+                                class="p-6 border rounded-3xl bg-slate-50 dark:bg-slate-950 flex items-center justify-between">
+                                <div>
+                                    <p class="font-black text-sm uppercase tracking-tighter">{{ ph.holiday_name }}</p>
+                                    <p class="text-[10px] text-slate-400 font-bold uppercase">{{ ph.holiday_date }} • {{
+                                        ph.holiday_type.replace('_', ' ') }}</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button @click="handleApproval(ph.id, 'holiday', 'approve')"
+                                        class="p-3 bg-emerald-500 text-white rounded-xl hover:scale-105 transition">
+                                        <ThumbsUp class="h-4 w-4" />
+                                    </button>
+                                    <button @click="handleApproval(ph.id, 'holiday', 'reject')"
+                                        class="p-3 bg-rose-500 text-white rounded-xl hover:scale-105 transition">
+                                        <ThumbsDown class="h-4 w-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </Transition>
 
-        <!-- Monthly Pipeline Modal (unchanged, already shows shift times) -->
+        <Transition enter-active-class="duration-300 ease-out" enter-from-class="opacity-0 scale-95"
+            enter-to-class="opacity-100 scale-100" leave-active-class="duration-200 ease-in"
+            leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
+            <div v-if="isHolidayModalOpen" class="fixed inset-0 z-[80] flex items-center justify-center p-4">
+                <div class="absolute inset-0 bg-slate-900/90 backdrop-blur-md" @click="closeModal"></div>
+                <div
+                    class="relative bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl overflow-hidden border border-white/10">
+                    <div class="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                        <h2 class="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                            {{ getHolidayInfo(holidayForm.holiday_date) ? 'Edit' : 'Add' }} Holiday</h2>
+                        <button @click="closeModal" class="p-2 hover:bg-rose-50 rounded-full">
+                            <X class="h-5 w-5" />
+                        </button>
+                    </div>
+                    <form @submit.prevent="submitHoliday" class="p-8 space-y-6">
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</label>
+                            <input type="date" v-model="holidayForm.holiday_date" required
+                                class="w-full mt-2 px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-blue-600" />
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Holiday
+                                Name</label>
+                            <input type="text" v-model="holidayForm.holiday_name" required
+                                placeholder="e.g., Christmas Day"
+                                class="w-full mt-2 px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 focus:ring-2 focus:ring-blue-600 uppercase font-black" />
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</label>
+                            <select v-model="holidayForm.holiday_type" required
+                                class="w-full mt-2 px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 focus:ring-2 focus:ring-blue-600 font-bold">
+                                <option value="regular">Regular Holiday (Non-working)</option>
+                                <option value="special_non_working">Special Non-Working</option>
+                                <option value="special_working">Special Working</option>
+                            </select>
+                        </div>
+                        <div v-if="getHolidayInfo(holidayForm.holiday_date)" class="flex gap-3">
+                            <button type="button" @click="deleteHoliday(holidayForm.holiday_date)"
+                                class="flex-1 py-4 bg-rose-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-rose-600 transition">Delete</button>
+                            <button type="submit" :disabled="holidayForm.processing"
+                                class="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition shadow-lg disabled:opacity-50">Save</button>
+                        </div>
+                        <button v-else type="submit" :disabled="holidayForm.processing"
+                            class="w-full py-4 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition shadow-lg disabled:opacity-50">Save
+                            Holiday</button>
+                    </form>
+                </div>
+            </div>
+        </Transition>
+
         <Transition enter-active-class="duration-300 ease-out" enter-from-class="opacity-0 scale-95"
             enter-to-class="opacity-100 scale-100" leave-active-class="duration-200 ease-in"
             leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
@@ -506,8 +782,8 @@ const shiftIcon = (type) => {
                                         class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
                                         Monthly Pipeline: {{ monthName }}</h2>
                                 </div>
-                                <p class="text-xs text-slate-500 font-bold uppercase tracking-widest">Assign an employee
-                                    to a shift for the WHOLE month</p>
+                                <p class="text-xs text-slate-500 font-bold uppercase tracking-widest">Whole-Month
+                                    Scheduler (Non-working holidays skipped automatically)</p>
                             </div>
                             <button @click="closeModal" class="p-3 hover:bg-rose-50 rounded-2xl transition-colors">
                                 <X class="h-6 w-6" />
@@ -534,13 +810,11 @@ const shiftIcon = (type) => {
                                             :is="shiftType === 'Morning' ? Sunrise : (shiftType === 'Afternoon' ? Sunset : Moon)"
                                             class="h-4 w-4" />
                                     </div>
-                                    <div class="flex flex-col">
-                                        <span class="font-black text-xs uppercase tracking-widest">{{ shiftType
-                                        }}</span>
-                                        <span
+                                    <div class="flex flex-col"><span
+                                            class="font-black text-xs uppercase tracking-widest">{{ shiftType
+                                            }}</span><span
                                             class="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">{{
-                                                getShiftRange(shiftType) }}</span>
-                                    </div>
+                                                getShiftRange(shiftType) }}</span></div>
                                 </div>
                                 <button
                                     @click="activeMonthlySelectorShift = activeMonthlySelectorShift === shiftType ? null : shiftType"
@@ -555,13 +829,14 @@ const shiftIcon = (type) => {
                                     <div
                                         class="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[10px] font-bold text-blue-600">
                                         {{ emp.name.charAt(0) }}</div>
-                                    <div class="flex flex-col">
-                                        <span
+                                    <div class="flex flex-col flex-1"><span
                                             class="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-tight">{{
-                                                emp.name }}</span>
-                                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{{
-                                            getShiftRange(shiftType) }}</span>
-                                    </div>
+                                                emp.name }}</span></div>
+                                    <button
+                                        @click="removeShift(emp.id, selectedDate || new Date().toISOString().split('T')[0])"
+                                        class="p-1 text-slate-400 hover:text-rose-600 transition">
+                                        <Trash2 class="h-4 w-4" />
+                                    </button>
                                 </div>
                             </div>
                             <div v-else
@@ -575,19 +850,6 @@ const shiftIcon = (type) => {
                                 enter-from-class="opacity-0 translate-y-2" enter-to-class="opacity-100 translate-y-0">
                                 <div v-if="activeMonthlySelectorShift === shiftType"
                                     class="absolute top-20 left-0 right-0 z-[70] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-2xl p-4 max-h-[300px] overflow-y-auto custom-scroll">
-                                    <div class="flex items-center justify-between mb-4 px-2">
-                                        <div class="flex flex-col">
-                                            <span
-                                                class="text-[9px] font-black uppercase tracking-widest text-blue-600">Assign
-                                                Monthly {{ shiftType }}</span>
-                                            <span
-                                                class="text-[8px] font-bold text-slate-400 uppercase tracking-tight">{{
-                                                    getShiftRange(shiftType) }}</span>
-                                        </div>
-                                        <button @click="activeMonthlySelectorShift = null">
-                                            <X class="h-4 w-4 text-slate-400" />
-                                        </button>
-                                    </div>
                                     <div v-if="monthlyDeptStaff.length > 0" class="space-y-1">
                                         <button v-for="emp in monthlyDeptStaff" :key="emp.id"
                                             @click="setEmployeeMonthlySchedule(emp.id, shiftType)"
@@ -595,14 +857,9 @@ const shiftIcon = (type) => {
                                             <div
                                                 class="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-700 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center text-[9px] font-black">
                                                 {{ emp.name.charAt(0) }}</div>
-                                            <div class="flex flex-col items-start">
-                                                <span
-                                                    class="text-xs font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 uppercase">{{
-                                                        emp.name }}</span>
-                                                <span
-                                                    class="text-[8px] font-bold text-slate-400 uppercase group-hover:text-blue-400">{{
-                                                        getShiftRange(shiftType) }}</span>
-                                            </div>
+                                            <span
+                                                class="text-xs font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 uppercase">{{
+                                                    emp.name }}</span>
                                         </button>
                                     </div>
                                 </div>
@@ -625,7 +882,6 @@ const shiftIcon = (type) => {
             </div>
         </Transition>
 
-        <!-- Daily Shift Modal (unchanged, already shows shift times) -->
         <Transition enter-active-class="duration-300 ease-out" enter-from-class="opacity-0 scale-95"
             enter-to-class="opacity-100 scale-100" leave-active-class="duration-200 ease-in"
             leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
@@ -645,8 +901,13 @@ const shiftIcon = (type) => {
                                         class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
                                         Scheduled Shift: {{ selectedDate }}</h2>
                                 </div>
-                                <p class="text-xs text-slate-500 font-bold uppercase tracking-widest">Select Department
-                                    to Manage Pipeline Assignments</p>
+                                <div v-if="getHolidayInfo(selectedDate)" class="mt-2 text-sm">
+                                    <span class="font-bold uppercase"
+                                        :class="{ 'text-red-600': getHolidayInfo(selectedDate).type.includes('regular'), 'text-amber-600': getHolidayInfo(selectedDate).type === 'special_non_working', 'text-green-600': getHolidayInfo(selectedDate).type === 'special_working' }">
+                                        🎉 {{ getHolidayInfo(selectedDate).name }} ({{
+                                            getHolidayInfo(selectedDate).type.replace('_', ' ') }})
+                                    </span>
+                                </div>
                             </div>
                             <button @click="closeModal" class="p-3 hover:bg-rose-50 rounded-2xl transition-colors">
                                 <X class="h-6 w-6" />
@@ -673,18 +934,18 @@ const shiftIcon = (type) => {
                                             :is="shiftType === 'Morning' ? Sunrise : (shiftType === 'Afternoon' ? Sunset : Moon)"
                                             class="h-4 w-4" />
                                     </div>
-                                    <div class="flex flex-col">
-                                        <span class="font-black text-xs uppercase tracking-widest">{{ shiftType
-                                        }}</span>
-                                        <span
+                                    <div class="flex flex-col"><span
+                                            class="font-black text-xs uppercase tracking-widest">{{ shiftType
+                                            }}</span><span
                                             class="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">{{
-                                                getShiftRange(shiftType) }}</span>
-                                    </div>
+                                                getShiftRange(shiftType) }}</span></div>
                                 </div>
-                                <button
+                                <button :disabled="isNonWorkingDay(selectedDate)"
                                     @click="activeSelectorShift = activeSelectorShift === shiftType ? null : shiftType"
-                                    class="p-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border hover:scale-110 transition-transform">
-                                    <Plus class="h-4 w-4 text-blue-600" />
+                                    class="p-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border hover:scale-110 transition-transform"
+                                    :class="{ 'opacity-50 cursor-not-allowed': isNonWorkingDay(selectedDate) }">
+                                    <Plus class="h-4 w-4"
+                                        :class="isNonWorkingDay(selectedDate) ? 'text-slate-300' : 'text-blue-600'" />
                                 </button>
                             </div>
                             <div v-if="getEmployeesInShift(shiftType).length > 0" class="space-y-3">
@@ -693,13 +954,13 @@ const shiftIcon = (type) => {
                                     <div
                                         class="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-[10px] font-bold text-blue-600">
                                         {{ emp.name.charAt(0) }}</div>
-                                    <div class="flex flex-col">
-                                        <span
+                                    <div class="flex flex-col flex-1"><span
                                             class="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-tight">{{
-                                                emp.name }}</span>
-                                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{{
-                                            getShiftRange(shiftType) }}</span>
-                                    </div>
+                                                emp.name }}</span></div>
+                                    <button @click="removeShift(emp.id, selectedDate)"
+                                        class="p-1 text-slate-400 hover:text-rose-600 transition">
+                                        <Trash2 class="h-4 w-4" />
+                                    </button>
                                 </div>
                             </div>
                             <div v-else
@@ -710,36 +971,18 @@ const shiftIcon = (type) => {
                             </div>
                             <Transition enter-active-class="duration-200 ease-out"
                                 enter-from-class="opacity-0 translate-y-2" enter-to-class="opacity-100 translate-y-0">
-                                <div v-if="activeSelectorShift === shiftType"
+                                <div v-if="activeSelectorShift === shiftType && !isNonWorkingDay(selectedDate)"
                                     class="absolute top-20 left-0 right-0 z-[70] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-2xl p-4 max-h-[300px] overflow-y-auto custom-scroll">
-                                    <div class="flex items-center justify-between mb-4 px-2">
-                                        <div class="flex flex-col">
-                                            <span
-                                                class="text-[9px] font-black uppercase tracking-widest text-blue-600">Assign
-                                                to {{ shiftType }}</span>
-                                            <span
-                                                class="text-[8px] font-bold text-slate-400 uppercase tracking-tight">{{
-                                                    getShiftRange(shiftType) }}</span>
-                                        </div>
-                                        <button @click="activeSelectorShift = null">
-                                            <X class="h-4 w-4 text-slate-400" />
-                                        </button>
-                                    </div>
                                     <div v-if="departmentStaff.length > 0" class="space-y-1">
                                         <button v-for="emp in departmentStaff" :key="emp.id"
                                             @click="updateShift(emp.id, shiftType)"
                                             class="w-full flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-xl transition-colors group">
                                             <div
-                                                class="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-700 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center text-[9px] font-black transition-colors">
+                                                class="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-700 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center text-[9px] font-black">
                                                 {{ emp.name.charAt(0) }}</div>
-                                            <div class="flex flex-col items-start">
-                                                <span
-                                                    class="text-xs font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 uppercase">{{
-                                                        emp.name }}</span>
-                                                <span
-                                                    class="text-[8px] font-bold text-slate-400 uppercase group-hover:text-blue-400">{{
-                                                        getShiftRange(shiftType) }}</span>
-                                            </div>
+                                            <span
+                                                class="text-xs font-bold text-slate-600 dark:text-slate-300 group-hover:text-blue-600 uppercase">{{
+                                                    emp.name }}</span>
                                         </button>
                                     </div>
                                 </div>

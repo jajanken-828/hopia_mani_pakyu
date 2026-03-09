@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
-// Added for CRM dashboard stats
 use App\Models\Client;
-use App\Models\Product; // Added for CRM integration
-use App\Models\PurchaseOrder; // Added for HRM audit logs
-use App\Models\User; // Added for ECO dashboard stats
+use App\Models\Product;
+use App\Models\PurchaseOrder;
+use App\Models\TraineeGrade;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -36,7 +36,7 @@ class DashboardController extends Controller
             return Inertia::render('Dashboard/TRAINEE/index', [
                 'user' => $user,
                 'stats' => [
-                    'progress' => 45, // Example static progress
+                    'progress' => 45,
                     'assigned_modules' => 5,
                     'days_remaining' => 12,
                 ],
@@ -63,22 +63,82 @@ class DashboardController extends Controller
     private function handleHrmDashboard(string $position)
     {
         if ($position === 'manager') {
-            // Fetch trainees suggested by HRM Staff for promotion
-            $suggestedTrainees = User::where('promotion_suggested', true)
-                ->orderBy('suggested_at', 'desc')
-                ->get();
+            /*
+             * Fetch ALL trainees regardless of promotion_suggested flag.
+             * The manager must be able to grade any trainee directly —
+             * not only those already suggested by HRM Staff.
+             *
+             * Ordering: suggested trainees first (suggested_at IS NOT NULL),
+             * then unsugested ones, both groups sorted by created_at desc.
+             */
+            $suggestedTrainees = User::where('position', 'trainee')
+                ->with('traineeGrade')
+                ->orderByRaw('promotion_suggested DESC')   // suggested ones first
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($user) {
+                    return [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'role' => $user->role,
+                        'department' => $user->department,
+                        'employee_id' => $user->employee_id,
+                        'suggested_at' => $user->suggested_at,
+                        'promotion_suggested' => (bool) $user->promotion_suggested,
+                        'profile_photo_url' => $user->profile_photo_path
+                            ? asset('storage/'.$user->profile_photo_path)
+                            : null,
+                        // Explicitly cast to null so Vue computed checks work correctly
+                        'trainee_grade' => $user->traineeGrade ? [
+                            'id' => $user->traineeGrade->id,
+                            'skills_performance' => $user->traineeGrade->skills_performance,
+                            'behaviour' => $user->traineeGrade->behaviour,
+                            'technicals' => $user->traineeGrade->technicals,
+                            'safety_awareness' => $user->traineeGrade->safety_awareness,
+                            'productivity' => $user->traineeGrade->productivity,
+                            'total_percentage' => $user->traineeGrade->total_percentage,
+                        ] : null,
+                    ];
+                });
+
+            // All managers and staff (exclude trainees — they appear in the trainee tab)
+            $allEmployees = User::whereIn('position', ['manager', 'staff'])
+                ->orderBy('role')
+                ->orderBy('position')
+                ->orderBy('name')
+                ->get()
+                ->map(function ($user) {
+                    return [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'role' => $user->role,
+                        'position' => $user->position,
+                        'department' => $user->department,
+                        'employee_id' => $user->employee_id,
+                        'is_active' => (bool) $user->is_active,
+                        'join_date' => $user->join_date,
+                        'profile_photo_url' => $user->profile_photo_path
+                            ? asset('storage/'.$user->profile_photo_path)
+                            : null,
+                    ];
+                });
 
             return Inertia::render('Dashboard/HRM/Manager/Index', [
                 'suggestedTrainees' => $suggestedTrainees,
+                'allEmployees' => $allEmployees,
                 'stats' => [
-                    'totalEmployees' => User::count(),
+                    'totalEmployees' => User::whereIn('position', ['manager', 'staff'])->count(),
                     'activeRecruitment' => 12,
                     'pendingLeaves' => 8,
                     'attendanceRate' => 95,
+                    'totalTrainees' => User::where('position', 'trainee')->count(),
                 ],
             ]);
         }
 
+        // ── HRM Staff Dashboard ──────────────────────────────────
         $employees = User::all()->map(function ($user) {
             return [
                 'id' => $user->id,
@@ -90,7 +150,6 @@ class DashboardController extends Controller
                 'department' => $user->department,
                 'employee_id' => $user->employee_id,
                 'profile_photo_path' => $user->profile_photo_path,
-                // Full URL for the profile photo
                 'profile_photo_url' => $user->profile_photo_path
                     ? asset('storage/'.$user->profile_photo_path)
                     : null,
@@ -108,7 +167,7 @@ class DashboardController extends Controller
         });
 
         return Inertia::render('Dashboard/HRM/Employee/Index', [
-            'employees' => $employees, // Use the mapped variable here
+            'employees' => $employees,
             'auditLogs' => $auditLogs,
             'stats' => [
                 'total' => User::count(),
@@ -135,8 +194,7 @@ class DashboardController extends Controller
 
         $user->update(['is_active' => $newStatus]);
 
-        // Save the action to your new AuditLog table
-        \App\Models\AuditLog::create([
+        AuditLog::create([
             'admin_id' => Auth::id(),
             'target_id' => $user->id,
             'target_name' => $user->name,
@@ -179,20 +237,135 @@ class DashboardController extends Controller
 
     /**
      * Finalize the promotion of a trainee to staff status.
-     * This moves them from 'trainee' to 'staff' and clears the suggestion flag.
+     * Used when the trainee has already been graded by staff.
+     * The manager confirms and locks in the promotion.
      */
     public function finalizePromotion($id)
     {
         $trainee = User::findOrFail($id);
 
+        // Update via array is safer than explicit assignment to avoid fillable blocks
         $trainee->update([
             'position' => 'staff',
             'promotion_suggested' => false,
             'suggested_at' => null,
         ]);
 
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'target_id' => $trainee->id,
+            'target_name' => $trainee->name,
+            'action' => 'promote',
+            'reason' => 'Manager approved promotion from Trainee to Staff.',
+        ]);
+
         return redirect()->back()->with('message', "{$trainee->name} has been successfully promoted to Staff.");
     }
+
+    /**
+     * Grade a trainee directly as an HRM Manager.
+     *
+     * Scale: each criterion is 1–5 stars. Percentage = (sum / 25) * 100.
+     * Passing threshold: 80%. Auto-promotes trainee to Staff if passed.
+     *
+     * Wrapped in DB::transaction so any failure rolls back atomically
+     * and returns a clear error response to the frontend.
+     */
+    public function gradeAndPromote(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'skills_performance' => 'required|integer|min:1|max:5',
+            'behaviour' => 'required|integer|min:1|max:5',
+            'technicals' => 'required|integer|min:1|max:5',
+            'safety_awareness' => 'required|integer|min:1|max:5',
+            'productivity' => 'required|integer|min:1|max:5',
+        ]);
+
+        $trainee = User::findOrFail($id);
+
+        $totalStars = (int) $validated['skills_performance']
+            + (int) $validated['behaviour']
+            + (int) $validated['technicals']
+            + (int) $validated['safety_awareness']
+            + (int) $validated['productivity'];
+
+        // Cast to int — the DB column is INTEGER, not DECIMAL
+        $percentage = (int) round(($totalStars / 25) * 100);
+
+        \Log::info('[gradeAndPromote] Starting save', [
+            'trainee_id' => $trainee->id,
+            'validated' => $validated,
+            'totalStars' => $totalStars,
+            'percentage' => $percentage,
+            'admin_id' => Auth::id(),
+        ]);
+
+        try {
+            \DB::transaction(function () use ($trainee, $validated, $percentage) {
+                // Use explicit firstOrNew + fill + save for the most reliable Eloquent write
+                $grade = TraineeGrade::firstOrNew(['user_id' => $trainee->id]);
+                $grade->skills_performance = (int) $validated['skills_performance'];
+                $grade->behaviour = (int) $validated['behaviour'];
+                $grade->technicals = (int) $validated['technicals'];
+                $grade->safety_awareness = (int) $validated['safety_awareness'];
+                $grade->productivity = (int) $validated['productivity'];
+                $grade->total_percentage = $percentage;
+                $grade->save();
+
+                \Log::info('[gradeAndPromote] TraineeGrade saved', [
+                    'grade_id' => $grade->id,
+                    'user_id' => $grade->user_id,
+                    'total_percentage' => $grade->total_percentage,
+                    'wasRecentlyCreated' => $grade->wasRecentlyCreated,
+                ]);
+
+                // Auto-promote if passing threshold
+                if ($percentage >= 80) {
+                    $trainee->position = 'staff';
+                    $trainee->promotion_suggested = false;
+                    $trainee->suggested_at = null;
+                    $trainee->save();
+                }
+            });
+
+            // Move AuditLog creation outside the transaction to ensure grades are saved even if audit fails
+            AuditLog::create([
+                'admin_id' => Auth::id(),
+                'target_id' => $trainee->id,
+                'target_name' => $trainee->name,
+                'action' => $percentage >= 80 ? 'promote' : 'grade',
+                'reason' => $percentage >= 80
+                    ? "Manager graded and auto-promoted. Final score: {$percentage}%."
+                    : "Manager submitted grade. Score: {$percentage}%. Below 80% threshold.",
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('[gradeAndPromote] DB write failed', [
+                'trainee_id' => $trainee->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return redirect()->back()->withErrors([
+                'grade' => 'Failed to save grades: '.$e->getMessage(),
+            ]);
+        }
+
+        if ($percentage >= 80) {
+            return redirect()->back()->with(
+                'message',
+                "{$trainee->name} scored {$percentage}% and has been automatically promoted to Staff!"
+            );
+        }
+
+        return redirect()->back()->with(
+            'message',
+            "{$trainee->name} has been graded. Score: {$percentage}% — below the 80% promotion threshold."
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Remaining department handlers (unchanged)
+    // ─────────────────────────────────────────────────────────────────
 
     private function handleScmDashboard(string $position)
     {
@@ -204,18 +377,12 @@ class DashboardController extends Controller
                     'completedDeliveries' => 24,
                     'stockAlerts' => 3,
                 ],
-                'inventoryItems' => [],
-                'pendingOrders' => [],
             ]);
         }
 
         return Inertia::render('Dashboard/SCM/Employee/Index', [
-            'stats' => [
-                'pendingPickups' => 5,
-                'incomingShipments' => 3,
-                'inventoryChecks' => 2,
-            ],
             'user' => Auth::user(),
+            'stats' => [],
         ]);
     }
 
@@ -250,16 +417,18 @@ class DashboardController extends Controller
 
     private function handleInvDashboard(string $position)
     {
+        $stockLevels = [
+            ['id' => 1, 'name' => 'Cotton Fabric',   'sku' => 'CF-001', 'quantity' => 150, 'status' => 'In Stock'],
+            ['id' => 2, 'name' => 'Polyester Blend',  'sku' => 'PB-002', 'quantity' => 85,  'status' => 'In Stock'],
+            ['id' => 3, 'name' => 'Silk Material',    'sku' => 'SM-003', 'quantity' => 25,  'status' => 'Low Stock'],
+            ['id' => 4, 'name' => 'Denim',            'sku' => 'DN-004', 'quantity' => 200, 'status' => 'In Stock'],
+            ['id' => 5, 'name' => 'Wool Blend',       'sku' => 'WB-005', 'quantity' => 8,   'status' => 'Critical'],
+        ];
+
         if ($position === 'manager') {
             return Inertia::render('Dashboard/INV/Manager/index', [
                 'user' => Auth::user(),
-                'stockLevels' => [
-                    ['id' => 1, 'name' => 'Cotton Fabric', 'sku' => 'CF-001', 'quantity' => 150, 'status' => 'In Stock'],
-                    ['id' => 2, 'name' => 'Polyester Blend', 'sku' => 'PB-002', 'quantity' => 85, 'status' => 'In Stock'],
-                    ['id' => 3, 'name' => 'Silk Material', 'sku' => 'SM-003', 'quantity' => 25, 'status' => 'Low Stock'],
-                    ['id' => 4, 'name' => 'Denim', 'sku' => 'DN-004', 'quantity' => 200, 'status' => 'In Stock'],
-                    ['id' => 5, 'name' => 'Wool Blend', 'sku' => 'WB-005', 'quantity' => 8, 'status' => 'Critical'],
-                ],
+                'stockLevels' => $stockLevels,
                 'stats' => [
                     'totalItems' => 468,
                     'lowStock' => 12,
@@ -271,16 +440,11 @@ class DashboardController extends Controller
 
         return Inertia::render('Dashboard/INV/Employee/index', [
             'user' => Auth::user(),
-            'stockLevels' => [
-                ['id' => 1, 'name' => 'Cotton Fabric', 'sku' => 'CF-001', 'quantity' => 150, 'status' => 'In Stock'],
-                ['id' => 2, 'name' => 'Polyester Blend', 'sku' => 'PB-002', 'quantity' => 85, 'status' => 'In Stock'],
-                ['id' => 3, 'name' => 'Silk Material', 'sku' => 'SM-003', 'quantity' => 25, 'status' => 'Low Stock'],
-                ['id' => 4, 'name' => 'Denim', 'sku' => 'DN-004', 'quantity' => 200, 'status' => 'In Stock'],
-                ['id' => 5, 'name' => 'Wool Blend', 'sku' => 'WB-005', 'quantity' => 8, 'status' => 'Critical'],
-                ['id' => 6, 'name' => 'Linen', 'sku' => 'LN-006', 'quantity' => 45, 'status' => 'In Stock'],
-                ['id' => 7, 'name' => 'Satin', 'sku' => 'ST-007', 'quantity' => 60, 'status' => 'In Stock'],
+            'stockLevels' => array_merge($stockLevels, [
+                ['id' => 6, 'name' => 'Linen',  'sku' => 'LN-006', 'quantity' => 45, 'status' => 'In Stock'],
+                ['id' => 7, 'name' => 'Satin',  'sku' => 'ST-007', 'quantity' => 60, 'status' => 'In Stock'],
                 ['id' => 8, 'name' => 'Velvet', 'sku' => 'VL-008', 'quantity' => 15, 'status' => 'Low Stock'],
-            ],
+            ]),
             'stats' => [
                 'totalItems' => 468,
                 'lowStock' => 12,
@@ -333,23 +497,20 @@ class DashboardController extends Controller
                     'totalPipelineValue' => (float) \App\Models\CrmLead::whereNotIn('status', ['Closed-Won', 'Lost'])
                         ->sum('estimated_value'),
                     'activeInquiries' => \App\Models\CrmLead::where('status', 'Inquiry')->count(),
-                    'pendingApprovals' => \App\Models\PurchaseOrder::whereIn('status', ['credit_review', 'tier_assignment'])
-                        ->count(),
+                    'pendingApprovals' => \App\Models\PurchaseOrder::whereIn('status', ['credit_review', 'tier_assignment'])->count(),
                     'conversionRate' => (int) $conversionRate,
                 ],
-                'dailyActivityCount' => \App\Models\CrmInteraction::whereDate('created_at', \Carbon\Carbon::today())->count(),
-                'leaderboard' => \App\Models\User::where('role', 'CRM')
+                'dailyActivityCount' => \App\Models\CrmInteraction::whereDate('created_at', Carbon::today())->count(),
+                'leaderboard' => User::where('role', 'CRM')
                     ->where('position', 'staff')
-                    ->withCount(['leads as won_deals' => function ($query) {
-                        $query->where('status', 'Closed-Won');
-                    }])
+                    ->withCount(['leads as won_deals' => fn ($q) => $q->where('status', 'Closed-Won')])
                     ->orderBy('won_deals', 'desc')
                     ->get()
-                    ->map(fn ($user) => [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'email' => $user->email,
-                        'won_deals' => $user->won_deals,
+                    ->map(fn ($u) => [
+                        'id' => $u->id,
+                        'name' => $u->name,
+                        'email' => $u->email,
+                        'won_deals' => $u->won_deals,
                     ]),
             ]);
         }
@@ -367,25 +528,15 @@ class DashboardController extends Controller
     {
         $view = $position === 'manager' ? 'Dashboard/ECO/Manager/index' : 'Dashboard/ECO/Employee/index';
 
-        // 1. Fetch Real Product Data (Crucial for the Ledger)
-        // We use paginate(10) so that 'products.data' is available in Vue
         $products = Product::orderBy('name', 'asc')->paginate(10);
-
         $pendingCompanies = Client::whereIn('status', ['pending', 'Pending'])->latest()->get();
         $verifiedCompanies = Client::whereNotIn('status', ['pending', 'Pending'])->latest()->get();
 
-        // 2. Calculate Real-time Pipeline counts
         $pendingCreditCount = PurchaseOrder::where('status', 'credit_review')->count();
         $pendingTieringCount = PurchaseOrder::where('status', 'tier_assignment')->count();
 
-        // 3. Revenue Metrics
-        $todaySales = PurchaseOrder::where('status', 'approved')
-            ->whereDate('created_at', Carbon::today())
-            ->sum('total_amount');
-
-        $monthlyRevenue = PurchaseOrder::where('status', 'approved')
-            ->whereMonth('created_at', Carbon::now()->month)
-            ->sum('total_amount');
+        $todaySales = PurchaseOrder::where('status', 'approved')->whereDate('created_at', Carbon::today())->sum('total_amount');
+        $monthlyRevenue = PurchaseOrder::where('status', 'approved')->whereMonth('created_at', Carbon::now()->month)->sum('total_amount');
 
         $pipelineDetails = PurchaseOrder::with('client')
             ->whereIn('status', ['credit_review', 'tier_assignment'])
@@ -394,7 +545,7 @@ class DashboardController extends Controller
 
         return Inertia::render($view, [
             'user' => Auth::user(),
-            'products' => $products, // This populates the Inventory Ledger
+            'products' => $products,
             'pendingCompanies' => $pendingCompanies,
             'verifiedCompanies' => $verifiedCompanies,
             'onlineSales' => PurchaseOrder::with('client')->latest()->take(5)->get(),
@@ -404,8 +555,8 @@ class DashboardController extends Controller
                 'monthlyRevenue' => number_format($monthlyRevenue, 2),
                 'activeProducts' => Product::where('status', 'published')->count(),
                 'lowStockCount' => Product::where('stock', '<', 50)->count(),
-                'pendingCredit' => $pendingCreditCount, // For Department Pipeline
-                'pendingTiering' => $pendingTieringCount, // For Department Pipeline
+                'pendingCredit' => $pendingCreditCount,
+                'pendingTiering' => $pendingTieringCount,
             ],
         ]);
     }

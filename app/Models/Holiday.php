@@ -14,5 +14,10 @@ class Holiday extends Model
         'holiday_name',
         'holiday_type',
         'premium_rate',
+        'status', // New field
+    ];
+
+    protected $attributes = [
+        'status' => 'approved',
     ];
 }

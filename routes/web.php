@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\ClientAuthController;
+use App\Http\Controllers\Auth\SupplierAuthController;
 use App\Http\Controllers\client\DashboardController as ClientDashboardController;
 use App\Http\Controllers\client\InvoicesController;
 use App\Http\Controllers\client\OrdersController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\eco\staff\CustomerController;
 use App\Http\Controllers\eco\staff\OrdermngController;
 use App\Http\Controllers\eco\staff\ProductsController;
 use App\Http\Controllers\hrm\employee\AttendanceController;
+use App\Http\Controllers\hrm\employee\HolidayController;
 use App\Http\Controllers\hrm\employee\HrmstaffpayrollController;
 use App\Http\Controllers\hrm\employee\InterviewController;
 use App\Http\Controllers\hrm\employee\LeaveController;
@@ -27,6 +29,9 @@ use App\Http\Controllers\hrm\manager\AnalyticsController;
 use App\Http\Controllers\hrm\manager\ApplicantController;
 use App\Http\Controllers\hrm\manager\OnboardingController;
 use App\Http\Controllers\hrm\manager\PayrollController;
+use App\Http\Controllers\inv\InventoryController as InvInventoryController;
+use App\Http\Controllers\inv\MaterialController;
+use App\Http\Controllers\inv\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\scm\employee\InboundController;
 use App\Http\Controllers\scm\employee\InventoryController;
@@ -34,7 +39,8 @@ use App\Http\Controllers\scm\employee\RecievingController;
 use App\Http\Controllers\scm\employee\VerificationController;
 use App\Http\Controllers\scm\manager\AuditController;
 use App\Http\Controllers\scm\manager\CloseController;
-use App\Http\Controllers\scm\manager\SourcingController;
+use App\Http\Controllers\scm\manager\ProcurementController;
+use App\Http\Controllers\SUPPLIERS\SupplierDashboardController;
 use App\Http\Controllers\trainee\TraineeAttendanceController;
 use App\Http\Controllers\trainee\TraineePayslipController;
 use App\Http\Controllers\trainee\TraineeTimeKeepingController;
@@ -160,7 +166,7 @@ Route::prefix('dashboard/hrm')->name('hrm.')->middleware(['auth', 'verified'])->
         ->name('training.suggest-promotion');
 
     Route::get('/leave', [LeaveController::class, 'leave'])
-        ->middleware(['role:HRM', 'position:staff'])
+        ->middleware(['role:HRM', 'position:staff,manager'])
         ->name('employee.leave');
 
     // Route for Approve/Reject buttons (PATCH)
@@ -170,16 +176,36 @@ Route::prefix('dashboard/hrm')->name('hrm.')->middleware(['auth', 'verified'])->
     Route::post('/leave/manual', [LeaveController::class, 'store_manual'])->name('employee.leave.store_manual');
 
     Route::get('/attendance', [AttendanceController::class, 'attendance'])
-        ->middleware(['role:HRM', 'position:staff'])
+        ->middleware(['role:HRM', 'position:staff,manager'])
         ->name('employee.attendance');
 
-    // Inside web.php
-    Route::post('/attendance/toggle', [App\Http\Controllers\hrm\employee\AttendanceController::class, 'toggle'])
+    Route::post('/attendance/toggle', [AttendanceController::class, 'toggle'])
         ->name('employee.attendance.toggle');
 
+    // Soft-delete a single shift for a specific employee on a specific date.
+    // Vue always calls this via router.delete() — keep only the DELETE route to avoid name collision.
+    Route::delete('/attendance/shift', [AttendanceController::class, 'destroyShift'])
+        ->name('employee.attendance.destroy-shift');
+
+    // Soft-delete all shifts for an employee across a whole month.
+    Route::post('/attendance/shift/remove-monthly', [AttendanceController::class, 'destroyMonthlyShift'])
+        ->name('employee.attendance.destroy-monthly-shift');
+
+    // Approval routes — names must NOT repeat 'hrm.' since the parent group already adds it
+    Route::post('/attendance/approve-shift', [AttendanceController::class, 'approveShift'])->name('employee.attendance.approve-shift');
+    Route::post('/attendance/reject-shift', [AttendanceController::class, 'rejectShift'])->name('employee.attendance.reject-shift');
+    Route::post('/attendance/approve-holiday', [AttendanceController::class, 'approveHoliday'])->name('employee.attendance.approve-holiday');
+    Route::post('/attendance/reject-holiday', [AttendanceController::class, 'rejectHoliday'])->name('employee.attendance.reject-holiday');
+
+    // No position middleware here — both staff and managers use this; controller checks internally
     Route::post('/attendance/update-shift', [AttendanceController::class, 'updateShift'])
-        ->middleware(['role:HRM', 'position:staff'])
         ->name('employee.attendance.update-shift');
+
+    Route::prefix('holidays')->name('employee.holidays.')->group(function () {
+        Route::post('/', [HolidayController::class, 'store'])->name('store');
+        Route::patch('/{holiday}', [HolidayController::class, 'update'])->name('update');
+        Route::delete('/{holiday}', [HolidayController::class, 'destroy'])->name('destroy');
+    });
 
     Route::get('/interview', [InterviewController::class, 'interview'])
         ->middleware(['role:HRM', 'position:staff'])
@@ -207,10 +233,8 @@ Route::prefix('dashboard/hrm')->name('hrm.')->middleware(['auth', 'verified'])->
         ->middleware(['role:HRM', 'position:staff'])
         ->name('employee.hrmstaffpayroll');
 
-    Route::post('/payroll/store', [hrmstaffpayrollController::class, 'store'])
+    Route::post('/payroll/store', [HrmstaffpayrollController::class, 'store'])
         ->name('hrm.employee.payroll.store');
-
-    // routes/web.php inside the hrm. prefix group
 
     Route::patch('/payroll/{id}/approve', [HrmstaffpayrollController::class, 'approve'])
         ->name('employee.payroll.approve');
@@ -218,16 +242,30 @@ Route::prefix('dashboard/hrm')->name('hrm.')->middleware(['auth', 'verified'])->
     Route::patch('/payroll/{id}/reject', [HrmstaffpayrollController::class, 'reject'])
         ->name('employee.payroll.reject');
 
-    Route::post('/holidays/store', [hrmstaffpayrollController::class, 'storeHoliday'])
+    Route::post('/holidays/store', [HrmstaffpayrollController::class, 'storeHoliday'])
         ->name('hrm.holidays.store');
 
     /**
      * FINALIZE PROMOTION ROUTE (Manager Side)
-     * This allows the Manager to approve the suggestion and upgrade Trainee to Staff
+     * This allows the Manager to approve the suggestion and upgrade Trainee to Staff.
+     * NOTE: No extra role/position middleware here — the parent group already enforces
+     * auth + verified, and the controller re-checks via Auth::user() as needed.
+     * Extra middleware on POST routes can silently redirect (302) in Inertia,
+     * causing onSuccess to fire without the DB write ever happening.
      */
     Route::post('/manager/finalize-promotion/{id}', [DashboardController::class, 'finalizePromotion'])
         ->middleware(['role:HRM', 'position:manager'])
         ->name('manager.finalize-promotion');
+
+    /**
+     * GRADE & AUTO-PROMOTE ROUTE (Manager Side)
+     * Manager grades a trainee directly across 5 criteria (1-5 stars each).
+     * If total percentage >= 80%, the trainee is automatically promoted to Staff.
+     * NOTE: Middleware removed for the same reason as finalize-promotion above.
+     */
+    Route::post('/manager/grade-trainee/{id}', [DashboardController::class, 'gradeAndPromote'])
+        ->middleware(['role:HRM', 'position:manager'])
+        ->name('manager.grade-trainee');
 
     // Updated Applicant Routes
     Route::controller(ApplicantController::class)->group(function () {
@@ -279,9 +317,9 @@ Route::prefix('dashboard/scm')->name('scm.')->middleware(['auth', 'verified'])->
         ->middleware(['role:SCM', 'position:manager'])
         ->name('manager.dashboard');
 
-    Route::get('/sourcing', [SourcingController::class, 'sourcing'])
+    Route::get('/procurement', [ProcurementController::class, 'procurement'])
         ->middleware(['role:SCM', 'position:manager'])
-        ->name('manager.sourcing');
+        ->name('manager.procurement');
 
     Route::get('/audit', [AuditController::class, 'audit'])
         ->middleware(['role:SCM', 'position:manager'])
@@ -345,6 +383,18 @@ Route::prefix('dashboard/inv')->name('inv.')->middleware(['auth', 'verified'])->
     Route::get('/manager', [DashboardController::class, 'index'])
         ->middleware(['role:INV', 'position:manager'])
         ->name('manager.dashboard');
+
+    Route::get('/inventory', [InvInventoryController::class, 'inventory'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.inventory');
+
+    Route::get('/product', [ProductController::class, 'product'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.product');
+
+    Route::get('/material', [MaterialController::class, 'material'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.material');
 
     Route::get('/staff', [DashboardController::class, 'index'])
         ->middleware(['role:INV', 'position:staff'])
@@ -453,19 +503,45 @@ Route::middleware('guest:client')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| Protected Client Routes (B2B PORTAL) – FIXED REDIRECT
+| Protected Client Routes (B2B PORTAL)
 |--------------------------------------------------------------------------
 */
-// Protected Client Routes (B2B PORTAL)
 Route::middleware('auth:client')->prefix('partner')->name('client.')->group(function () {
     Route::get('/dashboard', [ClientDashboardController::class, 'index'])->name('dashboard');
-
-    // Ensure this matches the Controller and the View folder
     Route::get('/orders', [OrdersController::class, 'orders'])->name('orders');
     Route::post('/purchase-order', [ClientDashboardController::class, 'placeOrder'])->name('purchase-order.store');
     Route::post('/quotation/{po}/accept', [ClientDashboardController::class, 'acceptQuotation'])->name('quotation.accept');
     Route::get('/invoices', [InvoicesController::class, 'invoices'])->name('invoices');
     Route::get('/support', [SupportController::class, 'support'])->name('support');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Supplier Authentication Routes
+|--------------------------------------------------------------------------
+*/
+
+// Supplier Public Routes (guests only)
+Route::middleware('guest:supplier')->group(function () {
+    Route::get('supplier/login', [SupplierAuthController::class, 'showLogin'])->name('supplier.login');
+    Route::post('supplier/login', [SupplierAuthController::class, 'login'])->name('supplier.login.store');
+    Route::get('supplier/register', [SupplierAuthController::class, 'create'])->name('supplier.register');
+    Route::post('supplier/register', [SupplierAuthController::class, 'store'])->name('supplier.register.store');
+});
+
+/*
+ * Supplier logout MUST live outside the guest:supplier block above.
+ * A logged-in supplier is not a guest — putting logout inside guest middleware
+ * would block it with a redirect, silently leaving the supplier session alive.
+ * We protect it with auth:supplier instead so only authenticated suppliers can call it.
+ */
+Route::post('supplier/logout', [SupplierAuthController::class, 'logout'])
+    ->middleware('auth:supplier')
+    ->name('supplier.logout');
+
+// Protected Supplier Routes
+Route::middleware('auth:supplier')->prefix('supplier')->name('supplier.')->group(function () {
+    Route::get('/dashboard', [SupplierDashboardController::class, 'index'])->name('dashboard');
 });
 
 require __DIR__.'/auth.php';

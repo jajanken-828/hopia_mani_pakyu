@@ -101,7 +101,7 @@ const navItems = computed(() => {
     if (userRole === 'SCM') {
         if (userPosition === 'manager') {
             items.push(
-                { label: 'Sourcing', href: route('scm.manager.sourcing'), icon: Truck },
+                { label: 'Procurement', href: route('scm.manager.procurement'), icon: Truck },
                 { label: 'Audit', href: route('scm.manager.audit'), icon: ChartNoAxesCombined },
                 { label: 'Close', href: route('scm.manager.close'), icon: DoorOpen }
             )

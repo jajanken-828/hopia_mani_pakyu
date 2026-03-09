@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
 
@@ -33,13 +34,36 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'auth' => [
+                // Employees/Staff (Default Web Guard)
                 'user' => $request->user(),
-                'client' => $request->user('client'),
+
+                // B2B Clients - Safely retrieved if guard exists
+                'client' => $this->getGuardUser('client'),
+
+                // New: Supplier Guard - Safely retrieved if guard exists
+                'supplier' => $this->getGuardUser('supplier'),
             ],
             'ziggy' => fn () => [
                 ...(new Ziggy)->toArray(),
                 'location' => $request->url(),
             ],
+            // Flash messages for login/registration alerts
+            'flash' => [
+                'message' => fn () => $request->session()->get('message'),
+            ],
         ];
+    }
+
+    /**
+     * Safely get the user for a specific guard to prevent
+     * InvalidArgumentException if the guard is not yet defined.
+     */
+    protected function getGuardUser(string $guard)
+    {
+        try {
+            return Auth::guard($guard)->user();
+        } catch (\InvalidArgumentException $e) {
+            return null;
+        }
     }
 }

@@ -142,7 +142,7 @@ const attendanceRate = computed(() => props.attendance_history.length > 0 ? 100 
                                             stroke-linecap="round"></circle>
                                     </svg>
                                     <span class="absolute text-3xl font-black text-slate-800 italic">{{ attendanceRate
-                                    }}%</span>
+                                        }}%</span>
                                 </div>
                                 <p
                                     class="mt-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">
@@ -160,7 +160,7 @@ const attendanceRate = computed(() => props.attendance_history.length > 0 ? 100 
                                     <div class="flex items-center gap-2 mb-2">
                                         <h2 class="text-2xl font-black italic uppercase tracking-tight">{{ user.name }}
                                         </h2>
-                                        <BadgeCheck class="size-5 text-blue-400 fill-white" />
+                                        <!-- <BadgeCheck class="size-5 text-blue-400 fill-white" /> -->
                                     </div>
                                     <p class="text-slate-300 text-[11px] font-bold uppercase tracking-widest mb-6">
                                         {{ user.role }} | {{ user.position }} | ID: {{ user.id.toString().padStart(5,

@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class EmployeeShift extends Model
 {
+    use SoftDeletes; // Enables soft deletes for this model
+
     /**
      * The attributes that are mass assignable.
      * Includes dept_code for filtering and shift_type for the Morning/Afternoon/Graveyard logic.
@@ -17,6 +20,11 @@ class EmployeeShift extends Model
         'shift_type',
         'effective_date',
         'schedule_range', // Added to support the '8AM - 5PM' style strings in your controller
+        'status', // New field
+    ];
+
+    protected $attributes = [
+        'status' => 'approved',
     ];
 
     /**

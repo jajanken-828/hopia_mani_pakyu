@@ -5,6 +5,7 @@ namespace App\Http\Controllers\hrm\employee;
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceLog;
 use App\Models\EmployeeShift;
+use App\Models\Holiday;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -15,22 +16,57 @@ class AttendanceController extends Controller
 {
     /**
      * Display the attendance and shift management page.
-     * Updated to handle 12-hour format strings and local timezone context.
      */
     public function attendance(Request $request)
     {
-        // Use local timezone for context
         $now = Carbon::now('Asia/Manila');
         $today = $now->toDateString();
 
-        // 1. Get month and year from request, or default to current local date
         $month = $request->input('month', $now->month);
         $year = $request->input('year', $now->year);
 
-        // 2. Calculate the dynamic date range for the selected month
         $viewDate = Carbon::create($year, $month, 1, 0, 0, 0, 'Asia/Manila');
         $startOfMonth = $viewDate->copy()->startOfMonth()->toDateString();
         $endOfMonth = $viewDate->copy()->endOfMonth()->toDateString();
+
+        $holidays = Holiday::whereBetween('holiday_date', [$startOfMonth, $endOfMonth])
+            ->where('status', 'approved')
+            ->get()
+            ->map(fn ($h) => [
+                'id' => $h->id,
+                'date' => $h->holiday_date,
+                'name' => $h->holiday_name,
+                'type' => $h->holiday_type,
+                'premium_rate' => $h->premium_rate,
+            ]);
+
+        $pendingHolidays = Holiday::whereBetween('holiday_date', [$startOfMonth, $endOfMonth])
+            ->where('status', 'pending')
+            ->get();
+
+        $monthlyShifts = EmployeeShift::whereBetween('effective_date', [$startOfMonth, $endOfMonth])
+            ->where('status', 'approved')
+            ->get()
+            ->map(fn ($shift) => [
+                'user_id' => $shift->user_id,
+                'shift_type' => $shift->shift_type,
+                'effective_date' => Carbon::parse($shift->effective_date)->toDateString(),
+            ]);
+
+        $pendingShifts = EmployeeShift::with('user')
+            ->whereBetween('effective_date', [$startOfMonth, $endOfMonth])
+            ->where('status', 'pending')
+            ->get()
+            ->map(fn ($shift) => [
+                'id' => $shift->id,
+                'user_id' => $shift->user_id,
+                'shift_type' => $shift->shift_type,
+                'effective_date' => Carbon::parse($shift->effective_date)->toDateString(),
+                'schedule_range' => $shift->schedule_range,
+                'dept_code' => $shift->dept_code,
+                'status' => $shift->status,
+                'user' => $shift->user ? ['id' => $shift->user->id, 'name' => $shift->user->name] : null,
+            ]);
 
         return Inertia::render('Dashboard/HRM/Employee/attendance', [
             'employee_attendance' => User::with(['latestAttendance' => function ($query) use ($today) {
@@ -43,22 +79,17 @@ class AttendanceController extends Controller
                     'name' => $user->name,
                     'dept' => $user->role ?? 'N/A',
                     'shift' => $user->currentShift->shift_type ?? 'Not Set',
-                    'clock_in' => $user->latestAttendance->clock_in ?? '---', // Displays formatted string from DB
+                    'clock_in' => $user->latestAttendance->clock_in ?? '---',
                     'status' => $user->latestAttendance->status ?? 'Absent',
                 ];
             }),
-
-            // 3. Fetch shifts specifically for the month being viewed on the calendar
-            'monthly_shifts' => EmployeeShift::whereBetween('effective_date', [$startOfMonth, $endOfMonth])
-                ->get()
-                ->map(function ($shift) {
-                    return [
-                        'user_id' => $shift->user_id,
-                        'shift_type' => $shift->shift_type,
-                        'effective_date' => $shift->effective_date,
-                    ];
-                }),
-
+            'monthly_shifts' => $monthlyShifts,
+            'holidays' => $holidays,
+            'pending_shifts' => $pendingShifts,
+            'pending_holidays' => $pendingHolidays,
+            'is_manager' => Auth::user()->position === 'manager',
+            'current_month' => (int) $month,
+            'current_year' => (int) $year,
             'attendance_status' => [
                 'is_clocked_in' => false,
                 'last_action' => '08:45 AM',
@@ -68,45 +99,78 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Handles both single-day updates and monthly bulk scheduling for specific employees.
+     * Handles both single-day updates and bulk scheduling (monthly/weekly/daily).
      */
     public function updateShift(Request $request)
     {
-        // 1. Handle Bulk Monthly Scheduling for a Specific Employee
+        $isManager = Auth::user()->position === 'manager';
+        $status = $isManager ? 'approved' : 'pending';
+
+        $isNonWorkingDay = function ($date) {
+            $holiday = Holiday::where('holiday_date', $date)->where('status', 'approved')->first();
+            if (! $holiday) {
+                return false;
+            }
+
+            return in_array($holiday->holiday_type, ['regular', 'special_non_working']);
+        };
+
         if ($request->is_bulk) {
             $request->validate([
                 'user_id' => 'required|exists:users,id',
                 'shift_type' => 'required|in:Morning,Afternoon,Graveyard',
                 'dept_code' => 'required|string',
                 'schedule_range' => 'required|string',
-                'month' => 'required|integer|min:1|max:12',
-                'year' => 'required|integer',
+                'dates' => 'sometimes|array', // For weekly/daily bulk
+                'month' => 'sometimes|integer|min:1|max:12',
+                'year' => 'sometimes|integer',
             ]);
 
-            $dateContext = Carbon::create($request->year, $request->month, 1, 0, 0, 0, 'Asia/Manila');
-            $daysInMonth = $dateContext->daysInMonth;
-
-            for ($day = 1; $day <= $daysInMonth; $day++) {
-                $targetDate = Carbon::create($request->year, $request->month, $day, 0, 0, 0, 'Asia/Manila')->toDateString();
-
-                EmployeeShift::updateOrCreate(
-                    ['user_id' => $request->user_id, 'effective_date' => $targetDate],
-                    [
-                        'shift_type' => $request->shift_type,
-                        'dept_code' => $request->dept_code,
-                        'schedule_range' => $request->schedule_range,
-                    ]
-                );
+            $dates = $request->dates ?? [];
+            if (empty($dates)) {
+                // Fallback to monthly
+                $dateContext = Carbon::create($request->year, $request->month, 1, 0, 0, 0, 'Asia/Manila');
+                $daysInMonth = $dateContext->daysInMonth;
+                for ($day = 1; $day <= $daysInMonth; $day++) {
+                    $dates[] = Carbon::create($request->year, $request->month, $day, 0, 0, 0, 'Asia/Manila')->toDateString();
+                }
             }
 
-            // Redirect back with current month/year context
+            foreach ($dates as $targetDate) {
+                if ($isNonWorkingDay($targetDate)) {
+                    continue;
+                }
+
+                $existing = EmployeeShift::withTrashed()
+                    ->where('user_id', $request->user_id)
+                    ->where('effective_date', $targetDate)
+                    ->first();
+
+                $data = [
+                    'shift_type' => $request->shift_type,
+                    'dept_code' => $request->dept_code,
+                    'schedule_range' => $request->schedule_range,
+                    'status' => $status,
+                ];
+
+                if ($existing) {
+                    $existing->restore();
+                    $existing->update($data);
+                } else {
+                    EmployeeShift::create(array_merge([
+                        'user_id' => $request->user_id,
+                        'effective_date' => $targetDate,
+                    ], $data));
+                }
+            }
+
             return redirect()->route('hrm.employee.attendance', [
-                'month' => $request->month,
-                'year' => $request->year,
-            ])->with('success', 'Monthly schedule updated for the selected employee.');
+                'month' => $request->month ?? $dateContext->month,
+                'year' => $request->year ?? $dateContext->year,
+            ])->with('success', $isManager ? 'Schedule updated' : 'Schedule pending approval');
         }
 
-        // 2. Handle Single Day Manual Update
+        // Single day
         $request->validate([
             'user_id' => 'required|exists:users,id',
             'shift_type' => 'required|in:Morning,Afternoon,Graveyard',
@@ -115,34 +179,140 @@ class AttendanceController extends Controller
             'dept_code' => 'nullable|string',
         ]);
 
-        EmployeeShift::updateOrCreate(
-            ['user_id' => $request->user_id, 'effective_date' => $request->effective_date],
-            [
-                'shift_type' => $request->shift_type,
-                'dept_code' => $request->dept_code,
-                'schedule_range' => $request->schedule_range,
-            ]
-        );
+        $targetDate = Carbon::parse($request->effective_date)->toDateString();
 
-        // Maintain context for manual updates based on effective_date
-        $date = Carbon::parse($request->effective_date)->timezone('Asia/Manila');
+        if ($isNonWorkingDay($targetDate)) {
+            return back()->withErrors(['effective_date' => 'Cannot assign shifts on a non-working holiday.']);
+        }
+
+        $existing = EmployeeShift::withTrashed()
+            ->where('user_id', $request->user_id)
+            ->where('effective_date', $targetDate)
+            ->first();
+
+        $data = [
+            'shift_type' => $request->shift_type,
+            'dept_code' => $request->dept_code,
+            'schedule_range' => $request->schedule_range,
+            'status' => $status,
+        ];
+
+        if ($existing) {
+            $existing->restore();
+            $existing->update($data);
+        } else {
+            EmployeeShift::create(array_merge([
+                'user_id' => $request->user_id,
+                'effective_date' => $targetDate,
+            ], $data));
+        }
+
+        $date = Carbon::parse($targetDate)->timezone('Asia/Manila');
 
         return redirect()->route('hrm.employee.attendance', [
             'month' => $date->month,
             'year' => $date->year,
-        ])->with('success', 'Shift updated successfully.');
+        ])->with('success', $isManager ? 'Shift updated' : 'Shift pending approval');
+    }
+
+    /**
+     * Soft-delete a shift for a specific employee on a specific date.
+     */
+    public function destroyShift(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'effective_date' => 'required|date',
+        ]);
+
+        $date = Carbon::parse($request->effective_date)->format('Y-m-d');
+
+        EmployeeShift::where('user_id', $request->user_id)
+            ->where('effective_date', $date)
+            ->delete(); // Soft delete
+
+        return redirect()->back()->with('success', 'Shift removed.');
+    }
+
+    /**
+     * Soft-delete all shifts for a specific employee for the ENTIRE given month.
+     */
+    public function destroyMonthlyShift(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer',
+        ]);
+
+        $dateContext = Carbon::create($request->year, $request->month, 1, 0, 0, 0, 'Asia/Manila');
+        $startOfMonth = $dateContext->copy()->startOfMonth()->toDateString();
+        $endOfMonth = $dateContext->copy()->endOfMonth()->toDateString();
+
+        EmployeeShift::where('user_id', $request->user_id)
+            ->whereBetween('effective_date', [$startOfMonth, $endOfMonth])
+            ->delete(); // Soft delete
+
+        return redirect()->back()->with('success', 'Monthly shifts removed.');
+    }
+
+    /**
+     * Approve pending shift
+     */
+    public function approveShift(Request $request)
+    {
+        $shift = EmployeeShift::findOrFail($request->id);
+        $shift->update(['status' => 'approved']);
+
+        return back()->with('success', 'Shift approved');
+    }
+
+    /**
+     * Reject pending shift
+     */
+    public function rejectShift(Request $request)
+    {
+        $shift = EmployeeShift::findOrFail($request->id);
+        $shift->update(['status' => 'rejected']);
+
+        return back()->with('success', 'Shift rejected');
+    }
+
+    /**
+     * Approve pending holiday
+     */
+    public function approveHoliday(Request $request)
+    {
+        $holiday = Holiday::findOrFail($request->id);
+        $holiday->update(['status' => 'approved']);
+
+        if (in_array($holiday->holiday_type, ['regular', 'special_non_working'])) {
+            EmployeeShift::where('effective_date', $holiday->holiday_date)->delete(); // Soft delete shifts
+        }
+
+        return back()->with('success', 'Holiday approved');
+    }
+
+    /**
+     * Reject pending holiday
+     */
+    public function rejectHoliday(Request $request)
+    {
+        $holiday = Holiday::findOrFail($request->id);
+        $holiday->update(['status' => 'rejected']);
+
+        return back()->with('success', 'Holiday rejected');
     }
 
     /**
      * Toggle logic for local Clock captures.
-     * Uses 12-hour format strings to match the new DB schema.
      */
     public function toggle()
     {
         $user = Auth::user();
-        $now = Carbon::now('Asia/Manila'); // Force local time
+        $now = Carbon::now('Asia/Manila');
         $today = $now->toDateString();
-        $timeString = $now->format('h:i A'); // 12-hour format
+        $timeString = $now->format('h:i A');
 
         $log = AttendanceLog::firstOrCreate(
             ['user_id' => $user->id, 'date' => $today]
@@ -150,7 +320,6 @@ class AttendanceController extends Controller
 
         if (! $log->clock_in) {
             $status = 'On-Time';
-            // Example logic: comparison for morning shift start
             $startTime = Carbon::createFromFormat('Y-m-d H:i:s', "$today 08:00:00", 'Asia/Manila');
             if ($now->gt($startTime)) {
                 $status = 'Late';

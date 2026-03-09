@@ -160,19 +160,44 @@ class ApplicantController extends Controller
             'position' => 'required|string',
         ]);
 
+        // Check if the user already exists to avoid duplication errors
+        if (User::where('email', $applicant->email)->exists()) {
+            return back()->withErrors(['email' => 'An account with this email already exists.']);
+        }
+
         return DB::transaction(function () use ($applicant, $request) {
             $year = now()->year;
+            $role = $request->role;
+
+            // Find the absolute highest sequence number currently used for this role & year
+            $latestUser = User::where('employee_id', 'like', "MONTI-{$year}-{$role}-%")
+                ->orderBy('employee_id', 'desc')
+                ->first();
+
+            if ($latestUser && preg_match('/-(\d{4})$/', $latestUser->employee_id, $matches)) {
+                $nextSequence = intval($matches[1]) + 1;
+            } else {
+                // Fallback if no specific year/role combo exists yet
+                $nextSequence = User::where('role', $role)->count() + 1;
+            }
+
+            // Loop to ensure absolute uniqueness (prevents race conditions / duplicate errors)
+            $employeeId = sprintf('MONTI-%s-%s-%04d', $year, $role, $nextSequence);
+            while (User::where('employee_id', $employeeId)->exists()) {
+                $nextSequence++;
+                $employeeId = sprintf('MONTI-%s-%s-%04d', $year, $role, $nextSequence);
+            }
 
             User::create([
                 'name' => $applicant->first_name.' '.$applicant->last_name,
                 'email' => $applicant->email,
                 'password' => Hash::make('password'),
-                'role' => $request->role,
+                'role' => $role,
                 'position' => $request->position,
-                'department' => $request->role,
+                'department' => $role,
                 'join_date' => now(),
                 'is_active' => true,
-                'employee_id' => 'MONTI-'.$year.'-'.$request->role.'-'.str_pad(User::where('role', $request->role)->count() + 1, 4, '0', STR_PAD_LEFT),
+                'employee_id' => $employeeId,
             ]);
 
             $applicant->update(['status' => 'Account Created']);
