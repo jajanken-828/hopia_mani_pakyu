@@ -143,7 +143,7 @@ const navItems = computed(() => {
         if (userPosition === 'manager') {
             items.push(
                 { label: 'Procurement', href: route('scm.manager.procurement'), icon: Truck },
-                { label: 'Audit', href: route('scm.manager.audit'), icon: ChartNoAxesCombined },
+                { label: 'Supplier Management', href: route('scm.manager.vendor'), icon: ChartNoAxesCombined },
                 { label: 'Close', href: route('scm.manager.close'), icon: DoorOpen }
             )
         } else if (userPosition === 'staff') {

@@ -4,7 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Client;
-use App\Models\Product;
+use App\Models\inv\Material;
+use App\Models\inv\Product;
+use App\Models\inv\Product as InvProduct;
+use App\Models\inv\Warehouse;
+use App\Models\inv\WarehouseMaterial;
 use App\Models\PurchaseOrder;
 use App\Models\TraineeGrade;
 use App\Models\User;
@@ -417,39 +421,152 @@ class DashboardController extends Controller
 
     private function handleInvDashboard(string $position)
     {
-        $stockLevels = [
-            ['id' => 1, 'name' => 'Cotton Fabric',   'sku' => 'CF-001', 'quantity' => 150, 'status' => 'In Stock'],
-            ['id' => 2, 'name' => 'Polyester Blend',  'sku' => 'PB-002', 'quantity' => 85,  'status' => 'In Stock'],
-            ['id' => 3, 'name' => 'Silk Material',    'sku' => 'SM-003', 'quantity' => 25,  'status' => 'Low Stock'],
-            ['id' => 4, 'name' => 'Denim',            'sku' => 'DN-004', 'quantity' => 200, 'status' => 'In Stock'],
-            ['id' => 5, 'name' => 'Wool Blend',       'sku' => 'WB-005', 'quantity' => 8,   'status' => 'Critical'],
+        // ── Materials with all their warehouse stock rows ─────────────────────
+        $materials = Material::with('warehouseMaterials')->get();
+
+        // ── Per-material aggregate status ─────────────────────────────────────
+        $totalSkus = $materials->count();
+        $inStock = 0;
+        $lowStock = 0;
+        $outOfStock = 0;
+        $totalValue = 0;
+
+        foreach ($materials as $mat) {
+            $qty = (float) $mat->warehouseMaterials->sum('quantity');
+            $totalValue += $qty * (float) $mat->unit_cost;
+
+            if ($qty <= 0) {
+                $outOfStock++;
+            } elseif ($qty <= $mat->reorder_point) {
+                $lowStock++;
+            } else {
+                $inStock++;
+            }
+        }
+
+        // ── Warehouses with SKU counts and total units ────────────────────────
+        $warehouses = Warehouse::withCount([
+            'warehouseMaterials as sku_count' => fn ($q) => $q->where('quantity', '>', 0),
+        ])
+            ->withSum('warehouseMaterials as total_units', 'quantity')
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($wh) => [
+                'id' => $wh->id,
+                'name' => $wh->name,
+                'location' => $wh->location,
+                'manager' => $wh->manager,
+                'color' => $wh->color ?? 'blue',
+                'skus' => (int) $wh->sku_count,
+                'total_units' => (float) ($wh->total_units ?? 0),
+            ])
+            ->values()
+            ->toArray();
+
+        $totalWarehouses = count($warehouses);
+
+        // ── Stock alerts — rows where qty <= reorder_point ────────────────────
+        $alertItems = WarehouseMaterial::with(['material', 'warehouse'])
+            ->whereHas('material')
+            ->get()
+            ->filter(fn ($wm) => (float) $wm->quantity <= (float) $wm->material->reorder_point)
+            ->sortByDesc(fn ($wm) => $wm->quantity <= 0 ? 1 : 0)
+            ->map(fn ($wm) => [
+                'sku' => $wm->material->mat_id,
+                'name' => $wm->material->name,
+                'warehouse' => $wm->warehouse->name,
+                'qty' => (float) $wm->quantity,
+                'reorder' => (float) $wm->material->reorder_point,
+                'type' => $wm->quantity <= 0 ? 'out' : 'low',
+            ])
+            ->values()
+            ->toArray();
+
+        // ── Category breakdown ────────────────────────────────────────────────
+        $palette = [
+            'Raw Material' => 'bg-blue-500',
+            'Chemical' => 'bg-violet-500',
+            'Accessory' => 'bg-emerald-500',
+            'Packaging' => 'bg-amber-500',
+            'Supplies' => 'bg-cyan-500',
         ];
 
+        $safeTotal = $totalSkus ?: 1;
+
+        $categoryBreakdown = $materials
+            ->groupBy('category')
+            ->map(fn ($group, $cat) => [
+                'name' => $cat,
+                'count' => $group->count(),
+                'pct' => (int) round(($group->count() / $safeTotal) * 100),
+                'color' => $palette[$cat] ?? 'bg-slate-400',
+            ])
+            ->values()
+            ->toArray();
+
+        // ── Recent activity — 10 most recently touched warehouse_materials ────
+        $recentActivity = WarehouseMaterial::with(['material', 'warehouse'])
+            ->latest('updated_at')
+            ->take(10)
+            ->get()
+            ->map(function ($wm) {
+                $qty = (float) $wm->quantity;
+                $reorder = (float) ($wm->material->reorder_point ?? 0);
+
+                if ($qty <= 0) {
+                    $action = 'Out of stock flagged';
+                    $color = 'red';
+                } elseif ($qty <= $reorder) {
+                    $action = 'Low stock alert';
+                    $color = 'amber';
+                } else {
+                    $action = 'Stock updated';
+                    $color = 'emerald';
+                }
+
+                return [
+                    'time' => $wm->updated_at->diffForHumans(),
+                    'action' => $action,
+                    'item' => $wm->material->name,
+                    'qty' => number_format($qty, 0).' '.$wm->material->unit,
+                    'color' => $color,
+                    'warehouse' => $wm->warehouse->name,
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        // ── Products total ────────────────────────────────────────────────────
+        $totalProducts = InvProduct::count();
+
+        // ── Manager view ──────────────────────────────────────────────────────
         if ($position === 'manager') {
             return Inertia::render('Dashboard/INV/Manager/index', [
-                'user' => Auth::user(),
-                'stockLevels' => $stockLevels,
-                'stats' => [
-                    'totalItems' => 468,
-                    'lowStock' => 12,
-                    'outOfStock' => 3,
-                    'warehouseCapacity' => 85,
+                'warehouses' => $warehouses,
+                'alertItems' => $alertItems,
+                'recentActivity' => $recentActivity,
+                'categoryBreakdown' => $categoryBreakdown,
+                'kpis' => [
+                    'totalSkus' => $totalSkus,
+                    'inStock' => $inStock,
+                    'lowStock' => $lowStock,
+                    'outOfStock' => $outOfStock,
+                    'totalWarehouses' => $totalWarehouses,
+                    'totalValue' => round($totalValue, 2),
+                    'totalProducts' => $totalProducts,
                 ],
             ]);
         }
 
+        // ── Employee / staff view ─────────────────────────────────────────────
         return Inertia::render('Dashboard/INV/Employee/index', [
             'user' => Auth::user(),
-            'stockLevels' => array_merge($stockLevels, [
-                ['id' => 6, 'name' => 'Linen',  'sku' => 'LN-006', 'quantity' => 45, 'status' => 'In Stock'],
-                ['id' => 7, 'name' => 'Satin',  'sku' => 'ST-007', 'quantity' => 60, 'status' => 'In Stock'],
-                ['id' => 8, 'name' => 'Velvet', 'sku' => 'VL-008', 'quantity' => 15, 'status' => 'Low Stock'],
-            ]),
-            'stats' => [
-                'totalItems' => 468,
-                'lowStock' => 12,
-                'outOfStock' => 3,
-                'warehouseCapacity' => 85,
+            'kpis' => [
+                'totalSkus' => $totalSkus,
+                'inStock' => $inStock,
+                'lowStock' => $lowStock,
+                'outOfStock' => $outOfStock,
+                'totalValue' => round($totalValue, 2),
             ],
         ]);
     }
@@ -528,7 +645,56 @@ class DashboardController extends Controller
     {
         $view = $position === 'manager' ? 'Dashboard/ECO/Manager/index' : 'Dashboard/ECO/Employee/index';
 
-        $products = Product::orderBy('name', 'asc')->paginate(10);
+        // Pull all INV products (same shape as ProductController::product())
+        $invProducts = InvProduct::with(['sizes', 'bom', 'specs', 'images'])
+            ->orderBy('id')
+            ->get()
+            ->map(function (InvProduct $p) {
+                return [
+                    'id' => $p->id,
+                    'product_id' => $p->product_id,
+                    'sku' => $p->sku,
+                    'name' => $p->name,
+                    'category' => $p->category,
+                    'subcategory' => $p->subcategory,
+                    'status' => $p->status,
+                    'color_tag' => $p->color_tag,
+                    'colorHex' => $p->color_hex,
+                    'colorName' => $p->color_name,
+                    'weight' => $p->weight,
+                    'dimensions' => $p->dimensions,
+                    'batch_size' => $p->batch_size,
+                    'leadTime' => $p->lead_time,
+                    'unitCost' => (float) $p->unit_cost,
+                    'sellingPrice' => (float) $p->selling_price,
+                    'stockOnHand' => $p->stock_on_hand,
+                    'moq' => $p->moq,
+                    'certification' => $p->certification,
+                    'description' => $p->description,
+                    'sizes' => $p->sizes->pluck('size')->toArray(),
+                    'materials' => $p->bom->map(fn ($b) => [
+                        'sku' => $b->sku_ref,
+                        'name' => $b->name,
+                        'qty' => (float) $b->qty,
+                        'unit' => $b->unit,
+                        'category' => $b->category,
+                        'warehouse' => $b->warehouse_note,
+                        'cost' => (float) $b->unit_cost,
+                        'stockStatus' => $b->stock_status,
+                    ])->toArray(),
+                    'specs' => $p->specs->map(fn ($s) => [
+                        'label' => $s->label,
+                        'value' => $s->value,
+                    ])->toArray(),
+                    'images' => $p->images->sortBy('sort_order')->map(fn ($img) => [
+                        'id' => $img->id,
+                        'url' => asset('storage/'.$img->path),
+                    ])->values()->toArray(),
+                ];
+            })
+            ->values()
+            ->toArray();
+
         $pendingCompanies = Client::whereIn('status', ['pending', 'Pending'])->latest()->get();
         $verifiedCompanies = Client::whereNotIn('status', ['pending', 'Pending'])->latest()->get();
 
@@ -545,7 +711,7 @@ class DashboardController extends Controller
 
         return Inertia::render($view, [
             'user' => Auth::user(),
-            'products' => $products,
+            'invProducts' => $invProducts,
             'pendingCompanies' => $pendingCompanies,
             'verifiedCompanies' => $verifiedCompanies,
             'onlineSales' => PurchaseOrder::with('client')->latest()->take(5)->get(),
@@ -553,8 +719,8 @@ class DashboardController extends Controller
             'stats' => [
                 'todaySales' => number_format($todaySales, 2),
                 'monthlyRevenue' => number_format($monthlyRevenue, 2),
-                'activeProducts' => Product::where('status', 'published')->count(),
-                'lowStockCount' => Product::where('stock', '<', 50)->count(),
+                'activeProducts' => InvProduct::where('status', 'Active')->count(),
+                'lowStockCount' => InvProduct::where('stock_on_hand', '<', 50)->count(),
                 'pendingCredit' => $pendingCreditCount,
                 'pendingTiering' => $pendingTieringCount,
             ],

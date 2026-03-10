@@ -15,8 +15,7 @@ class OrdermngController extends Controller
     public function ordermng(Request $request)
     {
         return Inertia::render('Dashboard/ECO/Employee/ordermng', [
-            // Fetch live orders with client relationships
-            'orders' => PurchaseOrder::with('client')
+            'orders' => PurchaseOrder::with(['client', 'items.product'])
                 ->when($request->search, function ($query, $search) {
                     $query->where('po_number', 'like', "%{$search}%")
                         ->orWhereHas('client', function ($q) use ($search) {
@@ -24,7 +23,7 @@ class OrdermngController extends Controller
                         });
                 })
                 ->latest()
-                ->paginate(10)
+                ->paginate(15)
                 ->withQueryString(),
 
             'filters' => $request->only(['search']),

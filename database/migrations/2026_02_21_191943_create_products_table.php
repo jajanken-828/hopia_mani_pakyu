@@ -10,15 +10,26 @@ return new class extends Migration
     {
         Schema::create('products', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            $table->string('product_id')->unique();  // Auto-generated: PRD-001
             $table->string('sku')->unique();
+            $table->string('name');
             $table->string('category');
-            $table->decimal('price', 15, 2);
-            $table->integer('stock')->default(0);
-            $table->string('image_path')->nullable(); // For file uploads
-            $table->enum('status', ['published', 'draft'])->default('draft');
+            $table->string('subcategory')->nullable();
+            $table->string('status')->default('Active'); // Active | Draft | Inactive
+            $table->string('color_tag')->nullable();
+            $table->string('color_hex')->nullable();
+            $table->string('color_name')->nullable();
+            $table->string('weight')->nullable();
+            $table->string('dimensions')->nullable();
+            $table->unsignedInteger('batch_size')->nullable();
+            $table->string('lead_time')->nullable();
+            $table->decimal('unit_cost', 12, 2)->default(0);
+            $table->decimal('selling_price', 12, 2)->default(0);
+            $table->unsignedInteger('stock_on_hand')->default(0);
+            $table->unsignedInteger('moq')->nullable();
+            $table->string('certification')->nullable();
+            $table->text('description')->nullable();
             $table->timestamps();
-            $table->softDeletes();
         });
     }
 

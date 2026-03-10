@@ -3,80 +3,71 @@
 namespace App\Http\Controllers\eco\staff;
 
 use App\Http\Controllers\Controller;
-use App\Models\Product;
+use App\Models\inv\Product as InvProduct;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class ProductsController extends Controller
 {
     public function products(Request $request)
     {
+        $invProducts = InvProduct::with(['sizes', 'bom', 'specs', 'images'])
+            ->when($request->search, function ($query, $search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('sku', 'like', "%{$search}%")
+                    ->orWhere('product_id', 'like', "%{$search}%");
+            })
+            ->orderBy('id')
+            ->get()
+            ->map(function (InvProduct $p) {
+                return [
+                    'id' => $p->id,
+                    'product_id' => $p->product_id,
+                    'sku' => $p->sku,
+                    'name' => $p->name,
+                    'category' => $p->category,
+                    'subcategory' => $p->subcategory,
+                    'status' => $p->status,
+                    'color_tag' => $p->color_tag,
+                    'colorHex' => $p->color_hex,
+                    'colorName' => $p->color_name,
+                    'weight' => $p->weight,
+                    'dimensions' => $p->dimensions,
+                    'batch_size' => $p->batch_size,
+                    'leadTime' => $p->lead_time,
+                    'unitCost' => (float) $p->unit_cost,
+                    'sellingPrice' => (float) $p->selling_price,
+                    'stockOnHand' => $p->stock_on_hand,
+                    'moq' => $p->moq,
+                    'certification' => $p->certification,
+                    'description' => $p->description,
+                    'sizes' => $p->sizes->pluck('size')->toArray(),
+                    'materials' => $p->bom->map(fn ($b) => [
+                        'sku' => $b->sku_ref,
+                        'name' => $b->name,
+                        'qty' => (float) $b->qty,
+                        'unit' => $b->unit,
+                        'category' => $b->category,
+                        'warehouse' => $b->warehouse_note,
+                        'cost' => (float) $b->unit_cost,
+                        'stockStatus' => $b->stock_status,
+                    ])->toArray(),
+                    'specs' => $p->specs->map(fn ($s) => [
+                        'label' => $s->label,
+                        'value' => $s->value,
+                    ])->toArray(),
+                    'images' => $p->images->sortBy('sort_order')->map(fn ($img) => [
+                        'id' => $img->id,
+                        'url' => asset('storage/'.$img->path),
+                    ])->values()->toArray(),
+                ];
+            })
+            ->values()
+            ->toArray();
+
         return Inertia::render('Dashboard/ECO/Employee/products', [
-            'products' => Product::latest()
-                ->when($request->search, function ($query, $search) {
-                    $query->where('name', 'like', "%{$search}%")
-                        ->orWhere('sku', 'like', "%{$search}%");
-                })
-                ->get(),
+            'invProducts' => $invProducts,
+            'filters' => $request->only(['search']),
         ]);
-    }
-
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'sku' => 'required|string|unique:products,sku',
-            'category' => 'required|string',
-            'price' => 'required|numeric|min:0',
-            'stock' => 'required|integer|min:0',
-            'status' => 'required|in:published,draft',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-        ]);
-
-        if ($request->hasFile('image')) {
-            $path = $request->file('image')->store('products', 'public');
-            $validated['image_path'] = $path;
-        }
-
-        Product::create($validated);
-
-        return back()->with('success', 'Product added successfully.');
-    }
-
-    // NEW: Update existing product details
-    public function update(Request $request, Product $product)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'sku' => "required|string|unique:products,sku,{$product->id}",
-            'category' => 'required|string',
-            'price' => 'required|numeric|min:0',
-            'stock' => 'required|integer|min:0',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-        ]);
-
-        if ($request->hasFile('image')) {
-            // Delete old image if exists
-            if ($product->image_path) {
-                Storage::disk('public')->delete($product->image_path);
-            }
-            $validated['image_path'] = $request->file('image')->store('products', 'public');
-        }
-
-        $product->update($validated);
-
-        return back()->with('success', 'Product updated successfully.');
-    }
-
-    // NEW: Toggle Status (Disable/Enable) instead of Hard Delete
-    public function toggleStatus(Product $product)
-    {
-        $newStatus = $product->status === 'published' ? 'draft' : 'published';
-        $product->update(['status' => $newStatus]);
-
-        $message = $newStatus === 'published' ? 'Product enabled.' : 'Product disabled.';
-
-        return back()->with('success', $message);
     }
 }

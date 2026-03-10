@@ -1,46 +1,26 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { Head } from '@inertiajs/vue3';
+import { ref, computed, watch } from 'vue';
+import { Head, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import {
     Search, Plus, ChevronDown, ArrowRightLeft, AlertTriangle, X,
     Edit2, Trash2, ArrowUpDown, Send, PackageCheck, Warehouse,
     TrendingUp, TrendingDown, Package, Layers, FlaskConical,
-    CheckCircle, DollarSign, BarChart2,
+    CheckCircle, DollarSign, BarChart2, ShoppingCart, ClipboardList,
+    ArrowRight, Zap,
 } from 'lucide-vue-next';
 
-// ─── Warehouses ──────────────────────────────────────────────────────────────
-const warehouses = ref([
-    { id: 1, name: 'Main Warehouse', location: 'Cavite, PH', color: 'blue' },
-    { id: 2, name: 'North Storage Facility', location: 'Bulacan, PH', color: 'emerald' },
-    { id: 3, name: 'South Distribution Hub', location: 'Laguna, PH', color: 'amber' },
-    { id: 4, name: 'East Textile Depot', location: 'Rizal, PH', color: 'violet' },
-]);
+// ─── Props from Inertia ───────────────────────────────────────────────────────
+const props = defineProps({
+    warehouses: { type: Array, default: () => [] },
+    materials: { type: Array, default: () => [] },
+});
 
-// ─── Master Materials (stock keyed by warehouse id) ──────────────────────────
-const materials = ref([
-    { id: 'MAT-001', name: 'Cotton Fabric Roll (White)', category: 'Raw Material', unit: 'rolls', reorder: 100, cost: 850.00, stock: { 1: 480, 2: 0, 3: 0, 4: 0 } },
-    { id: 'MAT-002', name: 'Polyester Blend (Navy)', category: 'Raw Material', unit: 'rolls', reorder: 100, cost: 920.00, stock: { 1: 95, 2: 0, 3: 0, 4: 0 } },
-    { id: 'MAT-003', name: 'Dye — Reactive Red', category: 'Chemical', unit: 'kg', reorder: 50, cost: 215.00, stock: { 1: 320, 2: 0, 3: 0, 4: 0 } },
-    { id: 'MAT-004', name: 'Elastic Band (1in)', category: 'Accessory', unit: 'meters', reorder: 2000, cost: 12.50, stock: { 1: 12000, 2: 0, 3: 0, 4: 0 } },
-    { id: 'MAT-005', name: 'Zipper (20cm Black)', category: 'Accessory', unit: 'pcs', reorder: 500, cost: 8.75, stock: { 1: 0, 2: 0, 3: 0, 4: 0 } },
-    { id: 'MAT-006', name: 'Linen Fabric (Beige)', category: 'Raw Material', unit: 'rolls', reorder: 80, cost: 1100.00, stock: { 1: 210, 2: 0, 3: 0, 4: 0 } },
-    { id: 'MAT-007', name: 'Thread Spool (Black)', category: 'Accessory', unit: 'spools', reorder: 200, cost: 45.00, stock: { 1: 840, 2: 0, 3: 0, 4: 0 } },
-    { id: 'MAT-101', name: 'Silk Fabric (Ivory)', category: 'Raw Material', unit: 'rolls', reorder: 80, cost: 2400.00, stock: { 1: 0, 2: 60, 3: 0, 4: 0 } },
-    { id: 'MAT-102', name: 'Dye — Indigo Blue', category: 'Chemical', unit: 'kg', reorder: 50, cost: 310.00, stock: { 1: 0, 2: 180, 3: 0, 4: 0 } },
-    { id: 'MAT-103', name: 'Button Set (Brass)', category: 'Accessory', unit: 'pcs', reorder: 1000, cost: 3.20, stock: { 1: 0, 2: 5500, 3: 0, 4: 0 } },
-    { id: 'MAT-104', name: 'Velcro Strip (White)', category: 'Accessory', unit: 'meters', reorder: 500, cost: 18.00, stock: { 1: 0, 2: 2200, 3: 0, 4: 0 } },
-    { id: 'MAT-105', name: 'Nylon Mesh', category: 'Raw Material', unit: 'rolls', reorder: 40, cost: 760.00, stock: { 1: 0, 2: 0, 3: 0, 4: 0 } },
-    { id: 'MAT-201', name: 'Denim Fabric (Dark)', category: 'Raw Material', unit: 'rolls', reorder: 100, cost: 1350.00, stock: { 1: 0, 2: 0, 3: 390, 4: 0 } },
-    { id: 'MAT-202', name: 'Packaging Box (L)', category: 'Packaging', unit: 'pcs', reorder: 500, cost: 25.00, stock: { 1: 0, 2: 0, 3: 1800, 4: 0 } },
-    { id: 'MAT-203', name: 'Shrink Wrap Roll', category: 'Packaging', unit: 'rolls', reorder: 50, cost: 420.00, stock: { 1: 0, 2: 0, 3: 45, 4: 0 } },
-    { id: 'MAT-204', name: 'Fleece Lining (Grey)', category: 'Raw Material', unit: 'rolls', reorder: 60, cost: 980.00, stock: { 1: 0, 2: 0, 3: 275, 4: 0 } },
-    { id: 'MAT-205', name: 'Label Printer Ribbon', category: 'Supplies', unit: 'pcs', reorder: 30, cost: 95.00, stock: { 1: 0, 2: 0, 3: 120, 4: 0 } },
-    { id: 'MAT-206', name: 'Foam Padding (5mm)', category: 'Packaging', unit: 'sheets', reorder: 100, cost: 55.00, stock: { 1: 0, 2: 0, 3: 600, 4: 0 } },
-    { id: 'MAT-301', name: 'Wool Blend Fabric', category: 'Raw Material', unit: 'rolls', reorder: 50, cost: 3200.00, stock: { 1: 0, 2: 0, 3: 0, 4: 88 } },
-    { id: 'MAT-302', name: 'Snap Fasteners', category: 'Accessory', unit: 'pcs', reorder: 800, cost: 4.50, stock: { 1: 0, 2: 0, 3: 0, 4: 3400 } },
-    { id: 'MAT-303', name: 'Fusible Interfacing', category: 'Raw Material', unit: 'rolls', reorder: 40, cost: 540.00, stock: { 1: 0, 2: 0, 3: 0, 4: 30 } },
-]);
+const warehouses = ref(props.warehouses);
+const materials = ref(props.materials);
+
+watch(() => props.warehouses, v => (warehouses.value = v), { deep: true });
+watch(() => props.materials, v => (materials.value = v), { deep: true });
 
 // ─── UI State ─────────────────────────────────────────────────────────────────
 const searchQuery = ref('');
@@ -49,20 +29,37 @@ const statusFilter = ref('All');
 const sortField = ref('name');
 const sortDir = ref('asc');
 const expandedMat = ref(null);
+const processing = ref(false);
 
 const showDelegateModal = ref(false);
 const showAddModal = ref(false);
+const showProcurementModal = ref(false);
 const delegateSuccess = ref(false);
+const procurementSuccess = ref(false);
 
 const delegateForm = ref({ materialId: null, fromWarehouse: null, toWarehouse: null, qty: '' });
-const newMaterial = ref({ id: '', name: '', category: '', unit: '', reorder: '', cost: '' });
+const newMaterial = ref({ name: '', category: '', unit: '', quantity: '', unit_cost: '', reorder_point: '' });
+
+// ─── Procurement Request Form ─────────────────────────────────────────────────
+const procurementTarget = ref(null);
+const procurementForm = ref({
+    material_id: null,
+    material_name: '',
+    category: '',
+    unit: '',
+    current_stock: 0,
+    reorder_point: 0,
+    required_qty: '',
+    urgency: 'Medium',
+    notes: '',
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const totalQty = (mat) => Object.values(mat.stock).reduce((a, b) => a + b, 0);
+const totalQty = (mat) => Object.values(mat.stock).reduce((a, b) => a + Number(b), 0);
 
 const matStatus = (mat) => {
     const t = totalQty(mat);
-    if (t === 0) return 'Out of Stock';
+    if (t <= 0) return 'Out of Stock';
     if (t <= mat.reorder) return 'Low Stock';
     return 'In Stock';
 };
@@ -77,6 +74,7 @@ const colorMap = {
     rose: { btn: 'bg-rose-600 text-white shadow-rose-500/30', badge: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200', bar: 'bg-rose-500', dot: 'bg-rose-500' },
     cyan: { btn: 'bg-cyan-600 text-white shadow-cyan-500/30', badge: 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200', bar: 'bg-cyan-500', dot: 'bg-cyan-500' },
 };
+const getColor = (c) => colorMap[c] ?? colorMap.blue;
 
 const statusStyle = (s) => ({
     'In Stock': 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
@@ -99,7 +97,7 @@ const filteredMaterials = computed(() => {
     let items = [...materials.value];
     if (searchQuery.value) {
         const q = searchQuery.value.toLowerCase();
-        items = items.filter(m => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q));
+        items = items.filter(m => m.name.toLowerCase().includes(q) || m.mat_id.toLowerCase().includes(q));
     }
     if (categoryFilter.value !== 'All') items = items.filter(m => m.category === categoryFilter.value);
     if (statusFilter.value !== 'All') items = items.filter(m => matStatus(m) === statusFilter.value);
@@ -128,24 +126,40 @@ const globalStats = computed(() => {
 });
 
 const warehouseBreakdown = (mat) =>
-    warehouses.value.map(w => ({ ...w, qty: mat.stock[w.id] || 0 }));
+    warehouses.value.map(w => ({ ...w, qty: Number(mat.stock[w.id] ?? mat.stock[String(w.id)] ?? 0) }));
 
-// Delegate modal helpers
 const delegateMaterial = computed(() =>
     materials.value.find(m => m.id === delegateForm.value.materialId) ?? null
 );
 const fromOptions = computed(() =>
     !delegateMaterial.value ? [] :
-        warehouses.value.filter(w => (delegateMaterial.value.stock[w.id] || 0) > 0)
+        warehouses.value.filter(w => (Number(delegateMaterial.value.stock[w.id] ?? delegateMaterial.value.stock[String(w.id)] ?? 0)) > 0)
 );
 const toOptions = computed(() =>
     warehouses.value.filter(w => w.id !== delegateForm.value.fromWarehouse)
 );
 const maxQty = computed(() =>
     delegateMaterial.value && delegateForm.value.fromWarehouse
-        ? delegateMaterial.value.stock[delegateForm.value.fromWarehouse] || 0
+        ? Number(delegateMaterial.value.stock[delegateForm.value.fromWarehouse] ?? delegateMaterial.value.stock[String(delegateForm.value.fromWarehouse)] ?? 0)
         : 0
 );
+
+// Suggested required qty: gap between reorder point and current stock, min 1
+const suggestedQty = computed(() => {
+    if (!procurementTarget.value) return 1;
+    const current = totalQty(procurementTarget.value);
+    const reorder = procurementTarget.value.reorder;
+    const gap = Math.max(reorder - current, 1);
+    return gap;
+});
+
+// Auto urgency based on stock status
+const autoUrgency = (mat) => {
+    const s = matStatus(mat);
+    if (s === 'Out of Stock') return 'High';
+    if (s === 'Low Stock') return 'Medium';
+    return 'Low';
+};
 
 // ─── Methods ──────────────────────────────────────────────────────────────────
 const setSort = (f) => {
@@ -159,45 +173,103 @@ const openDelegate = (mat) => {
     showDelegateModal.value = true;
 };
 
+const openProcurement = (mat) => {
+    procurementTarget.value = mat;
+    procurementForm.value = {
+        material_id: mat.id,
+        material_name: mat.name,
+        category: mat.category,
+        unit: mat.unit,
+        current_stock: totalQty(mat),
+        reorder_point: mat.reorder,
+        required_qty: suggestedQty.value,
+        urgency: autoUrgency(mat),
+        notes: '',
+    };
+    procurementSuccess.value = false;
+    showProcurementModal.value = true;
+};
+
 const confirmDelegate = () => {
     const { materialId, fromWarehouse, toWarehouse, qty } = delegateForm.value;
     const amount = Number(qty);
     if (!materialId || !fromWarehouse || !toWarehouse || !amount) return;
-    const mat = materials.value.find(m => m.id === materialId);
-    if (!mat || (mat.stock[fromWarehouse] || 0) < amount) return;
-    mat.stock[fromWarehouse] -= amount;
-    mat.stock[toWarehouse] = (mat.stock[toWarehouse] || 0) + amount;
-    delegateSuccess.value = true;
-    setTimeout(() => { showDelegateModal.value = false; delegateSuccess.value = false; }, 1200);
+    processing.value = true;
+    router.post(route('inv.manager.material.delegate'), {
+        material_id: materialId,
+        from_warehouse: fromWarehouse,
+        to_warehouse: toWarehouse,
+        quantity: amount,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            delegateSuccess.value = true;
+            setTimeout(() => { showDelegateModal.value = false; delegateSuccess.value = false; }, 1200);
+        },
+        onFinish: () => (processing.value = false),
+    });
+};
+
+const submitProcurementRequest = () => {
+    if (!procurementForm.value.required_qty || Number(procurementForm.value.required_qty) <= 0) return;
+    processing.value = true;
+    router.post(route('inv.manager.material.procurement'), {
+        material_id: procurementForm.value.material_id,
+        material_name: procurementForm.value.material_name,
+        category: procurementForm.value.category,
+        unit: procurementForm.value.unit,
+        current_stock: procurementForm.value.current_stock,
+        reorder_point: procurementForm.value.reorder_point,
+        required_qty: Number(procurementForm.value.required_qty),
+        urgency: procurementForm.value.urgency,
+        notes: procurementForm.value.notes,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            procurementSuccess.value = true;
+            setTimeout(() => {
+                showProcurementModal.value = false;
+                procurementSuccess.value = false;
+            }, 1800);
+        },
+        onFinish: () => (processing.value = false),
+    });
 };
 
 const addMaterial = () => {
-    if (!newMaterial.value.name || !newMaterial.value.id) return;
-    const stock = {};
-    warehouses.value.forEach(w => stock[w.id] = 0);
-    materials.value.push({
-        id: newMaterial.value.id,
+    if (!newMaterial.value.name) return;
+    processing.value = true;
+    router.post(route('inv.manager.material.store'), {
         name: newMaterial.value.name,
         category: newMaterial.value.category || 'Raw Material',
         unit: newMaterial.value.unit || 'pcs',
-        reorder: Number(newMaterial.value.reorder) || 0,
-        cost: Number(newMaterial.value.cost) || 0,
-        stock,
+        quantity: newMaterial.value.quantity || 0,
+        unit_cost: newMaterial.value.unit_cost || 0,
+        reorder_point: newMaterial.value.reorder_point || 0,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            newMaterial.value = { name: '', category: '', unit: '', quantity: '', unit_cost: '', reorder_point: '' };
+            showAddModal.value = false;
+        },
+        onFinish: () => (processing.value = false),
     });
-    newMaterial.value = { id: '', name: '', category: '', unit: '', reorder: '', cost: '' };
-    showAddModal.value = false;
 };
 
 const deleteMaterial = (id) => {
-    materials.value = materials.value.filter(m => m.id !== id);
-    if (expandedMat.value === id) expandedMat.value = null;
+    if (!confirm('Delete this material from the master list?')) return;
+    router.delete(route('inv.manager.material.destroy', { id }), {
+        preserveScroll: true,
+        onSuccess: () => {
+            if (expandedMat.value === id) expandedMat.value = null;
+        },
+    });
 };
 </script>
 
 <template>
 
     <Head title="Master Materials | Monti Textile" />
-
     <AuthenticatedLayout>
 
         <!-- ── Page Header ────────────────────────────────────────────────── -->
@@ -217,8 +289,6 @@ const deleteMaterial = (id) => {
 
         <!-- ── Global Stats ───────────────────────────────────────────────── -->
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-
-            <!-- Total Materials -->
             <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5">
                 <div class="flex items-center justify-between mb-3">
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Materials</p>
@@ -229,8 +299,6 @@ const deleteMaterial = (id) => {
                 <p class="text-3xl font-black text-slate-900 dark:text-white">{{ globalStats.total }}</p>
                 <p class="text-xs text-slate-400 mt-1">unique SKUs</p>
             </div>
-
-            <!-- Total Value -->
             <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5">
                 <div class="flex items-center justify-between mb-3">
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Value</p>
@@ -245,8 +313,6 @@ const deleteMaterial = (id) => {
                 </p>
                 <p class="text-xs text-slate-400 mt-1">across all warehouses</p>
             </div>
-
-            <!-- In Stock -->
             <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5">
                 <div class="flex items-center justify-between mb-3">
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">In Stock</p>
@@ -257,8 +323,6 @@ const deleteMaterial = (id) => {
                 <p class="text-3xl font-black text-emerald-600 dark:text-emerald-400">{{ globalStats.inStock }}</p>
                 <p class="text-xs text-slate-400 mt-1">materials</p>
             </div>
-
-            <!-- Low Stock -->
             <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5">
                 <div class="flex items-center justify-between mb-3">
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Low Stock</p>
@@ -269,8 +333,6 @@ const deleteMaterial = (id) => {
                 <p class="text-3xl font-black text-amber-600 dark:text-amber-400">{{ globalStats.lowStock }}</p>
                 <p class="text-xs text-slate-400 mt-1">need reorder soon</p>
             </div>
-
-            <!-- Out of Stock -->
             <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5">
                 <div class="flex items-center justify-between mb-3">
                     <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Out of Stock</p>
@@ -287,7 +349,7 @@ const deleteMaterial = (id) => {
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <div v-for="wh in warehouses" :key="wh.id"
                 class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 flex items-center gap-4">
-                <div :class="['p-2.5 rounded-xl', colorMap[wh.color].btn, 'shadow-lg']">
+                <div :class="['p-2.5 rounded-xl shadow-lg', getColor(wh.color).btn]">
                     <Warehouse class="w-4 h-4" />
                 </div>
                 <div class="min-w-0">
@@ -296,11 +358,30 @@ const deleteMaterial = (id) => {
                 </div>
                 <div class="ml-auto text-right flex-shrink-0">
                     <p class="text-lg font-black text-slate-900 dark:text-white">
-                        {{materials.filter(m => (m.stock[wh.id] || 0) > 0).length}}
+                        {{materials.filter(m => Number(m.stock[wh.id] ?? m.stock[String(wh.id)] ?? 0) > 0).length}}
                     </p>
                     <p class="text-[10px] text-slate-400">SKUs</p>
                 </div>
             </div>
+        </div>
+
+        <!-- ── Low/Out-of-Stock Alert Banner ──────────────────────────────── -->
+        <div v-if="globalStats.lowStock + globalStats.outOfStock > 0"
+            class="mb-5 flex items-center justify-between gap-4 px-5 py-3.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl">
+            <div class="flex items-center gap-3">
+                <AlertTriangle class="w-5 h-5 text-amber-500 flex-shrink-0" />
+                <p class="text-sm font-bold text-amber-800 dark:text-amber-300">
+                    {{ globalStats.lowStock + globalStats.outOfStock }} material(s) need restocking —
+                    <span class="font-black">{{ globalStats.outOfStock }} out of stock</span>,
+                    {{ globalStats.lowStock }} low.
+                    Use the <span class="underline decoration-dotted">Procurement</span> button on each row to request a
+                    restock.
+                </p>
+            </div>
+            <button @click="statusFilter = 'Low Stock'"
+                class="text-xs font-black text-amber-700 dark:text-amber-300 whitespace-nowrap hover:underline">
+                Filter Low →
+            </button>
         </div>
 
         <!-- ── Main Table Card ────────────────────────────────────────────── -->
@@ -309,15 +390,11 @@ const deleteMaterial = (id) => {
 
             <!-- Toolbar -->
             <div class="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-
-                <!-- Search -->
                 <div class="relative flex-1 min-w-[180px]">
                     <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                     <input v-model="searchQuery" type="text" placeholder="Search materials…"
                         class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200" />
                 </div>
-
-                <!-- Category -->
                 <div class="relative">
                     <select v-model="categoryFilter"
                         class="appearance-none pl-3 pr-8 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200 font-medium">
@@ -326,8 +403,6 @@ const deleteMaterial = (id) => {
                     <ChevronDown
                         class="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                 </div>
-
-                <!-- Status -->
                 <div class="relative">
                     <select v-model="statusFilter"
                         class="appearance-none pl-3 pr-8 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200 font-medium">
@@ -339,7 +414,6 @@ const deleteMaterial = (id) => {
                     <ChevronDown
                         class="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                 </div>
-
                 <p class="text-xs text-slate-400 ml-auto font-medium hidden sm:block">
                     <span class="font-bold text-slate-600 dark:text-slate-300">{{ filteredMaterials.length }}</span>
                     / {{ materials.length }} materials
@@ -353,14 +427,14 @@ const deleteMaterial = (id) => {
                         <tr>
                             <th class="px-5 py-3.5 w-8"></th>
                             <th v-for="col in [
-                                { label: 'MAT ID', field: 'id' },
+                                { label: 'MAT ID', field: 'mat_id' },
                                 { label: 'Material Name', field: 'name' },
                                 { label: 'Category', field: 'category' },
                                 { label: 'Total Qty', field: 'totalQty' },
                                 { label: 'Unit Cost (₱)', field: 'cost' },
                                 { label: 'Total Value', field: 'totalValue' },
                                 { label: 'Warehouses', field: null },
-                                { label: 'Status', field: 'status' },
+                                { label: 'Status', field: null },
                                 { label: '', field: null },
                             ]" :key="col.label"
                                 class="px-5 py-3.5 text-[10px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">
@@ -374,8 +448,6 @@ const deleteMaterial = (id) => {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-
-                        <!-- Empty state -->
                         <tr v-if="filteredMaterials.length === 0">
                             <td colspan="10" class="px-5 py-20 text-center text-slate-400 text-sm font-medium">
                                 <Package class="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -384,12 +456,8 @@ const deleteMaterial = (id) => {
                         </tr>
 
                         <template v-for="mat in filteredMaterials" :key="mat.id">
-                            <!-- Main Row -->
-                            <tr :class="[
-                                'hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors group',
-                                expandedMat === mat.id ? 'bg-slate-50/60 dark:bg-slate-800/40' : ''
-                            ]">
-                                <!-- Expand toggle -->
+                            <tr
+                                :class="['hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors group', expandedMat === mat.id ? 'bg-slate-50/60 dark:bg-slate-800/40' : '']">
                                 <td class="pl-5 py-4">
                                     <button @click="expandedMat = expandedMat === mat.id ? null : mat.id"
                                         class="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition text-slate-400">
@@ -397,64 +465,46 @@ const deleteMaterial = (id) => {
                                             :class="['w-3.5 h-3.5 transition-transform', expandedMat === mat.id ? 'rotate-180' : '']" />
                                     </button>
                                 </td>
-
-                                <!-- MAT ID -->
                                 <td class="px-5 py-4">
                                     <span
                                         class="font-mono text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
-                                        {{ mat.id }}
+                                        {{ mat.mat_id }}
                                     </span>
                                 </td>
-
-                                <!-- Name -->
                                 <td
                                     class="px-5 py-4 font-semibold text-slate-800 dark:text-slate-200 max-w-[220px] truncate">
                                     {{ mat.name }}
                                 </td>
-
-                                <!-- Category -->
                                 <td class="px-5 py-4">
                                     <span
                                         :class="['text-[10px] font-bold px-2.5 py-1 rounded-full', catColor[mat.category] ?? 'bg-slate-100 text-slate-500']">
                                         {{ mat.category }}
                                     </span>
                                 </td>
-
-                                <!-- Total Qty -->
                                 <td class="px-5 py-4">
                                     <span
                                         :class="['font-black text-base', totalQty(mat) === 0 ? 'text-red-500' : totalQty(mat) <= mat.reorder ? 'text-amber-600' : 'text-slate-900 dark:text-white']">
-                                        {{ totalQty(mat).toLocaleString() }}
+                                        {{ Number(totalQty(mat)).toLocaleString() }}
                                     </span>
                                     <span class="text-slate-400 text-xs ml-1">{{ mat.unit }}</span>
                                 </td>
-
-                                <!-- Unit Cost -->
-                                <td class="px-5 py-4 font-semibold text-slate-700 dark:text-slate-300">
-                                    ₱{{ fmt(mat.cost) }}
-                                </td>
-
-                                <!-- Total Value -->
-                                <td class="px-5 py-4 font-semibold text-slate-700 dark:text-slate-300">
-                                    ₱{{ fmt(totalQty(mat) * mat.cost) }}
-                                </td>
-
-                                <!-- Warehouse dots -->
+                                <td class="px-5 py-4 font-semibold text-slate-700 dark:text-slate-300">₱{{ fmt(mat.cost)
+                                }}</td>
+                                <td class="px-5 py-4 font-semibold text-slate-700 dark:text-slate-300">₱{{
+                                    fmt(totalQty(mat) * mat.cost) }}</td>
                                 <td class="px-5 py-4">
                                     <div class="flex items-center gap-1.5 flex-wrap">
                                         <span v-for="wh in warehouses" :key="wh.id"
-                                            :title="wh.name + ': ' + (mat.stock[wh.id] || 0) + ' ' + mat.unit" :class="[
-                                                'w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black transition-all',
-                                                (mat.stock[wh.id] || 0) > 0
-                                                    ? colorMap[wh.color].btn + ' shadow-sm'
+                                            :title="wh.name + ': ' + Number(mat.stock[wh.id] ?? mat.stock[String(wh.id)] ?? 0) + ' ' + mat.unit"
+                                            :class="['w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black transition-all',
+                                                Number(mat.stock[wh.id] ?? mat.stock[String(wh.id)] ?? 0) > 0
+                                                    ? getColor(wh.color).btn + ' shadow-sm'
                                                     : 'bg-slate-100 dark:bg-slate-800 text-slate-300 dark:text-slate-600'
                                             ]">
                                             {{ wh.name.charAt(0) }}
                                         </span>
                                     </div>
                                 </td>
-
-                                <!-- Status -->
                                 <td class="px-5 py-4">
                                     <span
                                         :class="['text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full', statusStyle(matStatus(mat))]">
@@ -462,19 +512,30 @@ const deleteMaterial = (id) => {
                                     </span>
                                 </td>
 
-                                <!-- Actions -->
+                                <!-- ── Actions Column ─────────────────────── -->
                                 <td class="px-5 py-4">
                                     <div
                                         class="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button @click="openDelegate(mat)" title="Delegate to warehouse"
-                                            class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-black rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition shadow-sm shadow-blue-500/20 whitespace-nowrap">
-                                            <ArrowRightLeft class="w-3 h-3" />
-                                            Delegate
+
+                                        <!-- Delegate Button -->
+                                        <button @click="openDelegate(mat)"
+                                            class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-black rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition shadow-sm whitespace-nowrap">
+                                            <ArrowRightLeft class="w-3 h-3" /> Delegate
                                         </button>
-                                        <button
-                                            class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition">
-                                            <Edit2 class="w-3.5 h-3.5" />
+
+                                        <!-- Procurement Button: always shown, pulsing if Low/Out -->
+                                        <button @click="openProcurement(mat)" :class="[
+                                            'inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-black rounded-lg transition shadow-sm whitespace-nowrap',
+                                            matStatus(mat) === 'Out of Stock'
+                                                ? 'bg-red-600 hover:bg-red-700 text-white ring-2 ring-red-400/40'
+                                                : matStatus(mat) === 'Low Stock'
+                                                    ? 'bg-amber-500 hover:bg-amber-600 text-white ring-2 ring-amber-400/40'
+                                                    : 'bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-500 text-white'
+                                        ]">
+                                            <ShoppingCart class="w-3 h-3" />
+                                            Procurement
                                         </button>
+
                                         <button @click="deleteMaterial(mat.id)"
                                             class="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition">
                                             <Trash2 class="w-3.5 h-3.5" />
@@ -488,31 +549,25 @@ const deleteMaterial = (id) => {
                                 <td colspan="10" class="px-5 pb-5 pt-1 bg-slate-50/50 dark:bg-slate-800/20">
                                     <div class="ml-8">
                                         <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                                            Warehouse Distribution
-                                        </p>
+                                            Warehouse Distribution</p>
                                         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                                            <div v-for="wh in warehouseBreakdown(mat)" :key="wh.id" :class="[
-                                                'rounded-xl border p-3.5 transition-all',
-                                                wh.qty > 0
-                                                    ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
-                                                    : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 opacity-60'
-                                            ]">
+                                            <div v-for="wh in warehouseBreakdown(mat)" :key="wh.id"
+                                                :class="['rounded-xl border p-3.5 transition-all', wh.qty > 0 ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 opacity-60']">
                                                 <div class="flex items-center gap-2 mb-2.5">
                                                     <span
-                                                        :class="['w-2 h-2 rounded-full flex-shrink-0', colorMap[wh.color].dot]" />
+                                                        :class="['w-2 h-2 rounded-full flex-shrink-0', getColor(wh.color).dot]" />
                                                     <p
                                                         class="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">
                                                         {{ wh.name }}</p>
                                                 </div>
                                                 <p
                                                     :class="['text-2xl font-black', wh.qty > 0 ? 'text-slate-900 dark:text-white' : 'text-slate-300 dark:text-slate-600']">
-                                                    {{ wh.qty.toLocaleString() }}
+                                                    {{ Number(wh.qty).toLocaleString() }}
                                                 </p>
                                                 <p class="text-[10px] text-slate-400 mt-0.5">{{ mat.unit }}</p>
-                                                <!-- Mini bar -->
                                                 <div
                                                     class="mt-3 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                    <div :class="['h-full rounded-full transition-all', colorMap[wh.color].bar]"
+                                                    <div :class="['h-full rounded-full transition-all', getColor(wh.color).bar]"
                                                         :style="{ width: totalQty(mat) > 0 ? (wh.qty / totalQty(mat) * 100) + '%' : '0%' }" />
                                                 </div>
                                                 <p class="text-[10px] text-slate-400 mt-1">
@@ -521,24 +576,33 @@ const deleteMaterial = (id) => {
                                                 </p>
                                             </div>
                                         </div>
-                                        <!-- Reorder note -->
+
+                                        <!-- Reorder Alert + Quick Procurement CTA -->
                                         <div v-if="matStatus(mat) !== 'In Stock'"
-                                            class="mt-3 flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl w-fit">
-                                            <AlertTriangle class="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                                            <p class="text-xs font-bold text-amber-700 dark:text-amber-400">
-                                                Reorder point: {{ mat.reorder.toLocaleString() }} {{ mat.unit }} —
-                                                total stock is
-                                                <span :class="matStatus(mat) === 'Out of Stock' ? 'text-red-600' : ''">
-                                                    {{ matStatus(mat) === 'Out of Stock' ? 'depleted' : 'belowthreshold'
-                                                    }}
-                                                </span>
-                                            </p>
+                                            class="mt-3 flex flex-wrap items-center gap-3">
+                                            <div
+                                                class="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+                                                <AlertTriangle class="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                                                <p class="text-xs font-bold text-amber-700 dark:text-amber-400">
+                                                    Reorder point: {{ mat.reorder.toLocaleString() }} {{ mat.unit }} —
+                                                    total stock is
+                                                    <span
+                                                        :class="matStatus(mat) === 'Out of Stock' ? 'text-red-600' : ''">
+                                                        {{ matStatus(mat) === 'Out of Stock' ? 'depleted' :
+                                                        'belowthreshold' }}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                            <button @click="openProcurement(mat)"
+                                                class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-black rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition">
+                                                <ShoppingCart class="w-3.5 h-3.5" />
+                                                Request Procurement
+                                            </button>
                                         </div>
                                     </div>
                                 </td>
                             </tr>
                         </template>
-
                     </tbody>
                 </table>
             </div>
@@ -546,17 +610,15 @@ const deleteMaterial = (id) => {
             <!-- Table Footer -->
             <div class="px-5 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                 <p class="text-xs text-slate-400 font-medium">
-                    Showing
-                    <span class="font-bold text-slate-600 dark:text-slate-300">{{ filteredMaterials.length }}</span>
-                    of
-                    <span class="font-bold text-slate-600 dark:text-slate-300">{{ materials.length }}</span>
+                    Showing <span class="font-bold text-slate-600 dark:text-slate-300">{{ filteredMaterials.length
+                    }}</span>
+                    of <span class="font-bold text-slate-600 dark:text-slate-300">{{ materials.length }}</span>
                     materials
                 </p>
                 <div class="flex items-center gap-3">
                     <span v-if="globalStats.lowStock > 0"
                         class="flex items-center gap-1.5 text-[10px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full ring-1 ring-amber-200">
-                        <AlertTriangle class="w-3 h-3" />
-                        {{ globalStats.lowStock }} low stock
+                        <AlertTriangle class="w-3 h-3" /> {{ globalStats.lowStock }} low stock
                     </span>
                     <span v-if="globalStats.outOfStock > 0"
                         class="flex items-center gap-1.5 text-[10px] font-black text-red-600 bg-red-50 px-2.5 py-1 rounded-full ring-1 ring-red-200">
@@ -567,9 +629,231 @@ const deleteMaterial = (id) => {
         </div>
 
 
-        <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!--  DELEGATE MODAL                                                   -->
-        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- ══ PROCUREMENT REQUEST MODAL ════════════════════════════════════ -->
+        <Teleport to="body">
+            <div v-if="showProcurementModal"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                @click.self="showProcurementModal = false">
+                <div
+                    class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-lg overflow-hidden">
+
+                    <!-- Success State -->
+                    <div v-if="procurementSuccess" class="flex flex-col items-center py-14 gap-4 px-6">
+                        <div
+                            class="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                            <CheckCircle class="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <p class="text-lg font-black text-slate-900 dark:text-white">Request Sent to SCM!</p>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 text-center">
+                            The procurement request for <strong>{{ procurementForm.material_name }}</strong>
+                            has been forwarded to the SCM Procurement module.
+                        </p>
+                        <div
+                            class="flex items-center gap-2 mt-1 px-4 py-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 text-xs font-bold text-blue-700 dark:text-blue-300">
+                            <ArrowRight class="w-4 h-4" />
+                            SCM Manager will review and send RFQ to suppliers.
+                        </div>
+                    </div>
+
+                    <!-- Form State -->
+                    <template v-else>
+                        <!-- Modal Header -->
+                        <div :class="[
+                            'px-6 py-5 border-b border-slate-100 dark:border-slate-700',
+                            procurementForm.urgency === 'High'
+                                ? 'bg-red-50 dark:bg-red-900/20'
+                                : procurementForm.urgency === 'Medium'
+                                    ? 'bg-amber-50 dark:bg-amber-900/20'
+                                    : 'bg-slate-50 dark:bg-slate-800'
+                        ]">
+                            <div class="flex items-start justify-between gap-4">
+                                <div class="flex items-start gap-3">
+                                    <div :class="[
+                                        'p-2.5 rounded-xl flex-shrink-0',
+                                        procurementForm.urgency === 'High'
+                                            ? 'bg-red-100 dark:bg-red-900/40'
+                                            : procurementForm.urgency === 'Medium'
+                                                ? 'bg-amber-100 dark:bg-amber-900/40'
+                                                : 'bg-slate-100 dark:bg-slate-700'
+                                    ]">
+                                        <ShoppingCart :class="[
+                                            'w-5 h-5',
+                                            procurementForm.urgency === 'High' ? 'text-red-600 dark:text-red-400'
+                                                : procurementForm.urgency === 'Medium' ? 'text-amber-600 dark:text-amber-400'
+                                                    : 'text-slate-500'
+                                        ]" />
+                                    </div>
+                                    <div>
+                                        <h3 class="text-base font-black text-slate-900 dark:text-white">Procurement
+                                            Request</h3>
+                                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                            This request will appear in the SCM Procurement module for sourcing.
+                                        </p>
+                                    </div>
+                                </div>
+                                <button @click="showProcurementModal = false"
+                                    class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/60 dark:hover:bg-slate-700 transition flex-shrink-0">
+                                    <X class="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="p-6 space-y-5">
+                            <!-- Material Info Card (read-only) -->
+                            <div
+                                class="px-4 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                                            <span
+                                                class="font-mono text-[10px] text-slate-400 bg-white dark:bg-slate-700 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600">
+                                                {{ procurementTarget?.mat_id }}
+                                            </span>
+                                            <span
+                                                :class="['text-[10px] font-bold px-2 py-0.5 rounded-full', catColor[procurementForm.category] ?? 'bg-slate-100 text-slate-500']">
+                                                {{ procurementForm.category }}
+                                            </span>
+                                        </div>
+                                        <p class="font-black text-slate-800 dark:text-slate-200 text-sm truncate">{{
+                                            procurementForm.material_name }}</p>
+                                    </div>
+                                    <span
+                                        :class="['text-[10px] font-black px-2.5 py-1 rounded-full flex-shrink-0', statusStyle(matStatus(procurementTarget))]">
+                                        {{ matStatus(procurementTarget) }}
+                                    </span>
+                                </div>
+
+                                <!-- Stock Overview -->
+                                <div class="mt-3 grid grid-cols-3 gap-2 text-center">
+                                    <div
+                                        class="bg-white dark:bg-slate-700 rounded-lg px-2 py-2 border border-slate-200 dark:border-slate-600">
+                                        <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">
+                                            Current Stock</p>
+                                        <p
+                                            :class="['text-base font-black mt-0.5', procurementForm.current_stock <= 0 ? 'text-red-600' : 'text-slate-800 dark:text-white']">
+                                            {{ Number(procurementForm.current_stock).toLocaleString() }}
+                                        </p>
+                                        <p class="text-[10px] text-slate-400">{{ procurementForm.unit }}</p>
+                                    </div>
+                                    <div
+                                        class="bg-white dark:bg-slate-700 rounded-lg px-2 py-2 border border-slate-200 dark:border-slate-600">
+                                        <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">
+                                            Reorder Point</p>
+                                        <p class="text-base font-black text-slate-800 dark:text-white mt-0.5">
+                                            {{ Number(procurementForm.reorder_point).toLocaleString() }}
+                                        </p>
+                                        <p class="text-[10px] text-slate-400">{{ procurementForm.unit }}</p>
+                                    </div>
+                                    <div
+                                        class="bg-amber-50 dark:bg-amber-900/20 rounded-lg px-2 py-2 border border-amber-200 dark:border-amber-700">
+                                        <p class="text-[10px] text-amber-600 font-semibold uppercase tracking-wide">Gap
+                                        </p>
+                                        <p class="text-base font-black text-amber-700 dark:text-amber-300 mt-0.5">
+                                            {{ procurementForm.current_stock < procurementForm.reorder_point ?
+                                                (procurementForm.reorder_point -
+                                                    procurementForm.current_stock).toLocaleString() : '—' }} </p>
+                                                <p class="text-[10px] text-amber-500">below reorder</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Required Quantity -->
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                    Required Quantity <span class="text-red-500">*</span>
+                                </label>
+                                <div class="mt-1 flex items-center gap-2">
+                                    <input v-model="procurementForm.required_qty" type="number" min="1"
+                                        :placeholder="'e.g. ' + suggestedQty"
+                                        class="flex-1 px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200 font-bold" />
+                                    <span class="text-sm font-bold text-slate-500 dark:text-slate-400 flex-shrink-0">
+                                        {{ procurementForm.unit }}
+                                    </span>
+                                    <button v-if="suggestedQty > 0" @click="procurementForm.required_qty = suggestedQty"
+                                        class="px-3 py-2.5 text-xs font-black text-blue-600 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-100 transition whitespace-nowrap">
+                                        Suggested
+                                    </button>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-1">
+                                    Suggested: <span class="font-bold text-slate-600 dark:text-slate-300">{{
+                                        Number(suggestedQty).toLocaleString() }} {{ procurementForm.unit }}</span>
+                                    (reorder gap)
+                                </p>
+                            </div>
+
+                            <!-- Urgency -->
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Urgency
+                                    Level</label>
+                                <div class="mt-1.5 grid grid-cols-3 gap-2">
+                                    <button v-for="level in ['High', 'Medium', 'Low']" :key="level"
+                                        @click="procurementForm.urgency = level" :class="[
+                                            'py-2.5 text-xs font-black rounded-xl border-2 transition-all',
+                                            procurementForm.urgency === level
+                                                ? level === 'High'
+                                                    ? 'border-red-500 bg-red-600 text-white shadow-md shadow-red-500/20'
+                                                    : level === 'Medium'
+                                                        ? 'border-amber-500 bg-amber-500 text-white shadow-md shadow-amber-500/20'
+                                                        : 'border-blue-500 bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                                                : 'border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-500'
+                                        ]">
+                                        {{ level === 'High' ? '🔴' : level === 'Medium' ? '🟡' : '🔵' }}
+                                        {{ level }}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Notes -->
+                            <div>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                    Notes / Special Instructions
+                                    <span class="normal-case font-medium text-slate-400">(optional)</span>
+                                </label>
+                                <textarea v-model="procurementForm.notes" rows="2"
+                                    placeholder="e.g. Specific grade required, packaging preference, preferred supplier..."
+                                    class="mt-1 w-full px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200 resize-none"></textarea>
+                            </div>
+
+                            <!-- Flow Info -->
+                            <div
+                                class="flex items-center gap-2 text-[10px] font-bold text-slate-400 dark:text-slate-500 px-1">
+                                <span class="flex items-center gap-1">
+                                    <span
+                                        class="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] font-black">INV</span>
+                                    Inventory
+                                </span>
+                                <ArrowRight class="w-3 h-3 flex-shrink-0" />
+                                <span class="flex items-center gap-1">
+                                    <span
+                                        class="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[9px] font-black">SCM</span>
+                                    Procurement
+                                </span>
+                                <ArrowRight class="w-3 h-3 flex-shrink-0" />
+                                <span>RFQ → Quotation → PO → Invoice → Payment</span>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div
+                            class="px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex gap-3 bg-slate-50 dark:bg-slate-800/50">
+                            <button @click="showProcurementModal = false"
+                                class="flex-1 py-2.5 text-sm font-bold rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition">
+                                Cancel
+                            </button>
+                            <button @click="submitProcurementRequest"
+                                :disabled="processing || !procurementForm.required_qty || Number(procurementForm.required_qty) <= 0"
+                                class="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-black rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition shadow-lg shadow-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed">
+                                <Send class="w-4 h-4" />
+                                {{ processing ? 'Sending...' : 'Send to SCM Procurement' }}
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </Teleport>
+
+
+        <!-- ══ DELEGATE MODAL ═══════════════════════════════════════════════ -->
         <Teleport to="body">
             <div v-if="showDelegateModal"
                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
@@ -600,7 +884,6 @@ const deleteMaterial = (id) => {
                             </button>
                         </div>
 
-                        <!-- Selected Material Info -->
                         <div v-if="delegateMaterial"
                             class="mb-5 px-4 py-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center gap-3">
                             <div
@@ -611,11 +894,12 @@ const deleteMaterial = (id) => {
                                 <p class="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{{
                                     delegateMaterial.name }}</p>
                                 <div class="flex items-center gap-2 mt-0.5">
-                                    <span class="font-mono text-[10px] text-slate-400">{{ delegateMaterial.id }}</span>
+                                    <span class="font-mono text-[10px] text-slate-400">{{ delegateMaterial.mat_id
+                                    }}</span>
                                     <span class="text-[10px] text-slate-400">·</span>
                                     <span class="text-[10px] font-bold text-slate-500">
-                                        {{ totalQty(delegateMaterial).toLocaleString() }} {{ delegateMaterial.unit }}
-                                        total
+                                        {{ Number(totalQty(delegateMaterial)).toLocaleString() }} {{
+                                            delegateMaterial.unit }} total
                                     </span>
                                 </div>
                             </div>
@@ -626,20 +910,18 @@ const deleteMaterial = (id) => {
                         </div>
 
                         <div class="space-y-4">
-
-                            <!-- From Warehouse -->
                             <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                    From Warehouse *
-                                </label>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">From
+                                    Warehouse *</label>
                                 <div class="relative mt-1">
                                     <select v-model="delegateForm.fromWarehouse"
                                         @change="delegateForm.toWarehouse = null; delegateForm.qty = ''"
                                         class="w-full appearance-none pl-3 pr-8 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200 font-medium">
                                         <option :value="null">Select source warehouse…</option>
                                         <option v-for="wh in fromOptions" :key="wh.id" :value="wh.id">
-                                            {{ wh.name }} ({{ (delegateMaterial?.stock[wh.id] || 0).toLocaleString() }}
-                                            {{ delegateMaterial?.unit }})
+                                            {{ wh.name }} ({{ Number(delegateMaterial?.stock[wh.id] ??
+                                                delegateMaterial?.stock[String(wh.id)] ?? 0).toLocaleString() }} {{
+                                                delegateMaterial?.unit }})
                                         </option>
                                     </select>
                                     <ChevronDown
@@ -650,7 +932,6 @@ const deleteMaterial = (id) => {
                                 </p>
                             </div>
 
-                            <!-- Arrow -->
                             <div class="flex items-center gap-3">
                                 <div class="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
                                 <div
@@ -660,19 +941,19 @@ const deleteMaterial = (id) => {
                                 <div class="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
                             </div>
 
-                            <!-- To Warehouse -->
                             <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                    To Warehouse *
-                                </label>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">To
+                                    Warehouse *</label>
                                 <div class="relative mt-1">
                                     <select v-model="delegateForm.toWarehouse" :disabled="!delegateForm.fromWarehouse"
                                         class="w-full appearance-none pl-3 pr-8 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
                                         <option :value="null">Select destination warehouse…</option>
                                         <option v-for="wh in toOptions" :key="wh.id" :value="wh.id">
                                             {{ wh.name }}
-                                            <template v-if="(delegateMaterial?.stock[wh.id] || 0) > 0">
-                                                ({{ (delegateMaterial?.stock[wh.id] || 0).toLocaleString() }} {{
+                                            <template
+                                                v-if="Number(delegateMaterial?.stock[wh.id] ?? delegateMaterial?.stock[String(wh.id)] ?? 0) > 0">
+                                                ({{ Number(delegateMaterial?.stock[wh.id] ??
+                                                    delegateMaterial?.stock[String(wh.id)] ?? 0).toLocaleString() }} {{
                                                     delegateMaterial?.unit }} existing)
                                             </template>
                                         </option>
@@ -682,11 +963,9 @@ const deleteMaterial = (id) => {
                                 </div>
                             </div>
 
-                            <!-- Quantity -->
                             <div>
-                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                    Quantity to Transfer *
-                                </label>
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantity
+                                    to Transfer *</label>
                                 <div class="mt-1 flex items-center gap-2">
                                     <input v-model="delegateForm.qty" type="number" min="1" :max="maxQty"
                                         :disabled="!delegateForm.fromWarehouse"
@@ -710,29 +989,24 @@ const deleteMaterial = (id) => {
                             </div>
                         </div>
 
-                        <!-- Actions -->
                         <div class="mt-6 flex gap-3">
                             <button @click="showDelegateModal = false"
                                 class="flex-1 py-2.5 text-sm font-bold rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
                                 Cancel
                             </button>
                             <button @click="confirmDelegate"
-                                :disabled="!delegateForm.fromWarehouse || !delegateForm.toWarehouse || !delegateForm.qty || Number(delegateForm.qty) > maxQty || Number(delegateForm.qty) <= 0"
+                                :disabled="processing || !delegateForm.fromWarehouse || !delegateForm.toWarehouse || !delegateForm.qty || Number(delegateForm.qty) > maxQty || Number(delegateForm.qty) <= 0"
                                 class="flex-1 inline-flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition shadow-lg shadow-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed">
-                                <Send class="w-4 h-4" />
-                                Confirm Delegation
+                                <Send class="w-4 h-4" /> Confirm Delegation
                             </button>
                         </div>
                     </template>
-
                 </div>
             </div>
         </Teleport>
 
 
-        <!-- ══════════════════════════════════════════════════════════════════ -->
-        <!--  ADD MATERIAL MODAL                                               -->
-        <!-- ══════════════════════════════════════════════════════════════════ -->
+        <!-- ══ ADD MATERIAL MODAL ════════════════════════════════════════════ -->
         <Teleport to="body">
             <div v-if="showAddModal"
                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
@@ -742,9 +1016,8 @@ const deleteMaterial = (id) => {
                     <div class="flex items-center justify-between mb-6">
                         <div>
                             <h3 class="text-lg font-black text-slate-900 dark:text-white">Add Material</h3>
-                            <p class="text-xs text-slate-400 mt-0.5">Creates the material in the master list with zero
-                                stock.
-                            </p>
+                            <p class="text-xs text-slate-400 mt-0.5">Mat ID is auto-generated. Initial quantity goes to
+                                the Main Warehouse.</p>
                         </div>
                         <button @click="showAddModal = false"
                             class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
@@ -753,14 +1026,8 @@ const deleteMaterial = (id) => {
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">MAT ID
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Category
                                 *</label>
-                            <input v-model="newMaterial.id" type="text" placeholder="e.g. MAT-999"
-                                class="mt-1 w-full px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200 font-mono" />
-                        </div>
-                        <div>
-                            <label
-                                class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</label>
                             <div class="relative mt-1">
                                 <select v-model="newMaterial.category"
                                     class="w-full appearance-none pl-3 pr-8 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200 font-medium">
@@ -775,6 +1042,12 @@ const deleteMaterial = (id) => {
                                     class="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                             </div>
                         </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit
+                                *</label>
+                            <input v-model="newMaterial.unit" type="text" placeholder="rolls, kg, pcs…"
+                                class="mt-1 w-full px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200" />
+                        </div>
                         <div class="col-span-2">
                             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Material Name
                                 *</label>
@@ -782,20 +1055,21 @@ const deleteMaterial = (id) => {
                                 class="mt-1 w-full px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200" />
                         </div>
                         <div>
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit</label>
-                            <input v-model="newMaterial.unit" type="text" placeholder="rolls, kg, pcs…"
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Initial
+                                Quantity</label>
+                            <input v-model="newMaterial.quantity" type="number" min="0" placeholder="0"
                                 class="mt-1 w-full px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200" />
                         </div>
                         <div>
                             <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reorder
                                 Point</label>
-                            <input v-model="newMaterial.reorder" type="number" placeholder="0"
+                            <input v-model="newMaterial.reorder_point" type="number" min="0" placeholder="0"
                                 class="mt-1 w-full px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200" />
                         </div>
                         <div class="col-span-2">
-                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit Cost
-                                (₱)</label>
-                            <input v-model="newMaterial.cost" type="number" placeholder="0.00"
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit Cost (₱)
+                                *</label>
+                            <input v-model="newMaterial.unit_cost" type="number" min="0" step="0.01" placeholder="0.00"
                                 class="mt-1 w-full px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700 dark:text-slate-200" />
                         </div>
                     </div>
@@ -804,7 +1078,7 @@ const deleteMaterial = (id) => {
                             class="flex-1 py-2.5 text-sm font-bold rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
                             Cancel
                         </button>
-                        <button @click="addMaterial" :disabled="!newMaterial.name || !newMaterial.id"
+                        <button @click="addMaterial" :disabled="processing || !newMaterial.name"
                             class="flex-1 py-2.5 text-sm font-bold rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-80 transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
                             Add to Master List
                         </button>

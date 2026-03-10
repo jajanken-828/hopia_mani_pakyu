@@ -37,9 +37,9 @@ use App\Http\Controllers\scm\employee\InboundController;
 use App\Http\Controllers\scm\employee\InventoryController;
 use App\Http\Controllers\scm\employee\RecievingController;
 use App\Http\Controllers\scm\employee\VerificationController;
-use App\Http\Controllers\scm\manager\AuditController;
 use App\Http\Controllers\scm\manager\CloseController;
 use App\Http\Controllers\scm\manager\ProcurementController;
+use App\Http\Controllers\scm\manager\VendorController;
 use App\Http\Controllers\SUPPLIERS\SupplierDashboardController;
 use App\Http\Controllers\trainee\TraineeAttendanceController;
 use App\Http\Controllers\trainee\TraineePayslipController;
@@ -313,41 +313,71 @@ Route::prefix('dashboard/hrm')->name('hrm.')->middleware(['auth', 'verified'])->
 */
 Route::prefix('dashboard/scm')->name('scm.')->middleware(['auth', 'verified'])->group(function () {
 
-    Route::get('/manager', [DashboardController::class, 'index'])
-        ->middleware(['role:SCM', 'position:manager'])
-        ->name('manager.dashboard');
+    // ── Manager routes ─────────────────────────────────────────────
+    Route::middleware(['role:SCM', 'position:manager'])->group(function () {
 
-    Route::get('/procurement', [ProcurementController::class, 'procurement'])
-        ->middleware(['role:SCM', 'position:manager'])
-        ->name('manager.procurement');
+        Route::get('/manager', [DashboardController::class, 'index'])
+            ->name('manager.dashboard');
 
-    Route::get('/audit', [AuditController::class, 'audit'])
-        ->middleware(['role:SCM', 'position:manager'])
-        ->name('manager.audit');
+        Route::get('/vendor', [VendorController::class, 'vendor'])
+            ->name('manager.vendor');
 
-    Route::get('/close', [CloseController::class, 'close'])
-        ->middleware(['role:SCM', 'position:manager'])
-        ->name('manager.close');
+        Route::get('/close', [CloseController::class, 'close'])
+            ->name('manager.close');
 
-    Route::get('/staff', [DashboardController::class, 'index'])
-        ->middleware(['role:SCM', 'position:staff'])
-        ->name('employee.dashboard');
+        // ── Procurement Module (full CRUD) ──────────────────────────
+        Route::prefix('procurement')->name('manager.procurement')->group(function () {
 
-    Route::get('/inbound', [InboundController::class, 'inbound'])
-        ->middleware(['role:SCM', 'position:staff'])
-        ->name('employee.inbound');
+            // Main page (Inertia render)
+            Route::get('/', [ProcurementController::class, 'procurement'])
+                ->name('');                                             // scm.manager.procurement
 
-    Route::get('/inventory', [InventoryController::class, 'inventory'])
-        ->middleware(['role:SCM', 'position:staff'])
-        ->name('employee.inventory');
+            // ── Material Request ──────────────────────────────────
+            // (Created automatically by Inventory module; read-only here)
 
-    Route::get('/recieving', [RecievingController::class, 'recieving'])
-        ->middleware(['role:SCM', 'position:staff'])
-        ->name('employee.recieving');
+            // ── RFQ ───────────────────────────────────────────────
+            Route::post('/rfq', [ProcurementController::class, 'createRFQ'])
+                ->name('.rfq.store');                                   // scm.manager.procurement.rfq.store
 
-    Route::get('/verification', [VerificationController::class, 'verification'])
-        ->middleware(['role:SCM', 'position:staff'])
-        ->name('employee.verification');
+            // ── Supplier Quotation Responses ──────────────────────
+            Route::post('/quotations/{responseId}/accept', [ProcurementController::class, 'acceptQuotation'])
+                ->name('.quotations.accept');
+
+            Route::post('/quotations/{responseId}/decline', [ProcurementController::class, 'declineQuotation'])
+                ->name('.quotations.decline');
+
+            // ── Purchase Orders ───────────────────────────────────
+            Route::post('/purchase-orders/{poId}/send', [ProcurementController::class, 'sendPurchaseOrder'])
+                ->name('.purchase-orders.send');
+
+            // ── Invoices (receive from supplier portal) ───────────
+            Route::post('/invoices/receive', [ProcurementController::class, 'receiveInvoiceFromSupplier'])
+                ->name('.invoices.receive');
+
+            // ── Payments ──────────────────────────────────────────
+            Route::post('/payments', [ProcurementController::class, 'processPayment'])
+                ->name('.payments.store');
+        });
+    });
+
+    // ── Staff routes ────────────────────────────────────────────────
+    Route::middleware(['role:SCM', 'position:staff'])->group(function () {
+
+        Route::get('/staff', [DashboardController::class, 'index'])
+            ->name('employee.dashboard');
+
+        Route::get('/inbound', [InboundController::class, 'inbound'])
+            ->name('employee.inbound');
+
+        Route::get('/inventory', [InventoryController::class, 'inventory'])
+            ->name('employee.inventory');
+
+        Route::get('/recieving', [RecievingController::class, 'recieving'])
+            ->name('employee.recieving');
+
+        Route::get('/verification', [VerificationController::class, 'verification'])
+            ->name('employee.verification');
+    });
 });
 
 /*
@@ -380,21 +410,68 @@ Route::prefix('dashboard/man')->name('man.')->middleware(['auth', 'verified'])->
 
 // Inventory (INV)
 Route::prefix('dashboard/inv')->name('inv.')->middleware(['auth', 'verified'])->group(function () {
+
     Route::get('/manager', [DashboardController::class, 'index'])
         ->middleware(['role:INV', 'position:manager'])
         ->name('manager.dashboard');
 
+    // ── Inventory / Warehouses ──────────────────────────────────────────────
     Route::get('/inventory', [InvInventoryController::class, 'inventory'])
         ->middleware(['role:INV', 'position:manager'])
         ->name('manager.inventory');
 
+    Route::post('/warehouse', [InvInventoryController::class, 'storeWarehouse'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.warehouse.store');
+
+    Route::post('/inventory/item', [InvInventoryController::class, 'storeItem'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.inventory.item.store');
+
+    Route::delete('/inventory/item/{wmId}', [InvInventoryController::class, 'destroyItem'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.inventory.item.destroy');
+
+    Route::post('/material/procurement', [MaterialController::class, 'requestProcurement'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.material.procurement');
+
+    // ── Master Materials ────────────────────────────────────────────────────
+    Route::get('/material', [MaterialController::class, 'material'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.material');
+
+    Route::post('/material', [MaterialController::class, 'store'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.material.store');
+
+    Route::delete('/material/{id}', [MaterialController::class, 'destroy'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.material.destroy');
+
+    Route::post('/material/delegate', [MaterialController::class, 'delegate'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.material.delegate');
+
+    // ── Products ────────────────────────────────────────────────────────────
     Route::get('/product', [ProductController::class, 'product'])
         ->middleware(['role:INV', 'position:manager'])
         ->name('manager.product');
 
-    Route::get('/material', [MaterialController::class, 'material'])
+    Route::post('/product', [ProductController::class, 'store'])
         ->middleware(['role:INV', 'position:manager'])
-        ->name('manager.material');
+        ->name('manager.product.store');
+
+    Route::post('/product/{id}/update', [ProductController::class, 'update'])   // ← ADD THIS
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.product.update');
+
+    Route::delete('/product/image/{imageId}', [ProductController::class, 'destroyImage'])
+        ->name('manager.product.image.destroy');
+
+    Route::delete('/product/{id}', [ProductController::class, 'destroy'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.product.destroy');
 
     Route::get('/staff', [DashboardController::class, 'index'])
         ->middleware(['role:INV', 'position:staff'])
