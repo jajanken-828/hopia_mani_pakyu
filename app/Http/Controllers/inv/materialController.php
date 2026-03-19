@@ -64,9 +64,13 @@ class MaterialController extends Controller
             ->values()
             ->toArray();
 
+        // FETCH PROCUREMENT REQUEST HISTORY TO SEND TO VUE
+        $materialRequests = MaterialRequest::orderBy('created_at', 'desc')->get();
+
         return Inertia::render('Dashboard/INV/Manager/material', [
             'warehouses' => $warehouses,
             'materials' => $materials,
+            'materialRequests' => $materialRequests, // Added this payload
         ]);
     }
 
@@ -154,10 +158,6 @@ class MaterialController extends Controller
     }
 
     // ── Request Procurement (Send to SCM) ────────────────────────────────────
-    //
-    // Creates a MaterialRequest record that will appear in the SCM
-    // Procurement module under "Material Request" for the SCM manager
-    // to review and send RFQs to suppliers.
 
     public function requestProcurement(Request $request)
     {
@@ -172,17 +172,6 @@ class MaterialController extends Controller
             'urgency' => 'required|in:High,Medium,Low',
             'notes' => 'nullable|string|max:1000',
         ]);
-
-        // Prevent duplicate pending requests for the same material
-        $existing = MaterialRequest::where('material_id', $data['material_id'])
-            ->whereIn('status', ['pending', 'rfq_sent'])
-            ->first();
-
-        if ($existing) {
-            return redirect()->back()->withErrors([
-                'procurement' => "A pending procurement request already exists for this material ({$existing->req_number}). Please wait for the SCM team to process it.",
-            ]);
-        }
 
         // Generate request number: MR-YYYY-NNN
         $year = now()->year;

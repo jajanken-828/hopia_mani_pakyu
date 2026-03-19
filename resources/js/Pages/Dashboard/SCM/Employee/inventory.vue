@@ -123,10 +123,10 @@ onMounted(() => {
                             <div class="flex justify-between">
                                 <span class="text-xs font-bold text-gray-400 uppercase">Current Tracking Status</span>
                                 <span class="text-xs font-black text-blue-600 uppercase">{{ selectedTask.status
-                                    }}</span>
+                                }}</span>
                             </div>
                             <p class="text-lg font-bold">Last Scanned: <span class="text-blue-600">{{
-                                    selectedTask.location }}</span></p>
+                                selectedTask.location }}</span></p>
                             <button class="w-full py-3 bg-gray-900 text-white rounded-xl text-sm font-bold">Request Lead
                                 Time Update from Mill</button>
                         </div>

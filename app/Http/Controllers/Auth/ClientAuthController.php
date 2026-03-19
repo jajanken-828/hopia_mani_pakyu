@@ -62,7 +62,7 @@ class ClientAuthController extends Controller
             // ✅ Allow both 'approved' and 'active' as valid statuses
             if (! in_array($client->status, ['approved', 'active'])) {
                 return back()->withErrors([
-                    'email' => 'Your account is not approved yet. Please wait for admin approval.',
+                    'email' => 'Your account does not exist.',
                 ]);
             }
 
@@ -73,7 +73,7 @@ class ClientAuthController extends Controller
         }
 
         return back()->withErrors([
-            'email' => 'The provided credentials do not match our records.',
+            'email' => 'Invalid Credentials.',
         ]);
     }
 }

@@ -1,54 +1,76 @@
 <script setup>
-import { ref, computed } from 'vue'
 import { usePage, Link } from '@inertiajs/vue3'
+import { route } from 'ziggy-js';
+import { computed, ref } from 'vue'
 import {
     Menu,
     X,
-    LogOut,
-    ShieldCheck,
     LayoutDashboard,
     BarChart3,
     Package,
+    LogOut,
+    ChevronRight,
+    CreditCard,
     UserPlus,
+    Spool,
     ClipboardList,
     ChartNoAxesCombined,
+    ShoppingBasket,
     HandCoins,
     FileUser,
     DoorOpen,
-    CreditCard,
     BicepsFlexed,
     Truck,
     Wallet,
     Factory,
+    Book,
     Boxes,
     ShoppingCart,
     Warehouse,
-    Users,
     Globe,
-    // Employee Portal Icons
     Clock,
     CalendarDays,
     History,
+    Users,
     Settings,
-    // Client Icons
     Receipt,
     HelpCircle,
-    Building2 // Added for department icon
+    ShieldCheck,
+    Building2,
+    RefreshCw,
+    ClipboardCheck,
 } from 'lucide-vue-next'
 
-const isOpen = ref(false)
 const page = usePage()
+
+// UI State
+const isOpen = ref(false)
+const isWorkforceOpen = ref(false)
+const showLogoutModal = ref(false)
+
+const toggleWorkforce = () => {
+    isWorkforceOpen.value = !isWorkforceOpen.value
+}
+
+// Bulletproof authentication object parsing (Synced from Sidebar.vue)
 const user = computed(() => page.props.auth.user)
 const client = computed(() => page.props.auth.client)
+const supplier = computed(() => page.props.auth.supplier || (page.props.auth.user?.business_name ? page.props.auth.user : null))
 const currentUrl = computed(() => page.url)
 
-// Determine if current user is a client (B2B)
-const isClient = computed(() => !!client.value)
-
-// Determine if inside employee ID portal
 const isEmployeePortal = computed(() => currentUrl.value.startsWith('/dashboard/employee-ui'))
+const isClient = computed(() => !!client.value)
+const isSupplier = computed(() => !!supplier.value || currentUrl.value.startsWith('/supplier'))
 
 const navItems = computed(() => {
+    // --- Supplier Navigation ---
+    if (isSupplier.value) {
+        return [
+            { label: 'Vendor Hub', href: route('supplier.dashboard'), icon: LayoutDashboard },
+            { label: 'Purchase Orders', href: route('supplier.orders'), icon: ShoppingCart },
+        ]
+    }
+
     // --- Client Navigation (B2B) ---
     if (isClient.value) {
         return [
@@ -69,7 +91,7 @@ const navItems = computed(() => {
         ]
     }
 
-    // --- Standard ERP Navigation (Employees by role/position) ---
+    // --- Standard ERP Navigation ---
     const items = [
         { label: 'Main Dashboard', href: route('dashboard'), icon: LayoutDashboard },
     ]
@@ -77,11 +99,29 @@ const navItems = computed(() => {
     const userRole = user.value?.role?.toUpperCase()
     const userPosition = user.value?.position?.toLowerCase()
 
-    // HRM Department
+    // --- Trainee Navigation ---
+    if (userPosition === 'trainee') {
+        items.push(
+            { label: 'Time In/Out', href: route('trainee.timekeeping'), icon: Clock },
+            { label: 'Attendance', href: route('trainee.attendance'), icon: CalendarDays },
+            { label: 'Payslips', href: route('trainee.payslip'), icon: HandCoins }
+        );
+        return items;
+    }
+
     if (userRole === 'HRM') {
         if (userPosition === 'manager') {
             items.push(
                 { label: 'Onboarding', href: route('hrm.manager.onboarding'), icon: BarChart3 },
+                {
+                    label: 'Workforce Management',
+                    icon: Users,
+                    isDropdown: true,
+                    children: [
+                        { label: 'Attendance', href: route('hrm.employee.attendance'), icon: FileUser },
+                        { label: 'Leave MGMT', href: route('hrm.employee.leave'), icon: DoorOpen },
+                    ]
+                },
                 { label: 'Payroll', href: route('hrm.manager.payroll'), icon: HandCoins },
                 { label: 'Analytics', href: route('hrm.manager.analytics'), icon: ChartNoAxesCombined }
             )
@@ -89,95 +129,87 @@ const navItems = computed(() => {
             items.push(
                 { label: 'Recruitment', href: route('hrm.applicants.index'), icon: UserPlus },
                 { label: 'Interview', href: route('hrm.employee.interview'), icon: ClipboardList },
-                { label: 'Training & Development', href: route('hrm.employee.training'), icon: BicepsFlexed },
-                { label: 'Attendance', href: route('hrm.employee.attendance'), icon: FileUser },
-                { label: 'Leave Management', href: route('hrm.employee.leave'), icon: DoorOpen },
+                { label: 'Training', href: route('hrm.employee.training'), icon: BicepsFlexed },
+                {
+                    label: 'Workforce Management',
+                    icon: Users,
+                    isDropdown: true,
+                    children: [
+                        { label: 'Attendance', href: route('hrm.employee.attendance'), icon: FileUser },
+                        { label: 'Leave MGMT', href: route('hrm.employee.leave'), icon: DoorOpen },
+                    ]
+                },
                 { label: 'Payroll', href: route('hrm.employee.hrmstaffpayroll'), icon: HandCoins }
             )
         }
     }
 
-    // SCM Department
     if (userRole === 'SCM') {
         if (userPosition === 'manager') {
             items.push(
                 { label: 'Procurement', href: route('scm.manager.procurement'), icon: Truck },
-                { label: 'Audit', href: route('scm.manager.audit'), icon: ChartNoAxesCombined },
+                { label: 'Supplier Management', href: route('scm.manager.vendor'), icon: ChartNoAxesCombined },
                 { label: 'Close', href: route('scm.manager.close'), icon: DoorOpen }
             )
         } else if (userPosition === 'staff') {
             items.push(
                 { label: 'Inbound', href: route('scm.employee.inbound'), icon: Truck },
                 { label: 'Receiving', href: route('scm.employee.recieving'), icon: Truck },
-                { label: 'Inventory Management', href: route('scm.employee.inventory'), icon: Package },
+                { label: 'Inventory', href: route('scm.employee.inventory'), icon: Package },
                 { label: 'Verifications', href: route('scm.employee.verification'), icon: HandCoins }
             )
         }
     }
 
-    // Finance
     if (userRole === 'FIN') {
-        if (userPosition === 'manager') {
-            items.push({ label: 'Finance Dashboard', href: route('fin.manager.dashboard'), icon: Wallet })
-        } else if (userPosition === 'staff') {
-            items.push({ label: 'Finance Portal', href: route('fin.employee.dashboard'), icon: Wallet })
-        }
+        items.push({ label: 'Finance', href: userPosition === 'manager' ? route('fin.manager.dashboard') : route('fin.employee.dashboard'), icon: Wallet })
     }
 
-    // Manufacturing
     if (userRole === 'MAN') {
-        if (userPosition === 'manager') {
-            items.push({ label: 'Manufacturing', href: route('man.manager.dashboard'), icon: Factory })
-        } else if (userPosition === 'staff') {
-            items.push({ label: 'Production Line', href: route('man.employee.dashboard'), icon: Factory })
-        }
+        items.push({ label: 'Manufacturing', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: Factory })
+        items.push({ label: 'Production Orders', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: ClipboardList })
+        items.push({ label: 'Machine Status', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: Settings })
+        items.push({ label: 'Maintenance', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: Receipt })
     }
 
-    // Inventory
     if (userRole === 'INV') {
+        items.push({ label: 'Inventory', href: userPosition === 'manager' ? route('inv.manager.inventory') : route('inv.employee.dashboard'), icon: Boxes })
         if (userPosition === 'manager') {
-            items.push({ label: 'Inventory Control', href: route('inv.manager.dashboard'), icon: Boxes })
-        } else if (userPosition === 'staff') {
-            items.push({ label: 'Stock Control', href: route('inv.employee.dashboard'), icon: Boxes })
+            items.push({ label: 'Master Materials', href: route('inv.manager.material'), icon: Spool })
+            items.push({ label: 'Master Products', href: route('inv.manager.product'), icon: Building2 })
         }
     }
 
-    // Order Management
     if (userRole === 'ORD') {
-        if (userPosition === 'manager') {
-            items.push({ label: 'Order Management', href: route('ord.manager.dashboard'), icon: ShoppingCart })
-        } else if (userPosition === 'staff') {
-            items.push({ label: 'Order Processing', href: route('ord.employee.dashboard'), icon: ShoppingCart })
-        }
+        items.push({ label: 'Orders', href: userPosition === 'manager' ? route('ord.manager.dashboard') : route('ord.employee.dashboard'), icon: ShoppingCart })
     }
 
-    // Warehouse
     if (userRole === 'WAR') {
-        if (userPosition === 'manager') {
-            items.push({ label: 'Warehouse', href: route('war.manager.dashboard'), icon: Warehouse })
-        } else if (userPosition === 'staff') {
-            items.push({ label: 'Warehouse Floor', href: route('war.employee.dashboard'), icon: Warehouse })
-        }
+        items.push({ label: 'Warehouse', href: userPosition === 'manager' ? route('war.manager.dashboard') : route('war.employee.dashboard'), icon: Warehouse })
     }
 
-    // CRM
     if (userRole === 'CRM') {
         if (userPosition === 'manager') {
-            items.push({ label: 'Customer Relations', href: route('crm.manager.dashboard'), icon: Users })
-        } else if (userPosition === 'staff') {
-            items.push({ label: 'Customer Support', href: route('crm.employee.dashboard'), icon: Users })
+            items.push(
+                { label: 'Quality Oversight', href: route('crm.oversight'), icon: Clock },
+                { label: 'Strategic Analytics', href: route('crm.strategy'), icon: ChartNoAxesCombined }
+            )
+        } else {
+            items.push(
+                { label: 'Lead & Deals', href: route('crm.lead'), icon: FileUser },
+                { label: 'Customer Profiles', href: route('crm.customerprofile'), icon: Users }
+            )
         }
     }
-
-    // E-Commerce
     if (userRole === 'ECO') {
         if (userPosition === 'manager') {
             items.push(
-                { label: 'Book Management', href: route('eco.manager.book'), icon: Globe },
-                { label: 'Credit Management', href: route('eco.manager.credit'), icon: CreditCard }
+                { label: 'Credit MGMT', href: route('eco.manager.credit'), icon: CreditCard },
+                { label: 'Book MGMT', href: route('eco.manager.book'), icon: Book },
             )
-        } else if (userPosition === 'staff') {
-            items.push({ label: 'Online Store', href: route('eco.employee.dashboard'), icon: Globe })
+        } else {
+            items.push({ label: 'Online Store', href: route('eco.employee.products'), icon: Globe })
+            items.push({ label: 'Order Management', href: route('eco.employee.ordermng'), icon: ShoppingBasket })
         }
     }
 
@@ -185,103 +217,259 @@ const navItems = computed(() => {
 })
 
 const isActive = (href) => {
+    if (href === '#') return false
     return currentUrl.value === href || currentUrl.value.startsWith(href + '/')
 }
 
-const closeSidebar = () => {
-    isOpen.value = false
+const displayName = computed(() => {
+    if (isSupplier.value) return supplier.value?.representative_name
+    if (isClient.value) return client.value?.company_name
+    return user.value?.name
+})
+
+const displayInitial = computed(() => displayName.value?.charAt(0) ?? '?')
+
+const displayDepartment = computed(() => {
+    if (isSupplier.value) return 'Supplier'
+    if (isClient.value) return client.value?.business_type
+    return user.value?.role
+})
+
+const displayPosition = computed(() => {
+    if (isSupplier.value) return supplier.value?.business_name ?? 'Vendor'
+    if (isEmployeePortal.value) return user.value?.employee_id ?? 'Staff'
+    if (isClient.value) return 'Partner'
+    return user.value?.position
+})
+
+const sidebarLabel = computed(() => {
+    if (isSupplier.value) return 'Vendor'
+    if (isClient.value) return 'Partner'
+    if (isEmployeePortal.value) return 'Employee'
+    return 'System'
+})
+
+const logoutRoute = computed(() => {
+    if (isClient.value) return route('client.logout')
+    if (isSupplier.value) return route('supplier.logout')
+    return route('logout')
+})
+
+const handleNavClick = () => {
+    isOpen.value = false;
 }
 </script>
 
 <template>
     <div class="md:hidden">
-        <button @click="isOpen = true"
-            class="p-2 rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none">
-            <Menu class="h-6 w-6" />
-        </button>
-
-        <Teleport to="body">
-            <div v-if="isOpen" class="fixed inset-0 z-[60] flex md:hidden">
-                <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" @click="closeSidebar"></div>
-
-                <div class="relative flex-1 flex flex-col max-w-xs w-full bg-white dark:bg-gray-900 shadow-2xl">
-                    <div class="absolute top-0 right-0 -mr-12 pt-4">
-                        <button @click="closeSidebar"
-                            class="h-10 w-10 rounded-full bg-white/10 text-white flex items-center justify-center">
-                            <X class="h-6 w-6" />
-                        </button>
-                    </div>
-
-                    <div class="flex-shrink-0 px-6 py-6 border-b border-gray-100 dark:border-gray-800">
-                        <div class="flex items-center mb-6">
-                            <div class="h-10 w-10 flex-shrink-0 mr-3">
-                                <img src="/images/applogo.png" alt="Monti Textile Logo"
-                                    class="h-full w-full object-contain" />
-                            </div>
-                            <div class="flex flex-col">
-                                <h2 class="text-xl font-bold text-gray-900 dark:text-white leading-tight">
-                                    Monti <span class="text-blue-600">Textile</span>
-                                </h2>
-                                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                    {{ isClient ? 'Partner Portal' : (isEmployeePortal ? 'Employee Portal' :
-                                        'ERPSystem') }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div
-                            class="flex items-center p-3 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700">
-                            <div
-                                class="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shadow-sm">
-                                {{ isClient ? client?.company_name?.charAt(0) : user?.name?.charAt(0) }}
-                            </div>
-                            <div class="ml-3 overflow-hidden">
-                                <p class="text-sm font-bold text-gray-900 dark:text-white truncate uppercase mb-0.5">
-                                    {{ isClient ? client?.company_name : user?.name }}
-                                </p>
-
-                                <div
-                                    class="flex items-center text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-tight mb-0.5">
-                                    <Building2 class="h-2.5 w-2.5 mr-1 text-gray-400" />
-                                    {{ isClient ? client?.business_type : user?.role }} Department
-                                </div>
-
-                                <div
-                                    class="flex items-center text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                    <ShieldCheck class="h-3 w-3 mr-1 text-blue-500" />
-                                    {{ isClient ? 'Business Client' : (isEmployeePortal ? (user?.employee_id || 'STAFF')
-                                        : (user?.position)) }}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flex-1 h-0 pt-4 pb-4 overflow-y-auto">
-                        <nav class="px-3 space-y-1.5">
-                            <Link v-for="item in navItems" :key="item.label" :href="item.href" @click="closeSidebar"
-                                :class="[
-                                    isActive(item.href)
-                                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 ring-1 ring-blue-100 dark:ring-blue-900/30'
-                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                                ]"
-                                class="group flex items-center px-3 py-3 text-base font-bold rounded-xl transition-all">
-                                <component :is="item.icon"
-                                    :class="[isActive(item.href) ? 'text-blue-600' : 'text-gray-400']"
-                                    class="mr-3 h-5 w-5" />
-                                {{ item.label }}
-                            </Link>
-                        </nav>
-                    </div>
-
-                    <div class="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30">
-                        <Link :href="route('logout')" method="post" as="button"
-                            class="flex w-full items-center justify-center px-4 py-3 rounded-xl bg-red-50 dark:bg-red-900/10 text-red-600 font-bold text-sm transition-colors hover:bg-red-100 dark:hover:bg-red-900/20">
-                            <LogOut class="mr-2 h-5 w-5" />
-                            Sign Out
-                        </Link>
-                    </div>
+        <nav
+            class="fixed top-0 left-0 right-0 z-[60] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm h-16 flex items-center justify-between px-4 transition-colors duration-300">
+            <div class="flex items-center gap-3">
+                <div :class="isSupplier ? 'bg-emerald-600 shadow-emerald-500/20' : 'bg-blue-600 shadow-blue-500/20'"
+                    class="h-8 w-8 rounded-lg flex items-center justify-center shadow-lg">
+                    <LayoutDashboard class="h-4.5 w-4.5 text-white" />
+                </div>
+                <div class="flex flex-col">
+                    <span
+                        class="text-[14px] font-black tracking-tight text-gray-900 dark:text-white uppercase leading-none">
+                        Monti <span :class="isSupplier ? 'text-emerald-600' : 'text-blue-600'">Textile</span>
+                    </span>
+                    <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
+                        {{ sidebarLabel }}
+                    </span>
                 </div>
             </div>
+
+            <button @click.stop="isOpen = !isOpen"
+                class="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                <Menu v-if="!isOpen" class="h-6 w-6" />
+                <X v-else class="h-6 w-6" />
+            </button>
+        </nav>
+
+        <transition enter-active-class="transition-opacity duration-300 ease-in-out" enter-from-class="opacity-0"
+            enter-to-class="opacity-100" leave-active-class="transition-opacity duration-200 ease-in-out"
+            leave-from-class="opacity-100" leave-to-class="opacity-0">
+            <div v-if="isOpen" @click="isOpen = false" class="fixed inset-0 z-[50] bg-black/40 backdrop-blur-sm"
+                aria-hidden="true"></div>
+        </transition>
+
+        <transition enter-active-class="transition-transform duration-300 ease-out" enter-from-class="-translate-x-full"
+            enter-to-class="translate-x-0" leave-active-class="transition-transform duration-200 ease-in"
+            leave-from-class="translate-x-0" leave-to-class="-translate-x-full">
+            <aside v-if="isOpen"
+                class="fixed inset-y-0 left-0 z-[55] w-[80vw] max-w-sm bg-slate-50 dark:bg-gray-950 flex flex-col shadow-2xl h-full pt-16">
+
+                <div class="flex-1 flex flex-col overflow-y-auto px-3 py-6 custom-scrollbar">
+                    <div class="mb-4 px-2">
+                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em]">Main Menu</p>
+                    </div>
+                    <nav class="space-y-1">
+                        <template v-for="item in navItems" :key="item.label">
+                            <div v-if="item.isDropdown" class="space-y-1">
+                                <button @click="toggleWorkforce" :class="[
+                                    isWorkforceOpen ? 'text-blue-600 bg-white/50 dark:bg-gray-900/50' : 'text-gray-500 dark:text-gray-400',
+                                    'w-full flex items-center justify-between px-3 py-3.5 text-[14px] font-bold rounded-xl hover:bg-white/50 dark:hover:bg-gray-900/50 transition-all duration-300'
+                                ]">
+                                    <div class="flex items-center">
+                                        <div :class="[isWorkforceOpen ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-gray-400']"
+                                            class="p-2 rounded-lg mr-3 transition-colors duration-300">
+                                            <component :is="item.icon" class="h-5 w-5" />
+                                        </div>
+                                        <span class="truncate tracking-tight">{{ item.label }}</span>
+                                    </div>
+                                    <ChevronRight
+                                        :class="['h-4 w-4 transition-transform duration-300', isWorkforceOpen ? 'rotate-90' : 'text-gray-400']" />
+                                </button>
+
+                                <div v-show="isWorkforceOpen" class="pl-12 space-y-1 mt-1 transition-all">
+                                    <Link v-for="subItem in item.children" :key="subItem.label" :href="subItem.href"
+                                        @click="handleNavClick" :class="[
+                                            isActive(subItem.href) ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                                        ]" class="flex items-center py-2.5 text-[13px] font-bold transition-colors">
+                                        <component :is="subItem.icon" class="h-4 w-4 mr-3" />
+                                        {{ subItem.label }}
+                                    </Link>
+                                </div>
+                            </div>
+
+                            <Link v-else :href="item.href" @click="handleNavClick" :class="[
+                                isActive(item.href)
+                                    ? isSupplier
+                                        ? 'bg-white dark:bg-gray-900 text-emerald-600 shadow-sm ring-1 ring-gray-200/50 dark:ring-gray-800'
+                                        : 'bg-white dark:bg-gray-900 text-blue-600 shadow-sm ring-1 ring-gray-200/50 dark:ring-gray-800'
+                                    : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-900/50 hover:text-gray-900 dark:hover:text-white'
+                            ]"
+                                class="group relative flex items-center justify-between px-3 py-3 text-[14px] font-bold rounded-xl transition-all duration-300">
+                                <div v-if="isActive(item.href)" :class="isSupplier ? 'bg-emerald-600' : 'bg-blue-600'"
+                                    class="absolute left-0 top-1/4 bottom-1/4 w-0.5 rounded-r-full"></div>
+                                <div class="flex items-center relative z-10">
+                                    <div :class="[
+                                        isActive(item.href)
+                                            ? isSupplier
+                                                ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600'
+                                                : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600'
+                                            : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300'
+                                    ]" class="p-2 rounded-lg transition-colors duration-300 mr-3">
+                                        <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+                                    </div>
+                                    <span class="truncate tracking-tight">{{ item.label }}</span>
+                                </div>
+                            </Link>
+                        </template>
+                    </nav>
+                </div>
+
+                <div class="p-4 mt-auto border-t border-gray-100 dark:border-gray-800">
+                    <div
+                        class="bg-white dark:bg-gray-900 rounded-2xl p-3 border border-gray-100 dark:border-gray-800 shadow-lg">
+                        <div class="flex items-center gap-3 relative z-10">
+                            <div class="relative flex-shrink-0">
+                                <div :class="isSupplier
+                                    ? 'from-emerald-600 to-teal-700 shadow-emerald-500/30'
+                                    : 'from-blue-600 to-indigo-700 shadow-blue-500/30'"
+                                    class="h-10 w-10 rounded-xl bg-gradient-to-br flex items-center justify-center text-white text-sm font-black shadow-lg uppercase">
+                                    {{ displayInitial }}
+                                </div>
+                                <div
+                                    class="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full">
+                                </div>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p
+                                    class="text-xs font-black text-gray-900 dark:text-white truncate uppercase tracking-tighter">
+                                    {{ displayName }}
+                                </p>
+                                <div class="flex items-center gap-1 mt-0.5 mb-1">
+                                    <Building2 class="h-3 w-3 text-gray-400" />
+                                    <span :class="isSupplier ? 'text-emerald-600' : 'text-blue-600'"
+                                        class="text-[9px] font-black uppercase truncate">
+                                        {{ displayDepartment }}
+                                    </span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <ShieldCheck :class="isSupplier ? 'text-emerald-500' : 'text-blue-500'"
+                                        class="h-3 w-3" />
+                                    <span class="text-[9px] font-black text-gray-400 uppercase truncate">
+                                        {{ displayPosition }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <button @click.stop="showLogoutModal = true; isOpen = false"
+                                class="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-300">
+                                <LogOut class="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </transition>
+
+        <Teleport to="body">
+            <transition name="modal-fade">
+                <div v-if="showLogoutModal"
+                    class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+                    @click.self="showLogoutModal = false">
+                    <div
+                        class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 w-full max-w-sm p-6 flex flex-col items-center text-center">
+                        <div
+                            class="h-14 w-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
+                            <LogOut class="h-6 w-6 text-red-600 dark:text-red-400 ml-1" />
+                        </div>
+                        <h3 class="text-xl font-black text-gray-900 dark:text-white mb-2">Sign Out</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 px-2">Are you sure you want to sign out
+                            of your
+                            account?</p>
+                        <div class="flex flex-col sm:flex-row gap-3 w-full">
+                            <button @click="showLogoutModal = false"
+                                class="w-full sm:flex-1 py-3 text-sm font-bold rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                                Cancel
+                            </button>
+                            <Link :href="logoutRoute" method="post" as="button"
+                                class="w-full sm:flex-1 py-3 text-sm font-bold rounded-xl bg-red-600 text-white hover:bg-red-700 transition shadow-lg shadow-red-500/20">
+                                Confirm Sign Out
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </transition>
         </Teleport>
     </div>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+    width: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.2);
+    border-radius: 10px;
+}
+
+/* Modal Transition */
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+    opacity: 0;
+}
+
+.modal-fade-enter-active .bg-white,
+.modal-fade-leave-active .bg-white {
+    transition: transform 0.2s ease;
+}
+
+.modal-fade-enter-from .bg-white,
+.modal-fade-leave-to .bg-white {
+    transform: scale(0.95) translateY(10px);
+}
+</style>

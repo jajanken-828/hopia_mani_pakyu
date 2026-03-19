@@ -35,14 +35,16 @@ import {
     HelpCircle,
     ShieldCheck,
     Building2,
-    RefreshCw,       // Added for Inventory Sync
-    ClipboardCheck,  // Added for Purchase Orders
+    RefreshCw,
+    ClipboardCheck,
 } from 'lucide-vue-next'
 
 const page = usePage()
+
+// Bulletproof authentication object parsing
 const user = computed(() => page.props.auth.user)
 const client = computed(() => page.props.auth.client)
-const supplier = computed(() => page.props.auth.supplier) // shared via HandleInertiaRequests
+const supplier = computed(() => page.props.auth.supplier || (page.props.auth.user?.business_name ? page.props.auth.user : null))
 const currentUrl = computed(() => page.url)
 
 // State for the Workforce dropdown
@@ -51,18 +53,19 @@ const toggleWorkforce = () => {
     isWorkforceOpen.value = !isWorkforceOpen.value
 }
 
+// State for Logout Confirmation Modal
+const showLogoutModal = ref(false)
+
 const isEmployeePortal = computed(() => currentUrl.value.startsWith('/dashboard/employee-ui'))
 const isClient = computed(() => !!client.value)
-// Use the shared prop — NOT the URL — so detection survives any redirect
-const isSupplier = computed(() => !!supplier.value)
+const isSupplier = computed(() => !!supplier.value || currentUrl.value.startsWith('/supplier'))
 
 const navItems = computed(() => {
     // --- Supplier Navigation ---
     if (isSupplier.value) {
         return [
-            { label: 'Dashboard', href: route('supplier.dashboard'), icon: LayoutDashboard },
-            { label: 'Purchase Orders', href: '#', icon: ClipboardCheck },
-            { label: 'Inventory Sync', href: '#', icon: RefreshCw },
+            { label: 'Vendor Hub', href: route('supplier.dashboard'), icon: LayoutDashboard },
+            { label: 'Purchase Orders', href: route('supplier.orders'), icon: ShoppingCart },
         ]
     }
 
@@ -172,9 +175,7 @@ const navItems = computed(() => {
         if (userPosition === 'manager') {
             items.push({ label: 'Master Materials', href: route('inv.manager.material'), icon: Spool })
             items.push({ label: 'Master Products', href: route('inv.manager.product'), icon: Building2 })
-
         }
-
     }
 
     if (userRole === 'ORD') {
@@ -247,21 +248,19 @@ const sidebarLabel = computed(() => {
     return 'System'
 })
 
-// Each guard needs its own logout route.
-// supplier.logout → clears auth:supplier session → redirects to /
-// logout          → clears auth (employee) session → redirects to /login
-// Using the wrong one leaves the session alive.
+// Ensures the correct logout route is triggered for the specific Auth Guard
 const logoutRoute = computed(() => {
-    return isSupplier.value ? route('supplier.logout') : route('logout')
+    if (isClient.value) return route('client.logout')
+    if (isSupplier.value) return route('supplier.logout')
+    return route('logout')
 })
 </script>
 
 <template>
-    <aside class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-50 transition-all duration-300">
+    <aside class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-40 transition-all duration-300">
         <div
             class="flex flex-col flex-grow bg-slate-50 dark:bg-gray-950 border-r border-gray-200/60 dark:border-gray-800/60 shadow-xl">
 
-            <!-- Logo -->
             <div class="flex items-center h-20 flex-shrink-0 px-4">
                 <div
                     class="flex items-center gap-2.5 p-2 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 w-full">
@@ -281,7 +280,6 @@ const logoutRoute = computed(() => {
                 </div>
             </div>
 
-            <!-- Navigation -->
             <div class="flex-1 flex flex-col overflow-y-auto px-3 py-4 custom-scrollbar">
                 <div class="mb-3 px-2">
                     <p class="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em]">Main Menu</p>
@@ -343,8 +341,7 @@ const logoutRoute = computed(() => {
                 </nav>
             </div>
 
-            <!-- User Profile & Logout -->
-            <div class="p-3 mt-auto">
+            <div class="p-3 mt-auto flex-shrink-0">
                 <div
                     class="bg-white dark:bg-gray-900 rounded-2xl p-2.5 border border-gray-100 dark:border-gray-800 shadow-lg group">
                     <div class="flex items-center gap-2.5 relative z-10">
@@ -379,14 +376,45 @@ const logoutRoute = computed(() => {
                                 </span>
                             </div>
                         </div>
-                        <Link :href="logoutRoute" method="post" as="button"
+
+                        <button @click="showLogoutModal = true"
                             class="p-2 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-300">
                             <LogOut class="h-3.5 w-3.5" />
-                        </Link>
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
+
+        <Teleport to="body">
+            <transition name="modal-fade">
+                <div v-if="showLogoutModal"
+                    class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+                    @click.self="showLogoutModal = false">
+                    <div
+                        class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 w-full max-w-sm p-6 flex flex-col items-center text-center">
+                        <div
+                            class="h-14 w-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
+                            <LogOut class="h-6 w-6 text-red-600 dark:text-red-400 ml-1" />
+                        </div>
+                        <h3 class="text-xl font-black text-gray-900 dark:text-white mb-2">Sign Out</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 px-2">Are you sure you want to sign out
+                            of your
+                            account?</p>
+                        <div class="flex gap-3 w-full">
+                            <button @click="showLogoutModal = false"
+                                class="flex-1 py-3 text-sm font-bold rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                                Cancel
+                            </button>
+                            <Link :href="logoutRoute" method="post" as="button"
+                                class="flex-1 py-3 text-sm font-bold rounded-xl bg-red-600 text-white hover:bg-red-700 transition shadow-lg shadow-red-500/20">
+                                Confirm Sign Out
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </transition>
+        </Teleport>
     </aside>
 </template>
 
@@ -402,5 +430,26 @@ const logoutRoute = computed(() => {
 .custom-scrollbar::-webkit-scrollbar-thumb {
     background: rgba(156, 163, 175, 0.2);
     border-radius: 10px;
+}
+
+/* Modal Transition */
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+    opacity: 0;
+}
+
+.modal-fade-enter-active .bg-white,
+.modal-fade-leave-active .bg-white {
+    transition: transform 0.2s ease;
+}
+
+.modal-fade-enter-from .bg-white,
+.modal-fade-leave-to .bg-white {
+    transform: scale(0.95) translateY(10px);
 }
 </style>

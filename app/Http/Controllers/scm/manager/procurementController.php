@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\scm\manager;
 
 use App\Http\Controllers\Controller;
+use App\Models\inv\Warehouse;
 use App\Models\Scm\MaterialRequest;
 use App\Models\Scm\ProcurementPayment;
 use App\Models\Scm\PurchaseInvoice;
@@ -24,140 +25,166 @@ class ProcurementController extends Controller
 
     public function procurement()
     {
-        $materialRequests = MaterialRequest::with('material')
-            ->orderByRaw("FIELD(urgency, 'High', 'Medium', 'Low')")
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(fn ($r) => [
-                'id' => $r->id,
-                'req_number' => $r->req_number,
-                'material_id' => $r->material_id,
-                'material_name' => $r->material?->name ?? $r->material_name,
-                'category' => $r->material?->category ?? $r->category,
-                'unit' => $r->material?->unit ?? $r->unit,
-                'current_stock' => $r->current_stock,
-                'reorder_point' => $r->reorder_point,
-                'required_qty' => $r->required_qty,
-                'urgency' => $r->urgency,
-                'requested_by' => $r->requested_by,
-                'requested_at' => $r->requested_at?->format('Y-m-d'),
-                'status' => $r->status,
-                'notes' => $r->notes,
+        try {
+            // ── FETCH WAREHOUSES FOR DYNAMIC RFQ DROPDOWN ────────────
+            $warehouses = Warehouse::orderBy('name')->get()->map(fn ($w) => [
+                'id' => $w->id,
+                'name' => $w->name,
+                'location' => $w->location,
             ]);
 
-        $suppliers = Supplier::orderBy('business_name')
-            ->get()
-            ->map(fn ($s) => [
+            $materialRequests = MaterialRequest::with('material')
+                ->orderByRaw("FIELD(urgency, 'High', 'Medium', 'Low')")
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(fn ($r) => [
+                    'id' => $r->id,
+                    'req_number' => $r->req_number ?? 'N/A',
+                    'material_id' => $r->material_id,
+                    'material_name' => $r->material?->name ?? $r->material_name ?? 'N/A',
+                    'category' => $r->material?->category ?? $r->category ?? 'N/A',
+                    'unit' => $r->material?->unit ?? $r->unit ?? 'pcs',
+                    'current_stock' => $r->current_stock ?? 0,
+                    'reorder_point' => $r->reorder_point ?? 0,
+                    'required_qty' => $r->required_qty ?? 0,
+                    'urgency' => $r->urgency ?? 'Medium',
+                    'requested_by' => $r->requested_by ?? 'System',
+                    'requested_at' => $r->requested_at ? \Carbon\Carbon::parse($r->requested_at)->format('Y-m-d') : null,
+                    'status' => $r->status ?? 'pending',
+                    'notes' => $r->notes ?? '',
+                ]);
+
+            // ── DYNAMIC SUPPLIERS QUERY ──────────────────────────────
+            // ONLY FETCH OFFICIAL/APPROVED VENDORS FOR PROCUREMENT
+            $suppliers = Supplier::whereHas('vendorRegistration', function ($query) {
+                $query->where('status', 'approved');
+            })
+                ->with('vendorRegistration.requirements')
+                ->orderBy('business_name')
+                ->get()
+                ->map(fn ($s) => [
                 'id' => $s->id,
                 'business_name' => $s->business_name,
-                'representative_name' => $s->representative_name,
+                'representative_name' => $s->representative_name ?? '',
                 'email' => $s->email,
                 'phone_number' => $s->phone_number,
-                'address' => $s->address,
-                'rating' => $s->rating ?? 4.5,
-                'status' => $s->status ?? 'Approved',
-                'categories' => $s->categories ?? [],
+                'address' => $s->address ?? '',
+                'rating' => $s->rating ?? 5.0,
+                'status' => 'Official Vendor',
+                // Fallback to all categories to ensure they show up in the Vue UI filter
+                'categories' => $s->categories ? json_decode($s->categories, true) : ['Fabric', 'Trim', 'Chemicals', 'Packaging'],
+                'requirements' => collect($s->vendorRegistration?->requirements ?? [])->map(fn ($req) => [
+                    'name' => $req->requirement_name,
+                    'value' => $req->value,
+                ])->toArray(),
             ]);
 
-        $rfqs = RequestForQuotation::with('responses.supplier')
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(fn ($rfq) => [
-                'id' => $rfq->id,
-                'rfq_number' => $rfq->rfq_number,
-                'mr_ref' => $rfq->mr_ref,
-                'material_name' => $rfq->material_name,
-                'category' => $rfq->category,
-                'unit' => $rfq->unit,
-                'required_qty' => $rfq->required_qty,
-                'deadline' => $rfq->deadline?->format('Y-m-d'),
-                'sent_at' => $rfq->sent_at?->format('Y-m-d'),
-                'status' => $rfq->status,
-                'notes' => $rfq->notes,
-                'responses' => $rfq->responses->map(fn ($r) => [
-                    'id' => $r->id,
-                    'supplier_id' => $r->supplier_id,
-                    'supplier_name' => $r->supplier?->business_name ?? $r->supplier_name,
-                    'unit_price' => $r->unit_price,
-                    'total_price' => $r->total_price,
-                    'lead_time' => $r->lead_time,
-                    'validity_date' => $r->validity_date?->format('Y-m-d'),
-                    'payment_terms' => $r->payment_terms,
-                    'notes' => $r->notes,
-                    'status' => $r->status,
-                    'submitted_at' => $r->submitted_at?->format('Y-m-d'),
-                ]),
-            ]);
+            $rfqs = RequestForQuotation::with('responses.supplier')
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(fn ($rfq) => [
+                    'id' => $rfq->id,
+                    'rfq_number' => $rfq->rfq_number,
+                    'mr_ref' => $rfq->mr_ref,
+                    'material_name' => $rfq->material_name ?? 'N/A',
+                    'category' => $rfq->category ?? 'N/A',
+                    'unit' => $rfq->unit ?? 'pcs',
+                    'required_qty' => $rfq->required_qty ?? 0,
+                    'deadline' => $rfq->deadline ? \Carbon\Carbon::parse($rfq->deadline)->format('Y-m-d') : null,
+                    'delivery_address' => $rfq->delivery_address ?? 'Main Warehouse',
+                    'sent_at' => $rfq->sent_at ? \Carbon\Carbon::parse($rfq->sent_at)->format('Y-m-d') : null,
+                    'status' => $rfq->status ?? 'sent',
+                    'notes' => $rfq->notes ?? '',
+                    'responses' => collect($rfq->responses ?? [])->map(fn ($r) => [
+                        'id' => $r->id,
+                        'supplier_id' => $r->supplier_id,
+                        'supplier_name' => $r->supplier?->business_name ?? $r->supplier_name ?? 'Unknown Supplier',
+                        'unit_price' => $r->unit_price ?? 0,
+                        'total_price' => $r->total_price ?? 0,
+                        'lead_time' => $r->lead_time ?? 'N/A',
+                        'validity_date' => $r->validity_date ? \Carbon\Carbon::parse($r->validity_date)->format('Y-m-d') : null,
+                        'payment_terms' => $r->payment_terms ?? 'Net 30',
+                        'notes' => $r->notes ?? '',
+                        'status' => $r->status ?? 'pending_review',
+                        'submitted_at' => $r->submitted_at ? \Carbon\Carbon::parse($r->submitted_at)->format('Y-m-d') : null,
+                    ]),
+                ]);
 
-        $purchaseOrders = ScmPurchaseOrder::with('items')
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(fn ($po) => [
-                'id' => $po->id,
-                'po_number' => $po->po_number,
-                'supplier_id' => $po->supplier_id,
-                'supplier_name' => $po->supplier_name,
-                'rfq_ref' => $po->rfq_ref,
-                'issued_date' => $po->issued_date?->format('Y-m-d'),
-                'expected_delivery' => $po->expected_delivery?->format('Y-m-d') ?? $po->expected_delivery,
-                'status' => $po->status,
-                'subtotal' => $po->subtotal,
-                'tax_rate' => $po->tax_rate,
-                'tax_amount' => $po->tax_amount,
-                'grand_total' => $po->grand_total,
-                'notes' => $po->notes,
-                'received' => $po->received ?? false,
-                'items' => $po->items->map(fn ($i) => [
-                    'id' => $i->id,
-                    'material_name' => $i->material_name,
-                    'qty' => $i->qty,
-                    'unit' => $i->unit,
-                    'unit_price' => $i->unit_price,
-                    'total' => $i->total,
-                ]),
-            ]);
+            $purchaseOrders = ScmPurchaseOrder::with('items')
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(fn ($po) => [
+                    'id' => $po->id,
+                    'po_number' => $po->po_number,
+                    'supplier_id' => $po->supplier_id,
+                    'supplier_name' => $po->supplier_name ?? 'N/A',
+                    'rfq_ref' => $po->rfq_ref,
+                    'issued_date' => $po->issued_date ? \Carbon\Carbon::parse($po->issued_date)->format('Y-m-d') : null,
+                    'expected_delivery' => $po->expected_delivery ?? 'N/A',
+                    'status' => $po->status ?? 'draft',
+                    'subtotal' => $po->subtotal ?? 0,
+                    'tax_rate' => $po->tax_rate ?? 10,
+                    'tax_amount' => $po->tax_amount ?? 0,
+                    'grand_total' => $po->grand_total ?? 0,
+                    'notes' => $po->notes ?? '',
+                    'received' => $po->received ?? false,
+                    'items' => collect($po->items ?? [])->map(fn ($i) => [
+                        'id' => $i->id,
+                        'material_name' => $i->material_name ?? 'N/A',
+                        'qty' => $i->qty ?? 0,
+                        'unit' => $i->unit ?? 'pcs',
+                        'unit_price' => $i->unit_price ?? 0,
+                        'total' => $i->total ?? 0,
+                    ]),
+                ]);
 
-        $invoices = PurchaseInvoice::orderBy('created_at', 'desc')
-            ->get()
-            ->map(fn ($inv) => [
-                'id' => $inv->id,
-                'invoice_number' => $inv->invoice_number,
-                'po_number' => $inv->po_number,
-                'supplier_name' => $inv->supplier_name,
-                'invoice_date' => $inv->invoice_date?->format('Y-m-d'),
-                'due_date' => $inv->due_date?->format('Y-m-d'),
-                'amount' => $inv->amount,
-                'payment_terms' => $inv->payment_terms,
-                'status' => $inv->status,
-                'received_at' => $inv->received_at?->format('Y-m-d'),
-            ]);
+            $invoices = PurchaseInvoice::orderBy('created_at', 'desc')
+                ->get()
+                ->map(fn ($inv) => [
+                    'id' => $inv->id,
+                    'invoice_number' => $inv->invoice_number ?? 'N/A',
+                    'po_number' => $inv->po_number ?? 'N/A',
+                    'supplier_name' => $inv->supplier_name ?? 'N/A',
+                    'invoice_date' => $inv->invoice_date ? \Carbon\Carbon::parse($inv->invoice_date)->format('Y-m-d') : null,
+                    'due_date' => $inv->due_date ? \Carbon\Carbon::parse($inv->due_date)->format('Y-m-d') : null,
+                    'amount' => $inv->amount ?? 0,
+                    'payment_terms' => $inv->payment_terms ?? 'Net 30',
+                    'status' => $inv->status ?? 'unpaid',
+                    'received_at' => $inv->received_at ? \Carbon\Carbon::parse($inv->received_at)->format('Y-m-d') : null,
+                ]);
 
-        $payments = ProcurementPayment::orderBy('created_at', 'desc')
-            ->get()
-            ->map(fn ($p) => [
-                'id' => $p->id,
-                'payment_number' => $p->payment_number,
-                'invoice_number' => $p->invoice_number,
-                'supplier_name' => $p->supplier_name,
-                'paid_date' => $p->paid_date?->format('Y-m-d'),
-                'amount' => $p->amount,
-                'method' => $p->method,
-                'bank_reference' => $p->bank_reference,
-                'remarks' => $p->remarks,
-                'status' => $p->status,
-            ]);
+            $payments = ProcurementPayment::orderBy('created_at', 'desc')
+                ->get()
+                ->map(fn ($p) => [
+                    'id' => $p->id,
+                    'payment_number' => $p->payment_number ?? 'N/A',
+                    'invoice_number' => $p->invoice_number ?? 'N/A',
+                    'supplier_name' => $p->supplier_name ?? 'N/A',
+                    'paid_date' => $p->paid_date ? \Carbon\Carbon::parse($p->paid_date)->format('Y-m-d') : null,
+                    'amount' => $p->amount ?? 0,
+                    'method' => $p->method ?? 'Bank Transfer',
+                    'bank_reference' => $p->bank_reference ?? '',
+                    'remarks' => $p->remarks ?? '',
+                    'status' => $p->status ?? 'cleared',
+                ]);
 
-        $stats = [
-            'pendingMaterialRequests' => $materialRequests->where('status', 'pending')->count(),
-            'activeRFQs' => $rfqs->whereIn('status', ['sent', 'partial_response'])->count(),
-            'pendingPOs' => $purchaseOrders->whereIn('status', ['draft', 'sent'])->count(),
-            'unpaidInvoices' => $invoices->where('status', 'unpaid')->count(),
-        ];
+            $stats = [
+                'pendingMaterialRequests' => $materialRequests->where('status', 'pending')->count(),
+                'activeRFQs' => $rfqs->whereIn('status', ['sent', 'partial_response'])->count(),
+                'pendingPOs' => $purchaseOrders->whereIn('status', ['draft', 'sent'])->count(),
+                'unpaidInvoices' => $invoices->where('status', 'unpaid')->count(),
+            ];
 
-        return Inertia::render('Dashboard/SCM/Manager/procurement', compact(
-            'materialRequests', 'suppliers', 'rfqs',
-            'purchaseOrders', 'invoices', 'payments', 'stats'
-        ));
+            return Inertia::render('Dashboard/SCM/Manager/procurement', compact(
+                'warehouses', 'materialRequests', 'suppliers', 'rfqs',
+                'purchaseOrders', 'invoices', 'payments', 'stats'
+            ));
+
+        } catch (\Exception $e) {
+            Log::error('Procurement page render failed: '.$e->getMessage());
+
+            return redirect()->back()->withErrors(['error' => 'Failed to load procurement data.']);
+        }
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -171,8 +198,8 @@ class ProcurementController extends Controller
             'material_name' => 'required|string',
             'required_qty' => 'required|numeric|min:1',
             'unit' => 'required|string',
-            'deadline' => 'required|date|after:today',
-            'delivery_address' => 'nullable|string',
+            'deadline' => 'required|date|after_or_equal:today', // <-- Fixed: Allows today
+            'delivery_address' => 'required|string',
             'payment_terms' => 'required|string',
             'notes' => 'nullable|string',
             'selected_suppliers' => 'required|array|min:1',
@@ -183,7 +210,7 @@ class ProcurementController extends Controller
         try {
             $mr = MaterialRequest::findOrFail($validated['mr_id']);
 
-            $rfq = RequestForQuotation::create([
+            RequestForQuotation::create([
                 'rfq_number' => $this->generateRFQNumber(),
                 'mr_ref' => $mr->req_number,
                 'mr_id' => $mr->id,
@@ -201,29 +228,16 @@ class ProcurementController extends Controller
                 'supplier_ids' => json_encode($validated['selected_suppliers']),
             ]);
 
-            // Update material request status
             $mr->update(['status' => 'rfq_sent']);
-
-            // TODO: Fire RFQSentToSupplier notification/email event for each supplier
-            // foreach ($validated['selected_suppliers'] as $supplierId) {
-            //     event(new RFQSentToSupplier($rfq, $supplierId));
-            // }
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'rfq' => array_merge($rfq->toArray(), [
-                    'sent_at' => $rfq->sent_at->format('Y-m-d'),
-                    'deadline' => $rfq->deadline->format('Y-m-d'),
-                    'responses' => [],
-                ]),
-            ]);
+            return redirect()->back()->with('success', 'RFQ Sent to selected vendors successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('RFQ creation failed: '.$e->getMessage());
 
-            return response()->json(['success' => false, 'message' => 'Failed to create RFQ.'], 500);
+            return redirect()->back()->withErrors(['error' => 'Failed to create RFQ.']);
         }
     }
 
@@ -243,22 +257,18 @@ class ProcurementController extends Controller
             $rfq = $response->rfq;
             $supplier = Supplier::findOrFail($response->supplier_id);
 
-            // Mark this response as accepted
             $response->update(['status' => 'accepted']);
 
-            // Decline all other pending responses for same RFQ
             RfqResponse::where('rfq_id', $rfq->id)
                 ->where('id', '!=', $responseId)
                 ->where('status', 'pending_review')
                 ->update(['status' => 'declined']);
 
-            // Calculate amounts
             $subtotal = $response->total_price;
             $taxRate = 10;
             $taxAmount = $subtotal * ($taxRate / 100);
             $grandTotal = $subtotal + $taxAmount;
 
-            // Create SCM Purchase Order
             $po = ScmPurchaseOrder::create([
                 'po_number' => $this->generatePONumber(),
                 'supplier_id' => $supplier->id,
@@ -276,7 +286,6 @@ class ProcurementController extends Controller
                 'received' => false,
             ]);
 
-            // Create PO item
             ScmPurchaseOrderItem::create([
                 'scm_purchase_order_id' => $po->id,
                 'material_id' => $rfq->material_id,
@@ -287,32 +296,16 @@ class ProcurementController extends Controller
                 'total' => $response->total_price,
             ]);
 
-            // Update RFQ status
             $rfq->update(['status' => 'responded']);
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'purchase_order' => array_merge($po->toArray(), [
-                    'issued_date' => $po->issued_date->format('Y-m-d'),
-                    'expected_delivery' => $response->lead_time,
-                    'items' => [[
-                        'id' => 1,
-                        'material_name' => $rfq->material_name,
-                        'qty' => $rfq->required_qty,
-                        'unit' => $rfq->unit,
-                        'unit_price' => $response->unit_price,
-                        'total' => $response->total_price,
-                    ]],
-                    'received' => false,
-                ]),
-            ]);
+            return redirect()->back()->with('success', 'Quotation accepted and Purchase Order generated.');
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Accept quotation failed: '.$e->getMessage());
 
-            return response()->json(['success' => false, 'message' => 'Failed to accept quotation.'], 500);
+            return redirect()->back()->withErrors(['error' => 'Failed to accept quotation.']);
         }
     }
 
@@ -333,14 +326,11 @@ class ProcurementController extends Controller
                 'decline_reason' => $validated['reason'],
             ]);
 
-            // TODO: Notify supplier of decline
-            // event(new QuotationDeclined($response));
-
-            return response()->json(['success' => true]);
+            return redirect()->back()->with('success', 'Quotation declined.');
         } catch (\Exception $e) {
             Log::error('Decline quotation failed: '.$e->getMessage());
 
-            return response()->json(['success' => false, 'message' => 'Failed to decline quotation.'], 500);
+            return redirect()->back()->withErrors(['error' => 'Failed to decline quotation.']);
         }
     }
 
@@ -354,14 +344,11 @@ class ProcurementController extends Controller
             $po = ScmPurchaseOrder::findOrFail($poId);
             $po->update(['status' => 'sent']);
 
-            // TODO: Send PO email to supplier
-            // event(new PurchaseOrderSentToSupplier($po));
-
-            return response()->json(['success' => true, 'status' => 'sent']);
+            return redirect()->back()->with('success', 'Purchase Order sent to supplier.');
         } catch (\Exception $e) {
             Log::error('Send PO failed: '.$e->getMessage());
 
-            return response()->json(['success' => false, 'message' => 'Failed to send PO.'], 500);
+            return redirect()->back()->withErrors(['error' => 'Failed to send PO.']);
         }
     }
 
@@ -386,7 +373,7 @@ class ProcurementController extends Controller
         try {
             $invoice = PurchaseInvoice::findOrFail($validated['invoice_id']);
 
-            $payment = ProcurementPayment::create([
+            ProcurementPayment::create([
                 'payment_number' => $this->generatePaymentNumber(),
                 'invoice_id' => $invoice->id,
                 'invoice_number' => $invoice->invoice_number,
@@ -403,23 +390,17 @@ class ProcurementController extends Controller
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'payment' => array_merge($payment->toArray(), [
-                    'paid_date' => $payment->paid_date->format('Y-m-d'),
-                ]),
-            ]);
+            return redirect()->back()->with('success', 'Payment processed successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Payment processing failed: '.$e->getMessage());
 
-            return response()->json(['success' => false, 'message' => 'Failed to process payment.'], 500);
+            return redirect()->back()->withErrors(['error' => 'Failed to process payment.']);
         }
     }
 
     // ──────────────────────────────────────────────────────────────
-    // SUPPLIER PORTAL: SUBMIT QUOTATION RESPONSE
-    // (Called from supplier-side auth routes)
+    // SUPPLIER PORTAL: SUBMIT QUOTATION RESPONSE (API/Fallback)
     // ──────────────────────────────────────────────────────────────
 
     public function submitQuotationResponse(Request $request, $rfqId)
@@ -429,7 +410,7 @@ class ProcurementController extends Controller
             'unit_price' => 'required|numeric|min:0',
             'total_price' => 'required|numeric|min:0',
             'lead_time' => 'required|string',
-            'validity_date' => 'required|date|after:today',
+            'validity_date' => 'required|date|after_or_equal:today',
             'payment_terms' => 'required|string',
             'notes' => 'nullable|string',
         ]);
@@ -452,7 +433,6 @@ class ProcurementController extends Controller
                 'submitted_at' => now(),
             ]);
 
-            // Update RFQ status
             $existingResponses = RfqResponse::where('rfq_id', $rfq->id)->count();
             $rfq->update(['status' => $existingResponses >= 2 ? 'responded' : 'partial_response']);
 
@@ -465,8 +445,7 @@ class ProcurementController extends Controller
     }
 
     // ──────────────────────────────────────────────────────────────
-    // SUPPLIER PORTAL: SEND PURCHASE INVOICE
-    // (Supplier submits invoice after PO is confirmed/received)
+    // SUPPLIER PORTAL: SEND PURCHASE INVOICE (API/Fallback)
     // ──────────────────────────────────────────────────────────────
 
     public function receiveInvoiceFromSupplier(Request $request)

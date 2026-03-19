@@ -1,7 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import StatCard from '@/Components/dashboard/StatsCard.vue';
 import {
     Boxes,
     Package,
@@ -61,11 +60,49 @@ onMounted(() => {
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <StatCard title="Total Inventory" :value="statsData.totalInventory" :icon="Boxes" />
-            <StatCard title="Pending Orders" :value="statsData.pendingOrders" :icon="Package" />
-            <StatCard title="Stock Alerts" :value="statsData.stockAlerts" :icon="AlertTriangle"
-                colorClass="text-rose-600 bg-rose-50 dark:bg-rose-900/20" />
-            <StatCard title="In-Transit" :value="statsData.inTransit" :icon="Truck" />
+            <div
+                class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600">
+                    <Boxes class="w-6 h-6" />
+                </div>
+                <div>
+                    <p class="text-sm font-semibold text-gray-500">Total Inventory</p>
+                    <p class="text-2xl font-black text-gray-900 dark:text-white">{{ statsData.totalInventory }}</p>
+                </div>
+            </div>
+
+            <div
+                class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600">
+                    <Package class="w-6 h-6" />
+                </div>
+                <div>
+                    <p class="text-sm font-semibold text-gray-500">Pending Orders</p>
+                    <p class="text-2xl font-black text-gray-900 dark:text-white">{{ statsData.pendingOrders }}</p>
+                </div>
+            </div>
+
+            <div
+                class="bg-rose-50 dark:bg-rose-900/10 p-6 rounded-2xl border border-rose-100 dark:border-rose-800 shadow-sm flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-rose-100 dark:bg-rose-900/30 text-rose-600">
+                    <AlertTriangle class="w-6 h-6" />
+                </div>
+                <div>
+                    <p class="text-sm font-semibold text-rose-600 dark:text-rose-400">Stock Alerts</p>
+                    <p class="text-2xl font-black text-rose-700 dark:text-rose-300">{{ statsData.stockAlerts }}</p>
+                </div>
+            </div>
+
+            <div
+                class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center gap-4">
+                <div class="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-600">
+                    <Truck class="w-6 h-6" />
+                </div>
+                <div>
+                    <p class="text-sm font-semibold text-gray-500">In-Transit</p>
+                    <p class="text-2xl font-black text-gray-900 dark:text-white">{{ statsData.inTransit }}</p>
+                </div>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -122,9 +159,9 @@ onMounted(() => {
                                 <tr v-for="item in materialNeeds" :key="item.id" class="group">
                                     <td class="py-4">
                                         <span class="block font-bold text-gray-800 dark:text-gray-200">{{ item.name
-                                            }}</span>
+                                        }}</span>
                                         <span class="text-[10px] text-gray-400 uppercase tracking-tighter">{{ item.type
-                                            }}</span>
+                                        }}</span>
                                     </td>
                                     <td class="py-4 text-right font-mono font-bold">{{ item.needed }} {{ item.unit }}
                                     </td>

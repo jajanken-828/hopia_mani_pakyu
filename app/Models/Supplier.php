@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -36,4 +37,28 @@ class Supplier extends Authenticatable
     protected $casts = [
         'password' => 'hashed',
     ];
+
+    /**
+     * Get the vendor registration associated with this supplier
+     */
+    public function vendorRegistration(): HasOne
+    {
+        return $this->hasOne(VendorRegistration::class);
+    }
+
+    /**
+     * Check if this supplier is approved
+     */
+    public function isApproved(): bool
+    {
+        return $this->vendorRegistration?->status === 'approved';
+    }
+
+    /**
+     * Get vendor requirements
+     */
+    public function requirements()
+    {
+        return $this->vendorRegistration?->requirements ?? collect();
+    }
 }

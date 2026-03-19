@@ -319,44 +319,52 @@ Route::prefix('dashboard/scm')->name('scm.')->middleware(['auth', 'verified'])->
         Route::get('/manager', [DashboardController::class, 'index'])
             ->name('manager.dashboard');
 
-        Route::get('/vendor', [VendorController::class, 'vendor'])
-            ->name('manager.vendor');
+        Route::prefix('vendor')->group(function () {
+            // Main page (Inertia render)
+            Route::get('/', [VendorController::class, 'vendor'])->name('manager.vendor'); // Generates 'scm.manager.vendor'
+
+            Route::post('/register', [VendorController::class, 'register'])->name('manager.vendor.register');
+            Route::get('/registrations', [VendorController::class, 'getRegistrations'])->name('manager.vendor.registrations');
+            Route::get('/registrations/{id}', [VendorController::class, 'getRegistration'])->name('manager.vendor.registration.show');
+            Route::post('/registrations/{id}/approve', [VendorController::class, 'approve'])->name('manager.vendor.approve');
+            Route::post('/registrations/{id}/reject', [VendorController::class, 'reject'])->name('manager.vendor.reject');
+            Route::post('/registrations/{id}/requirements', [VendorController::class, 'setRequirements'])->name('manager.vendor.requirements.store');
+            Route::get('/registrations/{id}/requirements', [VendorController::class, 'getRequirements'])->name('manager.vendor.requirements.show');
+            Route::get('/my-registration', [VendorController::class, 'getMyRegistration'])->name('manager.vendor.my-registration');
+        });
 
         Route::get('/close', [CloseController::class, 'close'])
             ->name('manager.close');
 
         // ── Procurement Module (full CRUD) ──────────────────────────
-        Route::prefix('procurement')->name('manager.procurement')->group(function () {
+        Route::prefix('procurement')->group(function () {
 
             // Main page (Inertia render)
             Route::get('/', [ProcurementController::class, 'procurement'])
-                ->name('');                                             // scm.manager.procurement
-
-            // ── Material Request ──────────────────────────────────
-            // (Created automatically by Inventory module; read-only here)
+                ->name('manager.procurement'); // Correctly generates 'scm.manager.procurement'
 
             // ── RFQ ───────────────────────────────────────────────
             Route::post('/rfq', [ProcurementController::class, 'createRFQ'])
-                ->name('.rfq.store');                                   // scm.manager.procurement.rfq.store
+                ->name('manager.procurement.rfq.store');
 
             // ── Supplier Quotation Responses ──────────────────────
             Route::post('/quotations/{responseId}/accept', [ProcurementController::class, 'acceptQuotation'])
-                ->name('.quotations.accept');
+                ->name('manager.procurement.quotations.accept');
 
             Route::post('/quotations/{responseId}/decline', [ProcurementController::class, 'declineQuotation'])
-                ->name('.quotations.decline');
+                ->name('manager.procurement.quotations.decline');
 
             // ── Purchase Orders ───────────────────────────────────
             Route::post('/purchase-orders/{poId}/send', [ProcurementController::class, 'sendPurchaseOrder'])
-                ->name('.purchase-orders.send');
+                ->name('manager.procurement.purchase-orders.send');
 
             // ── Invoices (receive from supplier portal) ───────────
             Route::post('/invoices/receive', [ProcurementController::class, 'receiveInvoiceFromSupplier'])
-                ->name('.invoices.receive');
+                ->name('manager.procurement.invoices.receive');
 
             // ── Payments ──────────────────────────────────────────
             Route::post('/payments', [ProcurementController::class, 'processPayment'])
-                ->name('.payments.store');
+                ->name('manager.procurement.payments.store');
         });
     });
 
@@ -419,6 +427,10 @@ Route::prefix('dashboard/inv')->name('inv.')->middleware(['auth', 'verified'])->
     Route::get('/inventory', [InvInventoryController::class, 'inventory'])
         ->middleware(['role:INV', 'position:manager'])
         ->name('manager.inventory');
+
+    Route::post('/inventory/receive', [InvInventoryController::class, 'receiveDelivery'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.inventory.receive');
 
     Route::post('/warehouse', [InvInventoryController::class, 'storeWarehouse'])
         ->middleware(['role:INV', 'position:manager'])
@@ -619,6 +631,10 @@ Route::post('supplier/logout', [SupplierAuthController::class, 'logout'])
 // Protected Supplier Routes
 Route::middleware('auth:supplier')->prefix('supplier')->name('supplier.')->group(function () {
     Route::get('/dashboard', [SupplierDashboardController::class, 'index'])->name('dashboard');
+    Route::post('/rfq/{id}/respond', [SupplierDashboardController::class, 'submitQuotation'])->name('rfq.respond');
+    Route::get('/orders', [SupplierDashboardController::class, 'purchaseOrders'])->name('orders');
+    Route::post('/orders/{id}/status', [SupplierDashboardController::class, 'updateOrderStatus'])->name('orders.update_status');
+    Route::post('/orders/{id}/invoice', [SupplierDashboardController::class, 'createInvoice'])->name('orders.invoice');
 });
 
 require __DIR__.'/auth.php';

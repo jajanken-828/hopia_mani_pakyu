@@ -90,7 +90,7 @@ function handleImageError() {
                                     class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                                 <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                             </span>
-                            System v1.0 Online
+                            WELCOME TO MONTI TEXTILE!
                         </div>
                         <h1
                             class="text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.1] mb-6">
@@ -151,8 +151,8 @@ function handleImageError() {
             <footer
                 class="py-10 border-t border-slate-200 dark:border-slate-800/60 mt-12 flex flex-col md:flex-row justify-between items-center gap-8">
                 <div class="text-xs text-slate-500 font-medium">
-                    © 2026 Monti Textile Corp <span class="mx-2 text-slate-300 dark:text-slate-700">|</span>
-                    <span class="font-mono text-blue-500">Node_Server: [STABLE]</span>
+                    © 2026 Monti Textile Manufacturing <span class="mx-2 text-slate-300 dark:text-slate-700">|</span>
+                    <span class="font-mono text-blue-500">Enterprise Resource Planning System</span>
                 </div>
 
                 <div class="flex flex-wrap gap-8 justify-center">

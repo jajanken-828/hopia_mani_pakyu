@@ -1,8 +1,7 @@
 <script setup>
 import { ref, computed, reactive, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { router } from '@inertiajs/vue3';
-import axios from 'axios';
+import { Head, router } from '@inertiajs/vue3';
 import {
     ClipboardList, FileText, Package, CreditCard, Receipt,
     CheckCircle, XCircle, ChevronDown, ChevronRight, Plus,
@@ -19,74 +18,40 @@ const props = defineProps({
     stats: {
         type: Object,
         default: () => ({
-            pendingMaterialRequests: 5,
-            activeRFQs: 8,
-            pendingPOs: 3,
-            unpaidInvoices: 2
+            pendingMaterialRequests: 0,
+            activeRFQs: 0,
+            pendingPOs: 0,
+            unpaidInvoices: 0
         })
+    },
+    warehouses: { // Dynamically populated for Delivery Address
+        type: Array,
+        default: () => []
     },
     materialRequests: {
         type: Array,
-        default: () => [
-            { id: 1, req_number: 'MR-2026-001', material_id: 1, material_name: '200GSM Combed Cotton', category: 'Fabric', unit: 'm', current_stock: 850, reorder_point: 1200, required_qty: 1750, urgency: 'High', requested_by: 'Inventory System', requested_at: '2026-03-08', status: 'pending', notes: 'Stock critically low, urgent restock needed.' },
-            { id: 2, req_number: 'MR-2026-002', material_id: 2, material_name: 'Reactive Dye (Navy)', category: 'Chemicals', unit: 'L', current_stock: 15, reorder_point: 50, required_qty: 100, urgency: 'High', requested_by: 'Inventory System', requested_at: '2026-03-08', status: 'rfq_sent', notes: 'Dye house running low.' },
-            { id: 3, req_number: 'MR-2026-003', material_id: 3, material_name: 'Branded Resin Buttons', category: 'Trim', unit: 'pcs', current_stock: 12000, reorder_point: 15000, required_qty: 25000, urgency: 'Medium', requested_by: 'Inventory System', requested_at: '2026-03-09', status: 'pending', notes: '' },
-            { id: 4, req_number: 'MR-2026-004', material_id: 4, material_name: 'Poly Bag (12x16)', category: 'Packaging', unit: 'pcs', current_stock: 2200, reorder_point: 5000, required_qty: 8000, urgency: 'Low', requested_by: 'Inventory System', requested_at: '2026-03-10', status: 'pending', notes: '' },
-        ]
+        default: () => []
     },
+    // Dynamically populated from the database containing ONLY approved/official vendors
     suppliers: {
         type: Array,
-        default: () => [
-            { id: 1, business_name: 'Heritage Textile Mills', representative_name: 'James Reyes', email: 'james@heritagetextile.com', phone_number: '+63-912-555-0101', address: 'Pampanga, PH', rating: 4.9, status: 'Preferred', categories: ['Fabric', 'Trim'] },
-            { id: 2, business_name: 'Eastern Yarn Co.', representative_name: 'Maria Santos', email: 'maria@easternyarn.com', phone_number: '+63-917-555-0202', address: 'Bulacan, PH', rating: 4.5, status: 'Verified', categories: ['Fabric'] },
-            { id: 3, business_name: 'Skyline Fabric Ltd', representative_name: 'Carlo Tan', email: 'carlo@skylinefabric.com', phone_number: '+63-918-555-0303', address: 'Quezon City, PH', rating: 4.7, status: 'Approved', categories: ['Fabric', 'Chemicals'] },
-            { id: 4, business_name: 'ChemPro Supplies', representative_name: 'Ana Cruz', email: 'ana@chempro.com', phone_number: '+63-920-555-0404', address: 'Manila, PH', rating: 4.6, status: 'Verified', categories: ['Chemicals'] },
-            { id: 5, business_name: 'Trim World Int\'l', representative_name: 'Bob Lim', email: 'bob@trimworld.com', phone_number: '+63-921-555-0505', address: 'Cavite, PH', rating: 4.3, status: 'Approved', categories: ['Trim', 'Packaging'] },
-        ]
+        default: () => []
     },
     rfqs: {
         type: Array,
-        default: () => [
-            {
-                id: 1, rfq_number: 'RFQ-2026-001', mr_ref: 'MR-2026-001', material_name: '200GSM Combed Cotton', category: 'Fabric', unit: 'm', required_qty: 1750, deadline: '2026-03-15', sent_at: '2026-03-09', status: 'partial_response', notes: 'Urgent – prioritize lead time.', responses: [
-                    { id: 1, supplier_id: 1, supplier_name: 'Heritage Textile Mills', unit_price: 8.45, total_price: 14787.50, lead_time: '10 days', validity_date: '2026-03-31', payment_terms: 'Net 30', notes: 'Can deliver in batch.', status: 'pending_review', submitted_at: '2026-03-10' },
-                    { id: 2, supplier_id: 2, supplier_name: 'Eastern Yarn Co.', unit_price: 7.90, total_price: 13825.00, lead_time: '18 days', validity_date: '2026-03-28', payment_terms: 'Net 45', notes: 'Best price guaranteed.', status: 'pending_review', submitted_at: '2026-03-10' },
-                ]
-            },
-            {
-                id: 2, rfq_number: 'RFQ-2026-002', mr_ref: 'MR-2026-002', material_name: 'Reactive Dye (Navy)', category: 'Chemicals', unit: 'L', required_qty: 100, deadline: '2026-03-14', sent_at: '2026-03-09', status: 'responded', notes: '', responses: [
-                    { id: 3, supplier_id: 4, supplier_name: 'ChemPro Supplies', unit_price: 42.00, total_price: 4200.00, lead_time: '7 days', validity_date: '2026-03-25', payment_terms: 'Net 30', notes: '', status: 'accepted', submitted_at: '2026-03-10' },
-                ]
-            },
-        ]
+        default: () => []
     },
     purchaseOrders: {
         type: Array,
-        default: () => [
-            {
-                id: 1, po_number: 'SCMPO-2026-0041', supplier_id: 1, supplier_name: 'Heritage Textile Mills', rfq_ref: 'RFQ-2026-001', issued_date: '2026-03-10', expected_delivery: '2026-03-20', status: 'confirmed', subtotal: 14787.50, tax_rate: 10, tax_amount: 1478.75, grand_total: 16266.25, notes: 'Deliver to Warehouse B.', items: [
-                    { id: 1, material_name: '200GSM Combed Cotton', qty: 1750, unit: 'm', unit_price: 8.45, total: 14787.50 }
-                ], received: false
-            },
-            {
-                id: 2, po_number: 'SCMPO-2026-0042', supplier_id: 4, supplier_name: 'ChemPro Supplies', rfq_ref: 'RFQ-2026-002', issued_date: '2026-03-10', expected_delivery: '2026-03-17', status: 'sent', subtotal: 4200.00, tax_rate: 10, tax_amount: 420.00, grand_total: 4620.00, notes: '', items: [
-                    { id: 2, material_name: 'Reactive Dye (Navy)', qty: 100, unit: 'L', unit_price: 42.00, total: 4200.00 }
-                ], received: false
-            },
-        ]
+        default: () => []
     },
     invoices: {
         type: Array,
-        default: () => [
-            { id: 1, invoice_number: 'INV-HTM-8821', po_number: 'SCMPO-2026-0041', supplier_name: 'Heritage Textile Mills', invoice_date: '2026-03-14', due_date: '2026-04-13', amount: 16266.25, payment_terms: 'Net 30', status: 'unpaid', received_at: '2026-03-14' },
-            { id: 2, invoice_number: 'INV-CPS-4410', po_number: 'SCMPO-2026-0042', supplier_name: 'ChemPro Supplies', invoice_date: '2026-03-11', due_date: '2026-04-10', amount: 4620.00, payment_terms: 'Net 30', status: 'paid', received_at: '2026-03-11' },
-        ]
+        default: () => []
     },
     payments: {
         type: Array,
-        default: () => [
-            { id: 1, payment_number: 'PAY-2026-051', invoice_number: 'INV-CPS-4410', supplier_name: 'ChemPro Supplies', paid_date: '2026-03-18', amount: 4620.00, method: 'Bank Transfer', bank_reference: 'TXN-00448812', remarks: '', status: 'cleared' },
-        ]
+        default: () => []
     }
 });
 
@@ -128,6 +93,34 @@ const localPOs = ref([...props.purchaseOrders]);
 const localInvoices = ref([...props.invoices]);
 const localPayments = ref([...props.payments]);
 
+// Keep data synced if Inertia pushes new props via polling or reload
+watch(() => props.rfqs, v => (localRFQs.value = v), { deep: true });
+watch(() => props.purchaseOrders, v => (localPOs.value = v), { deep: true });
+watch(() => props.invoices, v => (localInvoices.value = v), { deep: true });
+watch(() => props.payments, v => (localPayments.value = v), { deep: true });
+watch(() => props.materialRequests, v => (localMaterialRequests.value = v), { deep: true });
+
+// ─────────────────────────────────────────────────────────
+// MATERIAL REQUESTS TABS LOGIC
+// ─────────────────────────────────────────────────────────
+const mrTab = ref('pending');
+
+const displayedMaterialRequests = computed(() => {
+    return localMaterialRequests.value.filter(req => {
+        if (mrTab.value === 'pending') return req.status === 'pending';
+        if (mrTab.value === 'processing') return !['pending', 'fulfilled', 'received', 'completed', 'cancelled'].includes(req.status);
+        if (mrTab.value === 'completed') return ['fulfilled', 'received', 'completed', 'cancelled'].includes(req.status);
+        return true;
+    });
+});
+
+const countMR = (type) => {
+    if (type === 'pending') return localMaterialRequests.value.filter(r => r.status === 'pending').length;
+    if (type === 'processing') return localMaterialRequests.value.filter(r => !['pending', 'fulfilled', 'received', 'completed', 'cancelled'].includes(r.status)).length;
+    if (type === 'completed') return localMaterialRequests.value.filter(r => ['fulfilled', 'received', 'completed', 'cancelled'].includes(r.status)).length;
+    return 0;
+};
+
 // ─────────────────────────────────────────────────────────
 // MODALS STATE
 // ─────────────────────────────────────────────────────────
@@ -140,7 +133,7 @@ const rfqForm = reactive({
     required_qty: 0,
     unit: '',
     deadline: '',
-    delivery_address: 'Main Warehouse, Imus, Cavite',
+    delivery_address: '', // Cleared to force selection
     payment_terms: 'Net 30',
     notes: '',
     selected_suppliers: []
@@ -149,9 +142,10 @@ const rfqForm = reactive({
 // Supplier Selection Modal
 const showSupplierModal = ref(false);
 const supplierSelectionStep = ref(false);
+
+// Always return all approved suppliers, removing the strict category filter
 const filteredSuppliers = computed(() => {
-    if (!rfqTargetRequest.value) return props.suppliers;
-    return props.suppliers.filter(s => s.categories.includes(rfqTargetRequest.value.category));
+    return props.suppliers;
 });
 
 // View RFQ Detail Modal
@@ -209,53 +203,38 @@ const formatCurrency = (val) => {
 
 const statusBadge = (status) => {
     const map = {
-        pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-        rfq_sent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-        po_created: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
-        fulfilled: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-        partial_response: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-        responded: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-        pending_review: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-        accepted: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-        declined: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-        draft: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-        sent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-        confirmed: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
-        received: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-        cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-        unpaid: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-        paid: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-        overdue: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-700',
-        cleared: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-        High: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-        Medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-        Low: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+        pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+        rfq_sent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+        po_created: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+        responded: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+        pending_review: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+        accepted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+        declined: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+        draft: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+        sent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+
+        production: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+        shipping: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+        delivered: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+
+        confirmed: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+        partially_received: 'bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-400',
+        received: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+        unpaid: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+        paid: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+        High: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+        Medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+        Low: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
     };
-    return map[status] || 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
+    return map[status] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
 };
 
 const statusLabel = (status) => {
-    const map = {
-        pending: 'Pending',
-        rfq_sent: 'RFQ Sent',
-        po_created: 'PO Created',
-        fulfilled: 'Fulfilled',
-        partial_response: 'Partial Response',
-        responded: 'Responded',
-        pending_review: 'Pending Review',
-        accepted: 'Accepted',
-        declined: 'Declined',
-        draft: 'Draft',
-        sent: 'Sent',
-        confirmed: 'Confirmed',
-        received: 'Received',
-        cancelled: 'Cancelled',
-        unpaid: 'Unpaid',
-        paid: 'Paid',
-        overdue: 'Overdue',
-        cleared: 'Cleared',
-    };
-    return map[status] || status;
+    if (!status) return '';
+    if (status === 'production') return 'In Production';
+    if (status === 'shipping') return 'Shipping';
+    if (status === 'delivered') return 'Delivered';
+    return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
 const showNotif = (type, message) => {
@@ -283,7 +262,7 @@ const openCreateRFQ = (request) => {
     rfqForm.required_qty = request.required_qty;
     rfqForm.unit = request.unit;
     rfqForm.deadline = '';
-    rfqForm.delivery_address = 'Main Warehouse, Imus, Cavite';
+    rfqForm.delivery_address = ''; // Cleared to force selection
     rfqForm.payment_terms = 'Net 30';
     rfqForm.notes = request.notes || '';
     rfqForm.selected_suppliers = [];
@@ -292,8 +271,8 @@ const openCreateRFQ = (request) => {
 };
 
 const proceedToSupplierSelection = () => {
-    if (!rfqForm.deadline) {
-        showNotif('error', 'Please set a response deadline.');
+    if (!rfqForm.deadline || !rfqForm.delivery_address) {
+        showNotif('error', 'Please fill all required fields.');
         return;
     }
     supplierSelectionStep.value = true;
@@ -305,44 +284,25 @@ const toggleSupplier = (supplierId) => {
     else rfqForm.selected_suppliers.splice(idx, 1);
 };
 
-const submitRFQ = async () => {
+const submitRFQ = () => {
     if (rfqForm.selected_suppliers.length === 0) {
         showNotif('error', 'Please select at least one supplier.');
         return;
     }
     isLoading.value = true;
-    try {
-        const response = await axios.post('/dashboard/scm/procurement/rfq', rfqForm);
-        const newRFQ = response.data.rfq;
-        localRFQs.value.push(newRFQ);
-        const mr = localMaterialRequests.value.find(r => r.id === rfqForm.mr_id);
-        if (mr) mr.status = 'rfq_sent';
-        showRFQModal.value = false;
-        showNotif('success', `RFQ ${newRFQ.rfq_number} sent to ${rfqForm.selected_suppliers.length} supplier(s) successfully.`);
-    } catch (e) {
-        // Optimistic UI for demo
-        const newRFQ = {
-            id: Date.now(),
-            rfq_number: 'RFQ-2026-' + String(localRFQs.value.length + 1).padStart(3, '0'),
-            mr_ref: rfqTargetRequest.value.req_number,
-            material_name: rfqForm.material_name,
-            category: rfqTargetRequest.value.category,
-            unit: rfqForm.unit,
-            required_qty: rfqForm.required_qty,
-            deadline: rfqForm.deadline,
-            sent_at: new Date().toISOString().split('T')[0],
-            status: 'sent',
-            notes: rfqForm.notes,
-            responses: []
-        };
-        localRFQs.value.push(newRFQ);
-        const mr = localMaterialRequests.value.find(r => r.id === rfqForm.mr_id);
-        if (mr) mr.status = 'rfq_sent';
-        showRFQModal.value = false;
-        showNotif('success', `RFQ sent to ${rfqForm.selected_suppliers.length} supplier(s). (Demo mode)`);
-    } finally {
-        isLoading.value = false;
-    }
+    router.post('/dashboard/scm/procurement/rfq', rfqForm, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showRFQModal.value = false;
+            showNotif('success', `RFQ Sent to selected vendors.`);
+            isLoading.value = false;
+        },
+        onError: (errors) => {
+            isLoading.value = false;
+            const errorMsg = Object.values(errors)[0] || 'Failed to send RFQ.';
+            showNotif('error', errorMsg);
+        }
+    });
 };
 
 // ─────────────────────────────────────────────────────────
@@ -367,69 +327,43 @@ const openDeclineModal = (rfq, response) => {
     showDeclineModal.value = true;
 };
 
-const acceptQuotation = async () => {
+const acceptQuotation = () => {
     isLoading.value = true;
-    try {
-        const response = await axios.post(`/dashboard/scm/procurement/quotations/${selectedQuotationToAccept.value.id}/accept`, {
-            rfq_id: acceptingRFQ.value.id
-        });
-        const newPO = response.data.purchase_order;
-        localPOs.value.push(newPO);
-        selectedQuotationToAccept.value.status = 'accepted';
-        const rfq = localRFQs.value.find(r => r.id === acceptingRFQ.value.id);
-        if (rfq) rfq.status = 'responded';
-        showAcceptModal.value = false;
-        showNotif('success', `Purchase Order created successfully from ${selectedQuotationToAccept.value.supplier_name}'s quotation.`);
-        setSection('purchase_order');
-    } catch (e) {
-        // Optimistic UI
-        const q = selectedQuotationToAccept.value;
-        const rfq = acceptingRFQ.value;
-        const newPO = {
-            id: Date.now(),
-            po_number: 'SCMPO-2026-' + String(localPOs.value.length + 43).padStart(4, '0'),
-            supplier_id: q.supplier_id,
-            supplier_name: q.supplier_name,
-            rfq_ref: rfq.rfq_number,
-            issued_date: new Date().toISOString().split('T')[0],
-            expected_delivery: q.lead_time,
-            status: 'draft',
-            subtotal: q.total_price,
-            tax_rate: 10,
-            tax_amount: q.total_price * 0.10,
-            grand_total: q.total_price * 1.10,
-            notes: '',
-            items: [{ id: Date.now(), material_name: rfq.material_name, qty: rfq.required_qty, unit: rfq.unit, unit_price: q.unit_price, total: q.total_price }],
-            received: false
-        };
-        localPOs.value.push(newPO);
-        q.status = 'accepted';
-        const rfqRecord = localRFQs.value.find(r => r.id === rfq.id);
-        if (rfqRecord) rfqRecord.status = 'responded';
-        showAcceptModal.value = false;
-        showNotif('success', `PO ${newPO.po_number} created! (Demo mode)`);
-        setSection('purchase_order');
-    } finally {
-        isLoading.value = false;
-    }
+    router.post(`/dashboard/scm/procurement/quotations/${selectedQuotationToAccept.value.id}/accept`, {
+        rfq_id: acceptingRFQ.value.id
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showAcceptModal.value = false;
+            showNotif('success', `Purchase Order created successfully.`);
+            setSection('purchase_order');
+            isLoading.value = false;
+        },
+        onError: (errors) => {
+            isLoading.value = false;
+            const errorMsg = Object.values(errors)[0] || 'Failed to accept quotation.';
+            showNotif('error', errorMsg);
+        }
+    });
 };
 
-const declineQuotation = async () => {
+const declineQuotation = () => {
     isLoading.value = true;
-    try {
-        await axios.post(`/dashboard/scm/procurement/quotations/${selectedQuotationToDecline.value.id}/decline`, {
-            reason: declineReason.value
-        });
-        selectedQuotationToDecline.value.status = 'declined';
-        showDeclineModal.value = false;
-        showNotif('success', 'Quotation declined and supplier notified.');
-    } catch {
-        selectedQuotationToDecline.value.status = 'declined';
-        showDeclineModal.value = false;
-        showNotif('success', 'Quotation declined. (Demo mode)');
-    } finally {
-        isLoading.value = false;
-    }
+    router.post(`/dashboard/scm/procurement/quotations/${selectedQuotationToDecline.value.id}/decline`, {
+        reason: declineReason.value
+    }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showDeclineModal.value = false;
+            showNotif('success', 'Quotation declined and supplier notified.');
+            isLoading.value = false;
+        },
+        onError: (errors) => {
+            isLoading.value = false;
+            const errorMsg = Object.values(errors)[0] || 'Failed to decline quotation.';
+            showNotif('error', errorMsg);
+        }
+    });
 };
 
 // ─────────────────────────────────────────────────────────
@@ -440,18 +374,20 @@ const openPODetail = (po) => {
     showPODetailModal.value = true;
 };
 
-const sendPO = async (po) => {
+const sendPO = (po) => {
     isLoading.value = true;
-    try {
-        await axios.post(`/dashboard/scm/procurement/purchase-orders/${po.id}/send`);
-        po.status = 'sent';
-        showNotif('success', `PO ${po.po_number} sent to ${po.supplier_name}.`);
-    } catch {
-        po.status = 'sent';
-        showNotif('success', `PO ${po.po_number} sent. (Demo mode)`);
-    } finally {
-        isLoading.value = false;
-    }
+    router.post(`/dashboard/scm/procurement/purchase-orders/${po.id}/send`, {}, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showNotif('success', `PO sent to ${po.supplier_name}.`);
+            isLoading.value = false;
+        },
+        onError: (errors) => {
+            isLoading.value = false;
+            const errorMsg = Object.values(errors)[0] || 'Failed to send PO.';
+            showNotif('error', errorMsg);
+        }
+    });
 };
 
 // ─────────────────────────────────────────────────────────
@@ -470,51 +406,36 @@ const openPaymentModal = (invoice) => {
     showPaymentModal.value = true;
 };
 
-const submitPayment = async () => {
+const submitPayment = () => {
     if (!paymentForm.bank_reference) {
         showNotif('error', 'Please provide a reference number.');
         return;
     }
     isLoading.value = true;
-    try {
-        const response = await axios.post('/dashboard/scm/procurement/payments', paymentForm);
-        const newPayment = response.data.payment;
-        localPayments.value.push(newPayment);
-        const inv = localInvoices.value.find(i => i.id === paymentForm.invoice_id);
-        if (inv) inv.status = 'paid';
-        showPaymentModal.value = false;
-        showNotif('success', `Payment of ${formatCurrency(paymentForm.amount)} processed for ${paymentForm.supplier_name}.`);
-    } catch {
-        const newPayment = {
-            id: Date.now(),
-            payment_number: 'PAY-2026-' + String(localPayments.value.length + 52).padStart(3, '0'),
-            invoice_number: paymentForm.invoice_number,
-            supplier_name: paymentForm.supplier_name,
-            paid_date: paymentForm.payment_date,
-            amount: paymentForm.amount,
-            method: paymentForm.method,
-            bank_reference: paymentForm.bank_reference,
-            remarks: paymentForm.remarks,
-            status: 'cleared'
-        };
-        localPayments.value.push(newPayment);
-        const inv = localInvoices.value.find(i => i.id === paymentForm.invoice_id);
-        if (inv) inv.status = 'paid';
-        showPaymentModal.value = false;
-        showNotif('success', `Payment of ${formatCurrency(paymentForm.amount)} processed. (Demo mode)`);
-    } finally {
-        isLoading.value = false;
-    }
+    router.post('/dashboard/scm/procurement/payments', paymentForm, {
+        preserveScroll: true,
+        onSuccess: () => {
+            showPaymentModal.value = false;
+            showNotif('success', `Payment processed successfully.`);
+            isLoading.value = false;
+        },
+        onError: (errors) => {
+            isLoading.value = false;
+            const errorMsg = Object.values(errors)[0] || 'Failed to process payment.';
+            showNotif('error', errorMsg);
+        }
+    });
 };
 </script>
 
 <template>
+
+    <Head title="Procurement | SCM" />
     <AuthenticatedLayout>
-        <!-- ── Notification Toast ─────────────────────────────────── -->
         <transition name="slide-toast">
             <div v-if="notification.show" :class="[
                 'fixed top-5 right-5 z-[9999] flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl border text-sm font-medium',
-                notification.type === 'success' ? 'bg-white dark:bg-gray-800 border-green-300 text-green-700 dark:text-green-400' : 'bg-white dark:bg-gray-800 border-red-300 text-red-700 dark:text-red-400'
+                notification.type === 'success' ? 'bg-white dark:bg-slate-800 border-emerald-300 text-emerald-700 dark:text-emerald-400' : 'bg-white dark:bg-slate-800 border-red-300 text-red-700 dark:text-red-400'
             ]">
                 <component :is="notification.type === 'success' ? CheckCircle : XCircle"
                     class="w-5 h-5 flex-shrink-0" />
@@ -525,94 +446,90 @@ const submitPayment = async () => {
             </div>
         </transition>
 
-        <!-- ── Page Header ─────────────────────────────────────────── -->
         <div class="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-                <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Procurement Management</h2>
-                <p class="text-sm text-gray-500 dark:text-gray-400">SCM · Full Procurement Workflow</p>
+                <h2 class="text-2xl font-bold text-slate-800 dark:text-white">Procurement Management</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400">SCM · Full Procurement Workflow</p>
             </div>
-            <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                <span
-                    class="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 px-3 py-1.5 rounded-full font-medium">
-                    <AlertTriangle class="w-3.5 h-3.5" /> {{ props.stats.pendingMaterialRequests }} Pending Requests
+            <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <span v-if="localMaterialRequests.filter(r => r.status === 'pending').length > 0"
+                    class="flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 px-3 py-1.5 rounded-full font-medium border border-amber-100 dark:border-amber-800/30">
+                    <AlertTriangle class="w-3.5 h-3.5" /> {{localMaterialRequests.filter(r => r.status ===
+                    'pending').length }} Pending Requests
                 </span>
                 <span v-if="rfqResponseCount > 0"
-                    class="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full font-medium">
+                    class="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full font-medium border border-blue-100 dark:border-blue-800/30">
                     <FileText class="w-3.5 h-3.5" /> {{ rfqResponseCount }} Quotations to Review
                 </span>
                 <span v-if="pendingInvoiceCount > 0"
-                    class="flex items-center gap-1 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-3 py-1.5 rounded-full font-medium">
+                    class="flex items-center gap-1 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 px-3 py-1.5 rounded-full font-medium border border-red-100 dark:border-red-800/30">
                     <Receipt class="w-3.5 h-3.5" /> {{ pendingInvoiceCount }} Unpaid Invoices
                 </span>
             </div>
         </div>
 
-        <!-- ── Stats Row ─────────────────────────────────────────────── -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div
-                class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-center gap-3">
+                class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex items-center gap-3">
                 <div
                     class="w-10 h-10 rounded-lg bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center flex-shrink-0">
                     <ClipboardList class="w-5 h-5 text-orange-500" />
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-gray-800 dark:text-white">{{localMaterialRequests.filter(r =>
-                        r.status === 'pending').length }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Material Requests</p>
+                    <p class="text-2xl font-bold text-slate-800 dark:text-white">{{localMaterialRequests.filter(r =>
+                        r.status === 'pending').length}}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Material Requests</p>
                 </div>
             </div>
             <div
-                class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-center gap-3">
+                class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex items-center gap-3">
                 <div
                     class="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
                     <Send class="w-5 h-5 text-blue-500" />
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ localRFQs.length }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Active RFQs</p>
+                    <p class="text-2xl font-bold text-slate-800 dark:text-white">{{ localRFQs.length }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Active RFQs</p>
                 </div>
             </div>
             <div
-                class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-center gap-3">
+                class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex items-center gap-3">
                 <div
                     class="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center flex-shrink-0">
                     <ShoppingCart class="w-5 h-5 text-indigo-500" />
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ localPOs.length }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Purchase Orders</p>
+                    <p class="text-2xl font-bold text-slate-800 dark:text-white">{{ localPOs.length }}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Purchase Orders</p>
                 </div>
             </div>
             <div
-                class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-center gap-3">
+                class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex items-center gap-3">
                 <div
                     class="w-10 h-10 rounded-lg bg-red-50 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
                     <CircleDollarSign class="w-5 h-5 text-red-500" />
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-gray-800 dark:text-white">{{localInvoices.filter(i => i.status
-                        === 'unpaid').length }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Unpaid Invoices</p>
+                    <p class="text-2xl font-bold text-slate-800 dark:text-white">{{localInvoices.filter(i => i.status
+                        === 'unpaid').length}}</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Unpaid Invoices</p>
                 </div>
             </div>
         </div>
 
-        <!-- ── Main Layout ───────────────────────────────────────────── -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
-            <!-- LEFT NAV -->
             <div class="lg:col-span-3">
                 <div
-                    class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm sticky top-4">
+                    class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm sticky top-4">
                     <div class="px-4 pt-4 pb-2">
-                        <p class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                        <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                             Workflow</p>
                     </div>
                     <nav class="px-2 pb-3 space-y-0.5">
-                        <!-- Material Request -->
                         <button @click="setSection('material_request')" :class="[
                             'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
-                            activeSection === 'material_request' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            activeSection === 'material_request' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                         ]">
                             <div class="flex items-center gap-2.5">
                                 <ClipboardList class="w-4 h-4 flex-shrink-0" />
@@ -624,10 +541,9 @@ const submitPayment = async () => {
                             ]">{{localMaterialRequests.filter(r => r.status === 'pending').length}}</span>
                         </button>
 
-                        <!-- Supplier Quotation -->
                         <button @click="setSection('supplier_quotation')" :class="[
                             'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
-                            activeSection === 'supplier_quotation' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            activeSection === 'supplier_quotation' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                         ]">
                             <div class="flex items-center gap-2.5">
                                 <FileText class="w-4 h-4 flex-shrink-0" />
@@ -639,11 +555,10 @@ const submitPayment = async () => {
                             ]">{{ rfqResponseCount }}</span>
                         </button>
 
-                        <!-- Ordering & Receipt (accordion) -->
                         <div>
                             <button @click="toggleOrdering" :class="[
                                 'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
-                                ['purchase_order', 'invoice', 'make_payment'].includes(activeSection) ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/10' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                ['purchase_order', 'invoice', 'make_payment'].includes(activeSection) ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/10' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                             ]">
                                 <div class="flex items-center gap-2.5">
                                     <Package class="w-4 h-4 flex-shrink-0" />
@@ -653,14 +568,12 @@ const submitPayment = async () => {
                                     class="w-4 h-4 flex-shrink-0 transition-transform duration-200" />
                             </button>
 
-                            <!-- Sub nav -->
                             <transition name="accordion">
                                 <div v-show="orderingExpanded"
-                                    class="mt-0.5 ml-4 space-y-0.5 pl-3 border-l-2 border-gray-200 dark:border-gray-600">
-                                    <!-- Purchase Order -->
+                                    class="mt-0.5 ml-4 space-y-0.5 pl-3 border-l-2 border-slate-200 dark:border-slate-600">
                                     <button @click="setSection('purchase_order')" :class="[
                                         'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
-                                        activeSection === 'purchase_order' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                        activeSection === 'purchase_order' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
                                     ]">
                                         <div class="flex items-center gap-2">
                                             <ShoppingCart class="w-3.5 h-3.5 flex-shrink-0" />
@@ -668,11 +581,10 @@ const submitPayment = async () => {
                                         </div>
                                     </button>
 
-                                    <!-- Payment (sub-accordion) -->
                                     <div>
                                         <button @click="togglePayment" :class="[
                                             'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
-                                            ['invoice', 'make_payment'].includes(activeSection) ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/10' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                            ['invoice', 'make_payment'].includes(activeSection) ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/10' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
                                         ]">
                                             <div class="flex items-center gap-2">
                                                 <CreditCard class="w-3.5 h-3.5 flex-shrink-0" />
@@ -684,11 +596,10 @@ const submitPayment = async () => {
 
                                         <transition name="accordion">
                                             <div v-show="paymentExpanded"
-                                                class="mt-0.5 ml-3 space-y-0.5 pl-3 border-l-2 border-gray-200 dark:border-gray-600">
-                                                <!-- Invoice -->
+                                                class="mt-0.5 ml-3 space-y-0.5 pl-3 border-l-2 border-slate-200 dark:border-slate-600">
                                                 <button @click="setSection('invoice')" :class="[
                                                     'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
-                                                    activeSection === 'invoice' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                    activeSection === 'invoice' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
                                                 ]">
                                                     <div class="flex items-center gap-2">
                                                         <Receipt class="w-3.5 h-3.5 flex-shrink-0" />
@@ -700,10 +611,9 @@ const submitPayment = async () => {
                                                     ]">{{ pendingInvoiceCount }}</span>
                                                 </button>
 
-                                                <!-- Make Payment -->
                                                 <button @click="setSection('make_payment')" :class="[
                                                     'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
-                                                    activeSection === 'make_payment' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                    activeSection === 'make_payment' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
                                                 ]">
                                                     <DollarSign class="w-3.5 h-3.5 flex-shrink-0" />
                                                     <span>Make Payment</span>
@@ -716,9 +626,10 @@ const submitPayment = async () => {
                         </div>
                     </nav>
 
-                    <!-- Workflow indicator -->
-                    <div class="border-t border-gray-100 dark:border-gray-700 px-4 py-3 mt-1">
-                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Flow Status</p>
+                    <div class="border-t border-slate-100 dark:border-slate-700 px-4 py-3 mt-1">
+                        <p
+                            class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+                            Flow Status</p>
                         <div class="flex flex-col gap-1.5">
                             <div v-for="(step, i) in [
                                 { label: 'Material Request', key: 'material_request', done: localMaterialRequests.some(r => r.status !== 'pending') },
@@ -727,87 +638,110 @@ const submitPayment = async () => {
                                 { label: 'Invoice & Payment', key: 'invoice', done: localPayments.length > 0 }
                             ]" :key="i" class="flex items-center gap-2 text-xs">
                                 <div
-                                    :class="['w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0', step.done ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-600']">
+                                    :class="['w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0', step.done ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-600']">
                                     <CheckCircle v-if="step.done" class="w-3 h-3 text-white" />
                                 </div>
                                 <span
-                                    :class="step.done ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'">{{
-                                    step.label }}</span>
+                                    :class="step.done ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'">{{
+                                        step.label }}</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- RIGHT CONTENT PANEL -->
             <div class="lg:col-span-9">
                 <div
-                    class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm min-h-[500px]">
+                    class="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm min-h-[500px]">
 
-                    <!-- ══ MATERIAL REQUEST ══════════════════════════════════════ -->
                     <div v-if="activeSection === 'material_request'">
                         <div
-                            class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+                            class="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-t-xl">
                             <div>
-                                <h3 class="text-base font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                <h3 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
                                     <ClipboardList class="w-5 h-5 text-blue-500" />
                                     Material Requests
                                 </h3>
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Materials flagged for restock
-                                    by the Inventory module.</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Materials flagged for
+                                    restock by the Inventory module.</p>
                             </div>
                         </div>
-                        <div class="p-5 space-y-3">
-                            <div v-if="localMaterialRequests.length === 0" class="text-center py-16 text-gray-400">
+
+                        <div
+                            class="px-6 pt-3 flex gap-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30 overflow-x-auto no-scrollbar">
+                            <button @click="mrTab = 'pending'"
+                                :class="['pb-3 text-sm font-black border-b-2 transition-all whitespace-nowrap', mrTab === 'pending' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300']">
+                                Pending Actions
+                                <span
+                                    :class="['ml-1.5 px-2 py-0.5 rounded-full text-[10px] transition-colors', mrTab === 'pending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400']">{{
+                                    countMR('pending') }}</span>
+                            </button>
+                            <button @click="mrTab = 'processing'"
+                                :class="['pb-3 text-sm font-black border-b-2 transition-all whitespace-nowrap', mrTab === 'processing' ? 'border-amber-500 text-amber-600 dark:text-amber-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300']">
+                                On Process
+                                <span
+                                    :class="['ml-1.5 px-2 py-0.5 rounded-full text-[10px] transition-colors', mrTab === 'processing' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400']">{{
+                                    countMR('processing') }}</span>
+                            </button>
+                            <button @click="mrTab = 'completed'"
+                                :class="['pb-3 text-sm font-black border-b-2 transition-all whitespace-nowrap', mrTab === 'completed' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300']">
+                                Completed
+                                <span
+                                    :class="['ml-1.5 px-2 py-0.5 rounded-full text-[10px] transition-colors', mrTab === 'completed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400']">{{
+                                    countMR('completed') }}</span>
+                            </button>
+                        </div>
+
+                        <div class="p-5 space-y-3 bg-white dark:bg-slate-800 rounded-b-xl">
+                            <div v-if="displayedMaterialRequests.length === 0" class="text-center py-16 text-slate-400">
                                 <Boxes class="w-12 h-12 mx-auto mb-3 opacity-30" />
-                                <p class="text-sm">No material requests from Inventory.</p>
+                                <p class="text-sm font-bold">No {{ mrTab === 'pending' ? 'pending' : mrTab ===
+                                    'processing' ? 'processing' : 'completed' }} material requests.</p>
                             </div>
-                            <div v-for="req in localMaterialRequests" :key="req.id"
-                                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition-all">
+                            <div v-for="req in displayedMaterialRequests" :key="req.id"
+                                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 transition-all shadow-sm">
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-2 mb-1 flex-wrap">
-                                        <span class="text-xs font-mono text-gray-500 dark:text-gray-400">{{
+                                        <span class="text-xs font-mono text-slate-500 dark:text-slate-400">{{
                                             req.req_number }}</span>
-                                        <span :class="statusBadge(req.urgency)"
-                                            class="text-[10px] font-bold px-2 py-0.5 rounded-full">{{ req.urgency
-                                            }}</span>
                                         <span :class="statusBadge(req.status)"
                                             class="text-[10px] font-bold px-2 py-0.5 rounded-full">{{
-                                            statusLabel(req.status) }}</span>
+                                                statusLabel(req.status) }}</span>
                                     </div>
-                                    <p class="font-semibold text-gray-800 dark:text-white text-sm">{{ req.material_name
-                                        }}</p>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ req.category }}
+                                    <p class="font-semibold text-slate-800 dark:text-white text-sm">{{ req.material_name
+                                    }}</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{{ req.category }}
                                         &nbsp;·&nbsp; Requested: <strong>{{ Number(req.required_qty).toLocaleString() }}
                                             {{ req.unit }}</strong> &nbsp;·&nbsp; In Stock: <strong>{{
-                                            Number(req.current_stock).toLocaleString() }} {{ req.unit }}</strong></p>
-                                    <div class="mt-2 bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 w-full max-w-xs">
+                                                Number(req.current_stock).toLocaleString() }} {{ req.unit }}</strong></p>
+                                    <div class="mt-2 bg-slate-100 dark:bg-slate-700 rounded-full h-1.5 w-full max-w-xs">
                                         <div :style="{ width: Math.min((req.current_stock / req.reorder_point) * 100, 100) + '%' }"
-                                            :class="['h-1.5 rounded-full', req.current_stock < req.reorder_point ? 'bg-red-500' : 'bg-green-500']">
+                                            :class="['h-1.5 rounded-full', req.current_stock < req.reorder_point ? 'bg-red-500' : 'bg-emerald-500']">
                                         </div>
                                     </div>
-                                    <p v-if="req.notes" class="text-xs text-gray-400 dark:text-gray-500 mt-1 italic">{{
-                                        req.notes }}</p>
+                                    <p v-if="req.notes" class="text-xs text-slate-400 dark:text-slate-500 mt-1 italic">
+                                        {{
+                                            req.notes }}</p>
                                 </div>
-                                <div class="flex items-center gap-2 flex-shrink-0">
-                                    <div class="text-right mr-2">
-                                        <p class="text-xs text-gray-400">Gap</p>
+                                <div class="flex items-center gap-2 flex-shrink-0 mt-2 sm:mt-0">
+                                    <div class="text-left sm:text-right mr-2 sm:block flex-1 sm:flex-none">
+                                        <p class="text-xs text-slate-400 font-medium">Reorder Gap</p>
                                         <p
-                                            :class="['text-sm font-bold', req.current_stock < req.required_qty ? 'text-red-600' : 'text-green-600']">
+                                            :class="['text-sm font-bold', req.current_stock < req.required_qty ? 'text-red-600' : 'text-emerald-600']">
                                             {{ req.current_stock < req.required_qty ? '-' + (req.required_qty -
                                                 req.current_stock).toLocaleString() + ' ' + req.unit : 'Sufficient' }}
                                                 </p>
                                     </div>
                                     <button v-if="req.status === 'pending'" @click="openCreateRFQ(req)"
-                                        class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm whitespace-nowrap">
+                                        class="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm flex-1 sm:flex-none">
                                         <Send class="w-3.5 h-3.5" /> Create RFQ
                                     </button>
                                     <span v-else-if="req.status === 'rfq_sent'"
-                                        class="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
+                                        class="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center justify-center gap-1 flex-1 sm:flex-none bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800/30">
                                         <CheckCircle class="w-3.5 h-3.5" /> RFQ Sent
                                     </span>
                                     <span v-else
-                                        class="text-xs text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
+                                        class="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center justify-center gap-1 flex-1 sm:flex-none bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1.5 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
                                         <BadgeCheck class="w-3.5 h-3.5" /> {{ statusLabel(req.status) }}
                                     </span>
                                 </div>
@@ -815,185 +749,192 @@ const submitPayment = async () => {
                         </div>
                     </div>
 
-                    <!-- ══ SUPPLIER QUOTATION ════════════════════════════════════ -->
                     <div v-else-if="activeSection === 'supplier_quotation'">
                         <div
-                            class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+                            class="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
                             <div>
-                                <h3 class="text-base font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                <h3 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
                                     <FileText class="w-5 h-5 text-blue-500" />
                                     Supplier Quotations
                                 </h3>
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Review quotation responses
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Review quotation responses
                                     from suppliers. Accept to generate a Purchase Order.</p>
                             </div>
                         </div>
                         <div class="p-5 space-y-4">
-                            <div v-if="localRFQs.length === 0" class="text-center py-16 text-gray-400">
+                            <div v-if="localRFQs.length === 0" class="text-center py-16 text-slate-400">
                                 <FileText class="w-12 h-12 mx-auto mb-3 opacity-30" />
                                 <p class="text-sm">No RFQs sent yet. Create one from Material Requests.</p>
                             </div>
                             <div v-for="rfq in localRFQs" :key="rfq.id"
-                                class="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-                                <!-- RFQ Header -->
+                                class="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm">
                                 <div
-                                    class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-700/50">
+                                    class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-800/50">
                                     <div class="flex items-center gap-3 min-w-0">
                                         <div>
                                             <div class="flex items-center gap-2 flex-wrap">
                                                 <span
-                                                    class="text-xs font-mono font-bold text-gray-700 dark:text-gray-200">{{
-                                                    rfq.rfq_number }}</span>
-                                                <span class="text-[10px] text-gray-400 dark:text-gray-500">← {{
+                                                    class="text-xs font-mono font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600">{{
+                                                        rfq.rfq_number }}</span>
+                                                <span class="text-[10px] text-slate-400 dark:text-slate-500">← {{
                                                     rfq.mr_ref }}</span>
                                                 <span :class="statusBadge(rfq.status)"
                                                     class="text-[10px] font-bold px-2 py-0.5 rounded-full">{{
-                                                    statusLabel(rfq.status) }}</span>
+                                                        statusLabel(rfq.status) }}</span>
                                             </div>
-                                            <p class="text-sm font-semibold text-gray-800 dark:text-white mt-0.5">{{
+                                            <p class="text-sm font-semibold text-slate-800 dark:text-white mt-1">{{
                                                 rfq.material_name }}</p>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400">{{
+                                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{{
                                                 Number(rfq.required_qty).toLocaleString() }} {{ rfq.unit }}
                                                 &nbsp;·&nbsp; Deadline: {{ rfq.deadline }}</p>
                                         </div>
                                     </div>
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ rfq.responses?.length
+                                    <div
+                                        class="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto mt-2 sm:mt-0">
+                                        <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">{{
+                                            rfq.responses?.length
                                             || 0 }} response(s)</span>
                                         <button @click="openRFQDetail(rfq)"
-                                            class="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">
+                                            class="flex items-center justify-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-800/30 transition-colors font-semibold">
                                             <Eye class="w-3.5 h-3.5" /> View RFQ
                                         </button>
                                     </div>
                                 </div>
 
-                                <!-- Supplier Responses -->
                                 <div v-if="rfq.responses && rfq.responses.length > 0"
-                                    class="divide-y divide-gray-100 dark:divide-gray-700">
+                                    class="divide-y divide-slate-100 dark:divide-slate-700">
                                     <div v-for="res in rfq.responses" :key="res.id"
-                                        :class="['flex flex-wrap items-center justify-between gap-3 px-4 py-3 transition-all', res.status === 'accepted' ? 'bg-green-50 dark:bg-green-900/10' : res.status === 'declined' ? 'bg-red-50 dark:bg-red-900/10 opacity-60' : 'bg-white dark:bg-gray-800']">
-                                        <div class="flex items-center gap-3 min-w-0">
+                                        :class="['flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 transition-all', res.status === 'accepted' ? 'bg-emerald-50/50 dark:bg-emerald-900/10' : res.status === 'declined' ? 'bg-red-50/30 dark:bg-red-900/5 opacity-60' : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/80']">
+                                        <div class="flex items-start sm:items-center gap-3 min-w-0">
                                             <div
-                                                class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                                                class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm mt-1 sm:mt-0">
                                                 <span class="text-white text-xs font-bold">{{
                                                     res.supplier_name.charAt(0) }}</span>
                                             </div>
                                             <div>
-                                                <p class="font-semibold text-sm text-gray-800 dark:text-white">{{
+                                                <p class="font-semibold text-sm text-slate-800 dark:text-white">{{
                                                     res.supplier_name }}</p>
                                                 <div
-                                                    class="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex-wrap">
-                                                    <span>Unit: <strong class="text-gray-700 dark:text-gray-200">{{
-                                                            formatCurrency(res.unit_price) }}/{{ rfq.unit
+                                                    class="flex items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap">
+                                                    <span>Unit: <strong class="text-slate-700 dark:text-slate-200">{{
+                                                        formatCurrency(res.unit_price) }}/{{ rfq.unit
                                                             }}</strong></span>
-                                                    <span>Total: <strong class="text-gray-700 dark:text-gray-200">{{
-                                                            formatCurrency(res.total_price) }}</strong></span>
-                                                    <span>
-                                                        <Clock class="w-3 h-3 inline mr-0.5" />{{ res.lead_time }}
+                                                    <span>Total: <strong class="text-slate-700 dark:text-slate-200">{{
+                                                        formatCurrency(res.total_price) }}</strong></span>
+                                                    <span class="flex items-center">
+                                                        <Clock class="w-3 h-3 mr-1" />{{ res.lead_time }}
                                                     </span>
                                                     <span>Terms: {{ res.payment_terms }}</span>
-                                                    <span>Valid: {{ res.validity_date }}</span>
                                                 </div>
                                                 <p v-if="res.notes"
-                                                    class="text-xs text-gray-400 dark:text-gray-500 mt-0.5 italic">{{
-                                                    res.notes }}</p>
+                                                    class="text-[10px] text-slate-400 dark:text-slate-500 mt-1 italic border-l-2 border-slate-200 dark:border-slate-600 pl-2">
+                                                    {{
+                                                        res.notes }}</p>
                                             </div>
                                         </div>
-                                        <div class="flex items-center gap-2">
+                                        <div class="flex flex-wrap items-center gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
                                             <span :class="statusBadge(res.status)"
-                                                class="text-[10px] font-bold px-2 py-0.5 rounded-full">{{
-                                                statusLabel(res.status) }}</span>
+                                                class="text-[10px] font-bold px-2 py-1 rounded-md sm:rounded-full hidden sm:inline-block">{{
+                                                    statusLabel(res.status) }}</span>
                                             <template v-if="res.status === 'pending_review'">
                                                 <button @click="openAcceptModal(rfq, res)"
-                                                    class="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
+                                                    class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm">
                                                     <CheckCircle class="w-3.5 h-3.5" /> Accept
                                                 </button>
                                                 <button @click="openDeclineModal(rfq, res)"
-                                                    class="flex items-center gap-1 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border border-red-200 dark:border-red-800">
+                                                    class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold transition-all border border-red-200 dark:border-red-800/50 shadow-sm">
                                                     <XCircle class="w-3.5 h-3.5" /> Decline
                                                 </button>
                                             </template>
                                             <span v-else-if="res.status === 'accepted'"
-                                                class="text-xs text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
-                                                <BadgeCheck class="w-3.5 h-3.5" /> PO Created
+                                                class="w-full sm:w-auto text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center justify-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 sm:py-1.5 rounded-lg border border-emerald-100 dark:border-emerald-800/30">
+                                                <BadgeCheck class="w-4 h-4" /> PO Created
+                                            </span>
+                                            <span v-else-if="res.status === 'declined'"
+                                                class="w-full sm:w-auto text-xs text-red-500 dark:text-red-400 font-semibold flex items-center justify-center gap-1 bg-red-50 dark:bg-red-900/10 px-3 py-2 sm:py-1.5 rounded-lg border border-red-100 dark:border-red-800/30">
+                                                <Ban class="w-3.5 h-3.5" /> Declined
                                             </span>
                                         </div>
                                     </div>
                                 </div>
-                                <div v-else class="px-4 py-3 bg-white dark:bg-gray-800 text-xs text-gray-400 italic">
+                                <div v-else class="px-4 py-3 bg-white dark:bg-slate-800 text-xs text-slate-400 italic">
                                     Awaiting supplier responses...
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- ══ PURCHASE ORDER ═════════════════════════════════════════ -->
                     <div v-else-if="activeSection === 'purchase_order'">
                         <div
-                            class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+                            class="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
                             <div>
-                                <h3 class="text-base font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                <h3 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
                                     <ShoppingCart class="w-5 h-5 text-blue-500" />
                                     Purchase Orders
                                 </h3>
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">SCM-issued POs sent to
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">SCM-issued POs sent to
                                     suppliers. Click a row to
                                     expand details.</p>
                             </div>
                         </div>
                         <div class="p-5 space-y-3">
-                            <div v-if="localPOs.length === 0" class="text-center py-16 text-gray-400">
+                            <div v-if="localPOs.length === 0" class="text-center py-16 text-slate-400">
                                 <ShoppingCart class="w-12 h-12 mx-auto mb-3 opacity-30" />
                                 <p class="text-sm">No purchase orders yet. Accept a supplier quotation first.</p>
                             </div>
                             <div v-for="po in localPOs" :key="po.id"
-                                class="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
-                                <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-700/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+                                class="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
+                                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 bg-white dark:bg-slate-800 cursor-pointer"
                                     @click="openPODetail(po)">
                                     <div>
                                         <div class="flex items-center gap-2 flex-wrap">
                                             <span
-                                                class="text-xs font-mono font-bold text-gray-700 dark:text-gray-200">{{
-                                                po.po_number
+                                                class="text-xs font-mono font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600">{{
+                                                    po.po_number
                                                 }}</span>
                                             <span :class="statusBadge(po.status)"
                                                 class="text-[10px] font-bold px-2 py-0.5 rounded-full">{{
-                                                statusLabel(po.status) }}</span>
+                                                    statusLabel(po.status) }}</span>
                                         </div>
-                                        <p class="text-sm font-semibold text-gray-800 dark:text-white mt-0.5">{{
+                                        <p class="text-sm font-semibold text-slate-800 dark:text-white mt-1">{{
                                             po.supplier_name }}</p>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                            Issued: {{ po.issued_date }} &nbsp;·&nbsp; Expected Delivery: {{
-                                            po.expected_delivery }}
+                                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                            Issued: {{ po.issued_date }} &nbsp;·&nbsp; Delivery: {{
+                                                po.expected_delivery }}
                                             <template v-if="po.rfq_ref"> &nbsp;·&nbsp; Ref: {{ po.rfq_ref }}</template>
                                         </p>
                                     </div>
-                                    <div class="flex items-center gap-3">
-                                        <div class="text-right">
-                                            <p class="text-xs text-gray-400">Grand Total</p>
-                                            <p class="font-bold text-gray-800 dark:text-white">{{
-                                                formatCurrency(po.grand_total) }}</p>
+                                    <div
+                                        class="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0 border-t border-slate-100 dark:border-slate-700 pt-3 sm:border-0 sm:pt-0">
+                                        <div class="text-left sm:text-right">
+                                            <p
+                                                class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">
+                                                Grand Total</p>
+                                            <p class="font-black text-slate-800 dark:text-white text-base leading-none">
+                                                {{
+                                                    formatCurrency(po.grand_total) }}</p>
                                         </div>
-                                        <div class="flex items-center gap-1.5">
+                                        <div class="flex items-center gap-2">
                                             <button v-if="po.status === 'draft'" @click.stop="sendPO(po)"
-                                                class="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all">
-                                                <Send class="w-3 h-3" /> Send PO
+                                                class="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm">
+                                                <Send class="w-3.5 h-3.5" /> Send PO
                                             </button>
                                             <button @click.stop="openPODetail(po)"
-                                                class="p-1.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                                                class="p-2 sm:p-1.5 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 rounded-lg hover:text-blue-600 dark:hover:text-blue-400 transition-colors shadow-sm">
                                                 <Eye class="w-4 h-4" />
                                             </button>
                                         </div>
                                     </div>
                                 </div>
-                                <!-- Inline item preview -->
                                 <div
-                                    class="px-4 py-2 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
-                                    <div class="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
-                                        <span v-for="item in po.items" :key="item.id" class="flex items-center gap-1">
-                                            <Package class="w-3 h-3" /> {{ item.material_name }}: {{ item.qty }} {{
-                                            item.unit }} @ {{
-                                            formatCurrency(item.unit_price) }}
+                                    class="px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700">
+                                    <div class="flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400">
+                                        <span v-for="item in po.items" :key="item.id"
+                                            class="flex items-center gap-1.5 font-medium">
+                                            <Package class="w-3 h-3 text-slate-400" /> {{ item.material_name }}: {{
+                                            item.qty }} {{
+                                                item.unit }} @ {{
+                                                formatCurrency(item.unit_price) }}
                                         </span>
                                     </div>
                                 </div>
@@ -1001,70 +942,74 @@ const submitPayment = async () => {
                         </div>
                     </div>
 
-                    <!-- ══ INVOICE ════════════════════════════════════════════════ -->
                     <div v-else-if="activeSection === 'invoice'">
                         <div
-                            class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+                            class="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
                             <div>
-                                <h3 class="text-base font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                <h3 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
                                     <Receipt class="w-5 h-5 text-blue-500" />
                                     Purchase Invoices
                                 </h3>
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Invoices received from
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Invoices received from
                                     suppliers. Process payment
                                     on unpaid invoices.</p>
                             </div>
                         </div>
                         <div class="p-5">
-                            <div v-if="localInvoices.length === 0" class="text-center py-16 text-gray-400">
+                            <div v-if="localInvoices.length === 0" class="text-center py-16 text-slate-400">
                                 <Receipt class="w-12 h-12 mx-auto mb-3 opacity-30" />
                                 <p class="text-sm">No invoices yet.</p>
                             </div>
                             <div class="space-y-3">
                                 <div v-for="inv in localInvoices" :key="inv.id"
-                                    :class="['flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl border transition-all', inv.status === 'unpaid' ? 'border-red-200 dark:border-red-800 bg-red-50/40 dark:bg-red-900/5' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50']">
-                                    <div>
-                                        <div class="flex items-center gap-2 flex-wrap">
+                                    :class="['flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border transition-all shadow-sm', inv.status === 'unpaid' ? 'border-red-200 dark:border-red-800/50 bg-red-50/40 dark:bg-red-900/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800']">
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-2 flex-wrap mb-1">
                                             <span
-                                                class="text-xs font-mono font-bold text-gray-700 dark:text-gray-200">{{
-                                                inv.invoice_number
+                                                class="text-xs font-mono font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600">{{
+                                                    inv.invoice_number
                                                 }}</span>
-                                            <span class="text-xs text-gray-400 dark:text-gray-500">← {{ inv.po_number
+                                            <span
+                                                class="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">←
+                                                {{ inv.po_number
                                                 }}</span>
                                             <span :class="statusBadge(inv.status)"
                                                 class="text-[10px] font-bold px-2 py-0.5 rounded-full">{{
-                                                statusLabel(inv.status) }}</span>
+                                                    statusLabel(inv.status) }}</span>
                                         </div>
-                                        <p class="text-sm font-semibold text-gray-800 dark:text-white mt-0.5">{{
+                                        <p class="text-sm font-semibold text-slate-800 dark:text-white mt-1 truncate">{{
                                             inv.supplier_name }}</p>
                                         <div
-                                            class="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex-wrap">
-                                            <span>Invoice Date: {{ inv.invoice_date }}</span>
+                                            class="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex-wrap">
+                                            <span>Date: {{ inv.invoice_date }}</span>
                                             <span
-                                                :class="inv.status === 'unpaid' ? 'text-red-600 dark:text-red-400 font-semibold' : ''">Due:
+                                                :class="inv.status === 'unpaid' ? 'text-red-600 dark:text-red-400 font-bold' : ''">Due:
                                                 {{ inv.due_date }}</span>
                                             <span>Terms: {{ inv.payment_terms }}</span>
                                         </div>
                                     </div>
-                                    <div class="flex items-center gap-3">
-                                        <div class="text-right">
-                                            <p class="text-xs text-gray-400">Amount</p>
+                                    <div
+                                        class="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto border-t border-slate-100 dark:border-slate-700/50 pt-3 sm:border-0 sm:pt-0">
+                                        <div class="text-left sm:text-right">
                                             <p
-                                                :class="['font-bold text-lg', inv.status === 'unpaid' ? 'text-red-600 dark:text-red-400' : 'text-gray-800 dark:text-white']">
+                                                class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-0.5">
+                                                Amount Due</p>
+                                            <p
+                                                :class="['font-black text-lg leading-none', inv.status === 'unpaid' ? 'text-red-600 dark:text-red-400' : 'text-slate-800 dark:text-white']">
                                                 {{ formatCurrency(inv.amount) }}
                                             </p>
                                         </div>
                                         <div class="flex gap-2">
                                             <button @click="selectedInvoice = inv; showInvoiceModal = true"
-                                                class="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors border border-gray-200 dark:border-gray-600 rounded-lg">
+                                                class="p-2 sm:p-2 bg-white dark:bg-slate-700 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors border border-slate-200 dark:border-slate-600 rounded-lg shadow-sm">
                                                 <Eye class="w-4 h-4" />
                                             </button>
                                             <button v-if="inv.status === 'unpaid'" @click="openPaymentModal(inv)"
-                                                class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm">
+                                                class="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 sm:py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm shadow-blue-500/20">
                                                 <DollarSign class="w-3.5 h-3.5" /> Pay Now
                                             </button>
                                             <span v-else
-                                                class="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-medium px-2">
+                                                class="flex items-center justify-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-bold px-3 py-2 sm:py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/30 rounded-lg">
                                                 <BadgeCheck class="w-4 h-4" /> Paid
                                             </span>
                                         </div>
@@ -1074,109 +1019,171 @@ const submitPayment = async () => {
                         </div>
                     </div>
 
-                    <!-- ══ MAKE PAYMENT ═══════════════════════════════════════════ -->
                     <div v-else-if="activeSection === 'make_payment'">
                         <div
-                            class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+                            class="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
                             <div>
-                                <h3 class="text-base font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                <h3 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
                                     <DollarSign class="w-5 h-5 text-blue-500" />
                                     Payment History
                                 </h3>
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">All processed supplier
-                                    payments and transaction
-                                    records.</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">All processed supplier
+                                    payments and transaction records.</p>
                             </div>
                         </div>
                         <div class="p-5">
-                            <!-- Unpaid Queue -->
-                            <div v-if="localInvoices.some(i => i.status === 'unpaid')" class="mb-5">
+                            <div v-if="localInvoices.some(i => i.status === 'unpaid')" class="mb-6">
                                 <h4
-                                    class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                    <AlertTriangle class="w-3.5 h-3.5 text-red-500" /> Outstanding Payments
+                                    class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                    <AlertTriangle class="w-4 h-4 text-red-500" /> Outstanding Payments Required
                                 </h4>
-                                <div class="space-y-2">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                     <div v-for="inv in localInvoices.filter(i => i.status === 'unpaid')" :key="inv.id"
-                                        class="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg">
-                                        <div>
-                                            <p class="text-sm font-semibold text-gray-800 dark:text-white">{{
-                                                inv.invoice_number }} — {{
-                                                inv.supplier_name }}</p>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400">Due: {{ inv.due_date }}
+                                        class="flex flex-col justify-between p-4 bg-red-50/50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 rounded-xl shadow-sm">
+                                        <div class="mb-3">
+                                            <p class="text-sm font-bold text-slate-800 dark:text-white truncate"
+                                                :title="inv.supplier_name">
+                                                {{
+                                                    inv.supplier_name }}</p>
+                                            <div class="flex items-center gap-2 mt-1">
+                                                <span
+                                                    class="text-xs font-mono font-semibold text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">{{
+                                                    inv.invoice_number }}</span>
+                                            </div>
+                                            <p
+                                                class="text-[10px] text-red-600 dark:text-red-400 font-semibold uppercase tracking-wider mt-2">
+                                                Due: {{ inv.due_date }}
                                             </p>
                                         </div>
-                                        <div class="flex items-center gap-3">
-                                            <p class="font-bold text-red-600 dark:text-red-400">{{
+                                        <div class="flex items-end justify-between mt-auto">
+                                            <p class="font-black text-red-600 dark:text-red-400 text-lg leading-none">{{
                                                 formatCurrency(inv.amount) }}</p>
                                             <button @click="openPaymentModal(inv)"
-                                                class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all">
-                                                <DollarSign class="w-3 h-3" /> Pay
+                                                class="flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm">
+                                                <DollarSign class="w-3.5 h-3.5" /> Pay
                                             </button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Payment Log -->
                             <h4
-                                class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
-                                Completed Payments
+                                class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <CheckCircle class="w-4 h-4 text-emerald-500" /> Completed Transactions
                             </h4>
-                            <div v-if="localPayments.length === 0" class="text-center py-10 text-gray-400">
+                            <div v-if="localPayments.length === 0"
+                                class="text-center py-10 text-slate-400 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
                                 <CircleDollarSign class="w-10 h-10 mx-auto mb-2 opacity-30" />
-                                <p class="text-sm">No payments processed yet.</p>
+                                <p class="text-sm font-medium">No payments processed yet.</p>
                             </div>
-                            <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700" v-else>
+
+                            <div class="md:hidden space-y-3" v-else>
+                                <div v-for="pay in localPayments" :key="'mob-' + pay.id"
+                                    class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow-sm">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div>
+                                            <span
+                                                class="font-mono text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded">{{
+                                                pay.payment_number }}</span>
+                                            <p class="font-bold text-sm text-slate-800 dark:text-white mt-1">{{
+                                                pay.supplier_name }}</p>
+                                        </div>
+                                        <span
+                                            :class="['text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md', statusBadge(pay.status)]">{{
+                                            pay.status }}</span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2 text-xs mb-3">
+                                        <div>
+                                            <p class="text-[9px] text-slate-400 uppercase font-bold">Invoice</p>
+                                            <p class="font-mono text-slate-600 dark:text-slate-300">{{
+                                                pay.invoice_number }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-[9px] text-slate-400 uppercase font-bold">Date</p>
+                                            <p class="text-slate-600 dark:text-slate-300 font-medium">{{ pay.paid_date
+                                                }}</p>
+                                        </div>
+                                        <div class="col-span-2">
+                                            <p class="text-[9px] text-slate-400 uppercase font-bold">Method / Ref</p>
+                                            <p class="text-slate-600 dark:text-slate-300 font-medium">{{ pay.method }}
+                                                <span class="text-slate-400 mx-1">•</span> <span class="font-mono">{{
+                                                    pay.bank_reference
+                                                    }}</span></p>
+                                        </div>
+                                    </div>
+                                    <div
+                                        class="pt-3 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Amount
+                                            Paid</p>
+                                        <p class="font-black text-emerald-600 dark:text-emerald-400 text-base">{{
+                                            formatCurrency(pay.amount)
+                                            }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700"
+                                v-if="localPayments.length > 0">
                                 <table class="w-full text-sm text-left">
                                     <thead
-                                        class="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-700/50">
+                                        class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
                                         <tr>
-                                            <th class="px-4 py-3">Payment #</th>
-                                            <th class="px-4 py-3">Invoice</th>
-                                            <th class="px-4 py-3">Supplier</th>
-                                            <th class="px-4 py-3">Date</th>
-                                            <th class="px-4 py-3">Method</th>
-                                            <th class="px-4 py-3">Reference</th>
-                                            <th class="px-4 py-3 text-right">Amount</th>
-                                            <th class="px-4 py-3">Status</th>
+                                            <th class="px-5 py-3.5">Payment #</th>
+                                            <th class="px-5 py-3.5">Invoice</th>
+                                            <th class="px-5 py-3.5">Supplier</th>
+                                            <th class="px-5 py-3.5">Date</th>
+                                            <th class="px-5 py-3.5">Method</th>
+                                            <th class="px-5 py-3.5">Reference</th>
+                                            <th class="px-5 py-3.5 text-right">Amount</th>
+                                            <th class="px-5 py-3.5 text-center">Status</th>
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                         <tr v-for="pay in localPayments" :key="pay.id"
-                                            class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                                            <td class="px-4 py-3 font-mono text-xs text-gray-700 dark:text-gray-300">{{
-                                                pay.payment_number
+                                            class="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                            <td
+                                                class="px-5 py-3 font-mono text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                                {{
+                                                    pay.payment_number
                                                 }}</td>
-                                            <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{
-                                                pay.invoice_number }}</td>
-                                            <td class="px-4 py-3 font-medium text-gray-800 dark:text-white">{{
+                                            <td class="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">
+                                                {{
+                                                    pay.invoice_number }}</td>
+                                            <td class="px-5 py-3 font-bold text-slate-800 dark:text-white">{{
                                                 pay.supplier_name }}</td>
-                                            <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{
-                                                pay.paid_date }}</td>
-                                            <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{{ pay.method
+                                            <td
+                                                class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                                {{
+                                                    pay.paid_date }}</td>
+                                            <td
+                                                class="px-5 py-3 text-xs text-slate-600 dark:text-slate-300 font-medium">
+                                                {{ pay.method
                                                 }}</td>
-                                            <td class="px-4 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">{{
-                                                pay.bank_reference
+                                            <td class="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">
+                                                {{
+                                                    pay.bank_reference
                                                 }}</td>
-                                            <td class="px-4 py-3 text-right font-bold text-gray-800 dark:text-white">{{
-                                                formatCurrency(pay.amount) }}</td>
-                                            <td class="px-4 py-3">
+                                            <td class="px-5 py-3 text-right font-black text-slate-800 dark:text-white">
+                                                {{
+                                                    formatCurrency(pay.amount) }}</td>
+                                            <td class="px-5 py-3 text-center">
                                                 <span :class="statusBadge(pay.status)"
-                                                    class="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize">{{
-                                                    pay.status
+                                                    class="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">{{
+                                                        pay.status
                                                     }}</span>
                                             </td>
                                         </tr>
                                     </tbody>
-                                    <tfoot class="bg-gray-50 dark:bg-gray-700/30">
+                                    <tfoot
+                                        class="bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700">
                                         <tr>
                                             <td colspan="6"
-                                                class="px-4 py-3 text-xs font-bold text-gray-500 dark:text-gray-400 text-right">
+                                                class="px-5 py-3.5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">
                                                 Total Paid:</td>
                                             <td
-                                                class="px-4 py-3 text-right font-bold text-green-600 dark:text-green-400">
+                                                class="px-5 py-3.5 text-right font-black text-emerald-600 dark:text-emerald-400 text-base">
                                                 {{formatCurrency(localPayments.reduce((s, p) => s + Number(p.amount),
-                                                0)) }}
+                                                    0))}}
                                             </td>
                                             <td></td>
                                         </tr>
@@ -1190,234 +1197,287 @@ const submitPayment = async () => {
             </div>
         </div>
 
-        <!-- ════════════════════════════════════════════════════════════════ -->
-        <!--  MODAL: CREATE RFQ                                              -->
-        <!-- ════════════════════════════════════════════════════════════════ -->
         <transition name="modal-fade">
             <div v-if="showRFQModal"
-                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
                 @click.self="showRFQModal = false">
                 <div
-                    class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700">
-                    <!-- Header -->
+                    class="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border border-slate-200 dark:border-slate-700">
                     <div
-                        class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+                        class="flex items-center justify-between px-5 sm:px-6 py-4 sm:py-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex-shrink-0">
                         <div>
-                            <h3 class="text-base font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                            <h3
+                                class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                                 <FileText class="w-5 h-5 text-blue-500" />
-                                <span>{{ supplierSelectionStep ? 'Select Suppliers' : 'Create Request for Quotation'
-                                    }}</span>
+                                <span v-if="supplierSelectionStep">Select Approved Vendors</span>
+                                <span v-else>Create Request for Quotation</span>
                             </h3>
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ rfqTargetRequest?.req_number
-                                }} — {{
+                            <p class="text-[10px] sm:text-xs font-bold text-slate-500 mt-1 uppercase tracking-widest">{{
+                                rfqTargetRequest?.req_number }} <span class="text-slate-300 mx-1">•</span> {{
                                 rfqTargetRequest?.material_name }}</p>
                         </div>
                         <button @click="showRFQModal = false"
-                            class="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
-                            <X class="w-5 h-5" />
+                            class="p-2 bg-white dark:bg-slate-700 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 shadow-sm transition-all">
+                            <X class="w-4 h-4" />
                         </button>
                     </div>
 
-                    <!-- Step 1: RFQ Form -->
-                    <div v-if="!supplierSelectionStep" class="p-6 space-y-5">
+                    <div v-if="!supplierSelectionStep" class="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1">
                         <div
-                            class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-sm">
-                            <p class="font-bold text-blue-800 dark:text-blue-300 mb-1">Request for Quotation</p>
-                            <p class="text-blue-600 dark:text-blue-400 text-xs">Formal procurement inquiry to be sent to
-                                qualified suppliers.</p>
+                            class="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 p-4 rounded-xl">
+                            <p class="text-sm font-bold text-blue-800 dark:text-blue-300 mb-1">Target Material: <span
+                                    class="font-black">{{ rfqForm.material_name }}</span></p>
+                            <p class="text-xs font-medium text-blue-600 dark:text-blue-400">Please define the delivery
+                                parameters before selecting suppliers.</p>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label
-                                    class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Material</label>
-                                <input type="text" :value="rfqForm.material_name" readonly
-                                    class="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm text-gray-800 dark:text-white" />
-                            </div>
-                            <div>
-                                <label
-                                    class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Required
-                                    Quantity</label>
-                                <div class="flex">
+                                    class="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Required
+                                    Quantity *</label>
+                                <div class="flex relative">
                                     <input type="number" v-model="rfqForm.required_qty"
-                                        class="flex-1 px-3 py-2.5 rounded-l-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                                        class="w-full pl-3 pr-12 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 font-bold dark:text-white" />
                                     <span
-                                        class="px-3 py-2.5 bg-gray-100 dark:bg-gray-600 border border-l-0 border-gray-200 dark:border-gray-600 rounded-r-lg text-sm text-gray-500 dark:text-gray-400">{{
+                                        class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">{{
                                         rfqForm.unit }}</span>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label
-                                    class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Response
-                                    Deadline <span class="text-red-500">*</span></label>
+                                    class="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Response
+                                    Deadline *</label>
                                 <input type="date" v-model="rfqForm.deadline"
                                     :min="new Date().toISOString().split('T')[0]"
-                                    class="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                                    class="w-full px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 font-bold dark:text-white" />
                             </div>
-                            <div>
-                                <label
-                                    class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Payment
-                                    Terms</label>
-                                <select v-model="rfqForm.payment_terms"
-                                    class="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">
-                                    <option>Net 30</option>
-                                    <option>Net 45</option>
-                                    <option>Net 60</option>
-                                    <option>Cash on Delivery</option>
-                                    <option>50% DP, 50% on Delivery</option>
+                        </div>
+
+                        <div>
+                            <label
+                                class="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Delivery
+                                Address / Warehouse *</label>
+                            <div class="relative">
+                                <select v-model="rfqForm.delivery_address"
+                                    class="w-full appearance-none px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 font-bold text-slate-700 dark:text-slate-200">
+                                    <option value="" disabled>Select Destination Warehouse...</option>
+                                    <option v-for="wh in warehouses" :key="wh.id"
+                                        :value="wh.name + ' - ' + wh.location">
+                                        {{ wh.name }} ({{ wh.location }})
+                                    </option>
                                 </select>
+                                <ChevronDown
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="sm:col-span-2">
+                                <label
+                                    class="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Payment
+                                    Terms *</label>
+                                <div class="relative">
+                                    <select v-model="rfqForm.payment_terms"
+                                        class="w-full appearance-none px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 font-bold text-slate-700 dark:text-slate-200">
+                                        <option>Net 30</option>
+                                        <option>Net 45</option>
+                                        <option>Cash on Delivery</option>
+                                        <option>50% DP, 50% on Delivery</option>
+                                    </select>
+                                    <ChevronDown
+                                        class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                </div>
                             </div>
                         </div>
 
                         <div>
                             <label
-                                class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Delivery
-                                Address</label>
-                            <input type="text" v-model="rfqForm.delivery_address"
-                                class="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
-                        </div>
-
-                        <div>
-                            <label
-                                class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Additional
-                                Notes / Special Requirements</label>
-                            <textarea v-model="rfqForm.notes" rows="3"
-                                placeholder="e.g., Material specs, certifications required, packing instructions..."
-                                class="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"></textarea>
-                        </div>
-
-                        <div class="flex justify-end gap-3 pt-2">
-                            <button @click="showRFQModal = false"
-                                class="px-4 py-2.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Cancel</button>
-                            <button @click="proceedToSupplierSelection"
-                                class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm">
-                                Next: Select Suppliers
-                                <ArrowRight class="w-4 h-4" />
-                            </button>
+                                class="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Additional
+                                Notes</label>
+                            <textarea v-model="rfqForm.notes" rows="2"
+                                placeholder="Material specs, certifications required, etc."
+                                class="w-full px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 font-medium dark:text-white resize-none"></textarea>
                         </div>
                     </div>
 
-                    <!-- Step 2: Supplier Selection -->
-                    <div v-else class="p-6 space-y-4">
-                        <p class="text-sm text-gray-600 dark:text-gray-400">Select which suppliers to send this RFQ to.
-                            Only
-                            suppliers that carry <strong>{{ rfqTargetRequest?.category }}</strong> are shown.</p>
-                        <div class="space-y-2">
+                    <div v-if="!supplierSelectionStep"
+                        class="px-5 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex flex-col-reverse sm:flex-row gap-3 bg-slate-50 dark:bg-slate-800 flex-shrink-0">
+                        <button @click="showRFQModal = false"
+                            class="w-full sm:w-auto px-6 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors shadow-sm">Cancel</button>
+                        <button @click="proceedToSupplierSelection"
+                            class="w-full sm:flex-1 bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-black shadow-lg shadow-blue-500/20 flex justify-center items-center gap-2 hover:bg-blue-700 transition-colors">
+                            Next: Select Vendors
+                            <ArrowRight class="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    <div v-else class="p-5 sm:p-6 flex-1 overflow-y-auto space-y-4">
+                        <p class="text-sm font-medium text-slate-600 dark:text-slate-400">Select which official vendors
+                            to send
+                            this RFQ to. Only approved vendors from your database are shown here.</p>
+
+                        <div v-if="filteredSuppliers.length === 0"
+                            class="text-center p-10 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                            <Users class="h-10 w-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+                            <p class="text-sm text-slate-500 font-bold uppercase tracking-widest">No Official Vendors
+                                Available
+                            </p>
+                            <p class="text-xs text-slate-400 mt-1">Approve vendor registrations in the Vendor Registry
+                                first.
+                            </p>
+                        </div>
+
+                        <div class="space-y-3">
                             <div v-for="sup in filteredSuppliers" :key="sup.id" @click="toggleSupplier(sup.id)"
-                                :class="['flex items-center justify-between p-3.5 rounded-xl border-2 cursor-pointer transition-all', rfqForm.selected_suppliers.includes(sup.id) ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-700']">
-                                <div class="flex items-center gap-3">
+                                :class="['flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all', rfqForm.selected_suppliers.includes(sup.id) ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 shadow-sm' : 'border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 bg-white dark:bg-slate-800']">
+                                <div class="flex items-center gap-3.5 mb-3 sm:mb-0">
                                     <div
-                                        :class="['w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all', rfqForm.selected_suppliers.includes(sup.id) ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-500']">
+                                        :class="['w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-colors', rfqForm.selected_suppliers.includes(sup.id) ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600']">
                                         <CheckCircle v-if="rfqForm.selected_suppliers.includes(sup.id)"
-                                            class="w-3.5 h-3.5 text-white" />
+                                            class="w-3.5 h-3.5" />
                                     </div>
-                                    <div>
-                                        <p class="font-semibold text-sm text-gray-800 dark:text-white">{{
-                                            sup.business_name }}
-                                        </p>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ sup.representative_name
-                                            }} · {{
-                                            sup.email }}</p>
+                                    <div class="min-w-0">
+                                        <p class="font-black text-sm text-slate-900 dark:text-white truncate">{{
+                                            sup.business_name }}</p>
+                                        <p
+                                            class="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                                            {{
+                                            sup.representative_name }} <span class="mx-1">•</span> {{ sup.email }}</p>
                                     </div>
                                 </div>
-                                <div class="flex items-center gap-2">
-                                    <div class="flex items-center gap-0.5 text-xs text-yellow-500 font-bold">
-                                        <Star class="w-3 h-3 fill-yellow-400 text-yellow-400" /> {{ sup.rating }}
-                                    </div>
+                                <div class="flex items-center gap-3 pl-8 sm:pl-0 flex-shrink-0">
+                                    <span v-if="sup.requirements?.length"
+                                        class="text-[9px] font-black uppercase tracking-widest text-slate-500 bg-slate-100 dark:bg-slate-700 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-600 flex items-center gap-1.5">
+                                        <ClipboardList class="w-3 h-3" /> {{ sup.requirements.length }} Req.
+                                    </span>
                                     <span
-                                        :class="['text-[10px] font-bold px-2 py-0.5 rounded-full', sup.status === 'Preferred' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : sup.status === 'Verified' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400']">{{
-                                        sup.status }}</span>
+                                        class="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 border border-emerald-200 dark:border-emerald-800/50">
+                                        <BadgeCheck class="w-3 h-3" /> Official
+                                    </span>
                                 </div>
                             </div>
                         </div>
-                        <div class="flex justify-between items-center pt-2">
-                            <button @click="supplierSelectionStep = false"
-                                class="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex items-center gap-1">
-                                <ChevronRight class="w-4 h-4 rotate-180" /> Back
-                            </button>
-                            <div class="flex gap-3">
-                                <span class="text-xs text-gray-500 dark:text-gray-400 self-center">{{
-                                    rfqForm.selected_suppliers.length }} selected</span>
-                                <button @click="submitRFQ"
-                                    :disabled="isLoading || rfqForm.selected_suppliers.length === 0"
-                                    :class="['flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm', rfqForm.selected_suppliers.length > 0 ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-200 dark:bg-gray-600 text-gray-400 cursor-not-allowed']">
-                                    <Send class="w-4 h-4" />
-                                    <span v-if="isLoading">Sending...</span>
-                                    <span v-else>Send RFQ to {{ rfqForm.selected_suppliers.length }} Supplier(s)</span>
-                                </button>
-                            </div>
-                        </div>
+                    </div>
+
+                    <div v-if="supplierSelectionStep"
+                        class="px-5 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex flex-col-reverse sm:flex-row gap-3 bg-slate-50 dark:bg-slate-800 flex-shrink-0">
+                        <button @click="supplierSelectionStep = false"
+                            class="w-full sm:w-auto px-6 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors shadow-sm flex justify-center items-center gap-2">
+                            <ChevronRight class="w-4 h-4 rotate-180" /> Back
+                        </button>
+                        <button @click="submitRFQ" :disabled="isLoading || rfqForm.selected_suppliers.length === 0"
+                            :class="['w-full sm:flex-1 py-3 rounded-xl text-sm font-black flex justify-center items-center gap-2 transition-all', rfqForm.selected_suppliers.length > 0 ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed']">
+                            <Send class="w-4 h-4" />
+                            <span>{{ isLoading ? 'Sending...' : `Send RFQ (${rfqForm.selected_suppliers.length})`
+                                }}</span>
+                        </button>
                     </div>
                 </div>
             </div>
         </transition>
 
-        <!-- ════════════════════════════════════════════════════════════════ -->
-        <!--  MODAL: RFQ DETAIL VIEW                                         -->
-        <!-- ════════════════════════════════════════════════════════════════ -->
         <transition name="modal-fade">
             <div v-if="showRFQDetailModal && selectedRFQ"
-                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
                 @click.self="showRFQDetailModal = false">
                 <div
-                    class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200 dark:border-gray-700">
+                    class="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl w-full max-w-lg border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[90vh]">
                     <div
-                        class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-                        <h3 class="font-bold text-gray-800 dark:text-white">{{ selectedRFQ.rfq_number }}</h3>
-                        <button @click="showRFQDetailModal = false">
-                            <X class="w-5 h-5 text-gray-400" />
+                        class="flex items-center justify-between px-5 sm:px-6 py-4 sm:py-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex-shrink-0">
+                        <div>
+                            <h3
+                                class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                                <Eye class="w-5 h-5 text-blue-500" /> RFQ Details
+                            </h3>
+                            <p
+                                class="text-[10px] sm:text-xs font-bold text-slate-500 mt-1 uppercase tracking-widest font-mono">
+                                {{ selectedRFQ.rfq_number }}</p>
+                        </div>
+                        <button @click="showRFQDetailModal = false"
+                            class="p-2 bg-white dark:bg-slate-700 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 shadow-sm transition-all">
+                            <X class="w-4 h-4" />
                         </button>
                     </div>
-                    <div class="p-6 space-y-4">
-                        <div class="grid grid-cols-2 gap-3 text-sm">
-                            <div>
-                                <p class="text-xs text-gray-400 uppercase font-semibold">Material</p>
-                                <p class="text-gray-800 dark:text-white font-medium mt-0.5">{{ selectedRFQ.material_name
-                                    }}</p>
+                    <div class="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1">
+                        <div
+                            class="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+                            <div class="col-span-2">
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Target
+                                    Material
+                                </p>
+                                <p class="text-sm font-black text-slate-800 dark:text-white">{{
+                                    selectedRFQ.material_name }}</p>
                             </div>
                             <div>
-                                <p class="text-xs text-gray-400 uppercase font-semibold">Required Qty</p>
-                                <p class="text-gray-800 dark:text-white font-medium mt-0.5">{{
-                                    Number(selectedRFQ.required_qty).toLocaleString() }} {{ selectedRFQ.unit }}</p>
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Required
+                                    Qty</p>
+                                <p class="text-sm font-bold text-slate-800 dark:text-white">{{
+                                    Number(selectedRFQ.required_qty).toLocaleString() }} <span
+                                        class="text-xs text-slate-500">{{
+                                        selectedRFQ.unit }}</span></p>
                             </div>
                             <div>
-                                <p class="text-xs text-gray-400 uppercase font-semibold">Sent Date</p>
-                                <p class="text-gray-800 dark:text-white font-medium mt-0.5">{{ selectedRFQ.sent_at }}
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Deadline
+                                </p>
+                                <p class="text-sm font-bold text-slate-800 dark:text-white">{{ selectedRFQ.deadline }}
                                 </p>
                             </div>
-                            <div>
-                                <p class="text-xs text-gray-400 uppercase font-semibold">Response Deadline</p>
-                                <p class="text-gray-800 dark:text-white font-medium mt-0.5">{{ selectedRFQ.deadline }}
-                                </p>
+                            <div class="col-span-2" v-if="selectedRFQ.notes">
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Notes</p>
+                                <p
+                                    class="text-xs font-medium text-slate-600 dark:text-slate-400 italic border-l-2 border-slate-200 dark:border-slate-600 pl-2">
+                                    {{ selectedRFQ.notes }}</p>
                             </div>
                         </div>
-                        <div v-if="selectedRFQ.notes" class="text-sm">
-                            <p class="text-xs text-gray-400 uppercase font-semibold">Notes</p>
-                            <p class="text-gray-600 dark:text-gray-300 mt-0.5 italic">{{ selectedRFQ.notes }}</p>
-                        </div>
-                        <div class="pt-2 border-t border-gray-100 dark:border-gray-700">
-                            <p class="text-xs text-gray-400 uppercase font-semibold mb-2">Supplier Responses ({{
-                                selectedRFQ.responses?.length || 0 }})</p>
-                            <div v-if="!selectedRFQ.responses?.length" class="text-sm text-gray-400 italic">Awaiting
-                                responses...</div>
-                            <div v-for="res in selectedRFQ.responses" :key="res.id"
-                                class="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0 text-sm">
-                                <div>
-                                    <p class="font-medium text-gray-800 dark:text-white">{{ res.supplier_name }}</p>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{
-                                        formatCurrency(res.unit_price) }}/{{
-                                        selectedRFQ.unit }} · {{ res.lead_time }} · {{ res.payment_terms }}</p>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <p class="font-bold text-gray-800 dark:text-white">{{
-                                        formatCurrency(res.total_price) }}</p>
-                                    <span :class="statusBadge(res.status)"
-                                        class="text-[10px] font-bold px-2 py-0.5 rounded-full">{{
-                                        statusLabel(res.status)
-                                        }}</span>
+
+                        <div>
+                            <p
+                                class="text-xs font-black text-slate-800 dark:text-white flex items-center justify-between mb-3 border-b border-slate-100 dark:border-slate-800 pb-2">
+                                <span>Supplier Responses</span>
+                                <span
+                                    class="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-md text-[10px] uppercase tracking-widest">{{
+                                    selectedRFQ.responses?.length || 0 }} Total</span>
+                            </p>
+
+                            <div v-if="!selectedRFQ.responses?.length"
+                                class="text-sm font-medium text-slate-400 italic text-center py-6 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                                Awaiting vendor responses...</div>
+
+                            <div v-else class="space-y-3">
+                                <div v-for="res in selectedRFQ.responses" :key="res.id"
+                                    :class="['p-3 sm:p-4 rounded-xl border transition-colors', res.status === 'accepted' ? 'border-emerald-200 bg-emerald-50/50 dark:bg-emerald-900/10' : res.status === 'declined' ? 'border-red-200 bg-red-50/30 dark:bg-red-900/5 opacity-70' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800']">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <p class="font-black text-sm text-slate-800 dark:text-white truncate pr-2">{{
+                                            res.supplier_name }}</p>
+                                        <span
+                                            :class="['text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md whitespace-nowrap', statusBadge(res.status)]">{{
+                                            statusLabel(res.status) }}</span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
+                                        <div>
+                                            <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
+                                                Unit Price
+                                            </p>
+                                            <p class="font-bold text-slate-700 dark:text-slate-300">{{
+                                                formatCurrency(res.unit_price) }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
+                                                Lead Time
+                                            </p>
+                                            <p class="font-bold text-slate-700 dark:text-slate-300">{{ res.lead_time }}
+                                            </p>
+                                        </div>
+                                        <div
+                                            class="col-span-2 pt-2 border-t border-slate-100 dark:border-slate-700/50 mt-1 flex justify-between items-center">
+                                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                                                Total
+                                                Value</p>
+                                            <p class="font-black text-sm text-slate-900 dark:text-white">{{
+                                                formatCurrency(res.total_price) }}</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1426,304 +1486,363 @@ const submitPayment = async () => {
             </div>
         </transition>
 
-        <!-- ════════════════════════════════════════════════════════════════ -->
-        <!--  MODAL: ACCEPT QUOTATION → CREATE PO                           -->
-        <!-- ════════════════════════════════════════════════════════════════ -->
         <transition name="modal-fade">
             <div v-if="showAcceptModal && selectedQuotationToAccept"
-                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
                 @click.self="showAcceptModal = false">
                 <div
-                    class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-700">
+                    class="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <div
-                        class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-                        <h3 class="font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                            <CheckCircle class="w-5 h-5 text-green-500" /> Accept Quotation
+                        class="flex items-center justify-between px-5 sm:px-6 py-4 sm:py-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
+                        <h3
+                            class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                            <CheckCircle class="w-5 h-5 text-emerald-500" /> Accept Quotation
                         </h3>
-                        <button @click="showAcceptModal = false">
-                            <X class="w-5 h-5 text-gray-400" />
+                        <button @click="showAcceptModal = false"
+                            class="p-2 bg-white dark:bg-slate-700 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 shadow-sm transition-all">
+                            <X class="w-4 h-4" />
                         </button>
                     </div>
-                    <div class="p-6 space-y-4">
+                    <div class="p-5 sm:p-6 space-y-5">
                         <div
-                            class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 text-sm">
-                            <p class="font-bold text-green-800 dark:text-green-300 mb-2">A Purchase Order will be
-                                generated for:
-                            </p>
-                            <div class="space-y-1 text-green-700 dark:text-green-400">
-                                <p><strong>Supplier:</strong> {{ selectedQuotationToAccept.supplier_name }}</p>
-                                <p><strong>Material:</strong> {{ acceptingRFQ?.material_name }}</p>
-                                <p><strong>Quantity:</strong> {{ Number(acceptingRFQ?.required_qty).toLocaleString() }}
-                                    {{
-                                    acceptingRFQ?.unit }}</p>
-                                <p><strong>Unit Price:</strong> {{ formatCurrency(selectedQuotationToAccept.unit_price)
-                                    }}</p>
-                                <p
-                                    class="text-base font-bold border-t border-green-200 dark:border-green-700 pt-2 mt-2">
-                                    Grand
-                                    Total (incl. 10% tax): {{ formatCurrency(selectedQuotationToAccept.total_price *
-                                    1.1) }}</p>
-                                <p><strong>Lead Time:</strong> {{ selectedQuotationToAccept.lead_time }}</p>
-                                <p><strong>Payment Terms:</strong> {{ selectedQuotationToAccept.payment_terms }}</p>
+                            class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl p-4 sm:p-5">
+                            <p
+                                class="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-3">
+                                Generating Purchase Order for:</p>
+                            <div class="space-y-2 text-sm text-emerald-800 dark:text-emerald-300">
+                                <p class="flex justify-between items-center"><span
+                                        class="font-semibold text-emerald-600 dark:text-emerald-500 text-xs">Supplier</span>
+                                    <strong class="font-black truncate max-w-[180px]">{{
+                                        selectedQuotationToAccept.supplier_name
+                                        }}</strong>
+                                </p>
+                                <p class="flex justify-between items-center"><span
+                                        class="font-semibold text-emerald-600 dark:text-emerald-500 text-xs">Material</span>
+                                    <strong class="font-black truncate max-w-[180px]">{{ acceptingRFQ?.material_name
+                                        }}</strong>
+                                </p>
+                                <p class="flex justify-between items-center"><span
+                                        class="font-semibold text-emerald-600 dark:text-emerald-500 text-xs">Quantity</span>
+                                    <strong class="font-black">{{ Number(acceptingRFQ?.required_qty).toLocaleString() }}
+                                        <span class="text-[10px]">{{ acceptingRFQ?.unit }}</span></strong>
+                                </p>
+                                <div class="pt-3 pb-1 mt-3 border-t border-emerald-200 dark:border-emerald-800/50">
+                                    <p class="flex justify-between items-center"><span
+                                            class="font-black uppercase tracking-widest text-[10px] text-emerald-600 dark:text-emerald-500">Subtotal</span>
+                                        <strong class="font-bold">{{
+                                            formatCurrency(selectedQuotationToAccept.total_price)
+                                            }}</strong>
+                                    </p>
+                                    <p class="flex justify-between items-center mt-1"><span
+                                            class="font-black uppercase tracking-widest text-[10px] text-emerald-600 dark:text-emerald-500">Tax
+                                            (10%)</span> <strong class="font-bold">{{
+                                                formatCurrency(selectedQuotationToAccept.total_price * 0.1) }}</strong></p>
+                                </div>
+                                <div
+                                    class="pt-3 mt-1 border-t-2 border-emerald-300 dark:border-emerald-700 border-dashed">
+                                    <p class="flex justify-between items-end"><span
+                                            class="font-black uppercase tracking-widest text-xs text-emerald-700 dark:text-emerald-400 mb-0.5">Grand
+                                            Total</span> <strong class="text-xl font-black">{{
+                                                formatCurrency(selectedQuotationToAccept.total_price * 1.1) }}</strong></p>
+                                </div>
                             </div>
                         </div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">This will mark the other quotations for this
-                            RFQ and
-                            create a confirmed purchase order.</p>
-                        <div class="flex gap-3 justify-end pt-2">
-                            <button @click="showAcceptModal = false"
-                                class="px-4 py-2.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Cancel</button>
-                            <button @click="acceptQuotation" :disabled="isLoading"
-                                class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm">
-                                <CheckCircle class="w-4 h-4" />
-                                <span>{{ isLoading ? 'Processing...' : 'Confirm & Create PO' }}</span>
-                            </button>
-                        </div>
+                        <p class="text-xs text-slate-500 font-medium text-center">Accepting this quotation will
+                            automatically
+                            decline all others and generate a draft PO.</p>
+                    </div>
+                    <div
+                        class="px-5 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex flex-col-reverse sm:flex-row gap-3 bg-slate-50 dark:bg-slate-800">
+                        <button @click="showAcceptModal = false"
+                            class="w-full sm:w-auto px-6 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors shadow-sm">Cancel</button>
+                        <button @click="acceptQuotation" :disabled="isLoading"
+                            class="w-full sm:flex-1 bg-emerald-600 text-white px-6 py-3 rounded-xl text-sm font-black shadow-lg shadow-emerald-500/20 flex justify-center items-center gap-2 hover:bg-emerald-700 transition-colors disabled:opacity-50">
+                            <CheckCircle class="w-4 h-4" />
+                            <span>{{ isLoading ? 'Processing...' : 'Confirm & Create PO' }}</span>
+                        </button>
                     </div>
                 </div>
             </div>
         </transition>
 
-        <!-- ════════════════════════════════════════════════════════════════ -->
-        <!--  MODAL: DECLINE QUOTATION                                       -->
-        <!-- ════════════════════════════════════════════════════════════════ -->
         <transition name="modal-fade">
             <div v-if="showDeclineModal && selectedQuotationToDecline"
-                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
                 @click.self="showDeclineModal = false">
                 <div
-                    class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-700">
+                    class="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <div
-                        class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-                        <h3 class="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                        class="flex items-center justify-between px-5 sm:px-6 py-4 sm:py-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
+                        <h3
+                            class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                             <XCircle class="w-5 h-5 text-red-500" /> Decline Quotation
                         </h3>
-                        <button @click="showDeclineModal = false">
-                            <X class="w-5 h-5 text-gray-400" />
+                        <button @click="showDeclineModal = false"
+                            class="p-2 bg-white dark:bg-slate-700 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 shadow-sm transition-all">
+                            <X class="w-4 h-4" />
                         </button>
                     </div>
-                    <div class="p-6 space-y-4">
-                        <p class="text-sm text-gray-600 dark:text-gray-400">Declining the quotation from <strong>{{
-                                selectedQuotationToDecline.supplier_name }}</strong>. The supplier will be notified.</p>
+                    <div class="p-5 sm:p-6 space-y-5">
+                        <div
+                            class="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30 p-4 rounded-xl flex items-start gap-3">
+                            <AlertTriangle class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                            <p class="text-sm font-medium text-red-800 dark:text-red-300 leading-snug">Declining quote
+                                from
+                                <strong class="font-black">{{ selectedQuotationToDecline.supplier_name }}</strong>. This
+                                action
+                                is final and the supplier will be notified.
+                            </p>
+                        </div>
                         <div>
                             <label
-                                class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Reason
-                                for Declining</label>
+                                class="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Reason
+                                for Declining <span class="text-red-500">*</span></label>
                             <textarea v-model="declineReason" rows="3"
-                                placeholder="e.g., Price too high, lead time too long, found better supplier..."
-                                class="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none resize-none"></textarea>
+                                placeholder="e.g. Price too high, better offer found..."
+                                class="w-full px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-red-500/20 font-medium dark:text-white resize-none"></textarea>
                         </div>
-                        <div class="flex gap-3 justify-end">
-                            <button @click="showDeclineModal = false"
-                                class="px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Cancel</button>
-                            <button @click="declineQuotation" :disabled="isLoading"
-                                class="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all">
-                                <Ban class="w-4 h-4" /> {{ isLoading ? 'Processing...' : 'Decline Quotation' }}
-                            </button>
-                        </div>
+                    </div>
+                    <div
+                        class="px-5 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex flex-col-reverse sm:flex-row gap-3 bg-slate-50 dark:bg-slate-800">
+                        <button @click="showDeclineModal = false"
+                            class="w-full sm:w-auto px-6 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors shadow-sm">Cancel</button>
+                        <button @click="declineQuotation" :disabled="isLoading || !declineReason.trim()"
+                            class="w-full sm:flex-1 bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-black shadow-lg shadow-red-500/20 flex justify-center items-center gap-2 hover:bg-red-700 transition-colors disabled:opacity-50">
+                            <Ban class="w-4 h-4" />
+                            <span>{{ isLoading ? 'Processing...' : 'Confirm Decline' }}</span>
+                        </button>
                     </div>
                 </div>
             </div>
         </transition>
 
-        <!-- ════════════════════════════════════════════════════════════════ -->
-        <!--  MODAL: PO DETAIL                                               -->
-        <!-- ════════════════════════════════════════════════════════════════ -->
         <transition name="modal-fade">
             <div v-if="showPODetailModal && selectedPO"
-                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
                 @click.self="showPODetailModal = false">
                 <div
-                    class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200 dark:border-gray-700">
+                    class="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl w-full max-w-xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[90vh]">
                     <div
-                        class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+                        class="flex items-center justify-between px-5 sm:px-6 py-4 sm:py-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex-shrink-0">
                         <div>
-                            <h3 class="font-bold text-gray-800 dark:text-white">{{ selectedPO.po_number }}</h3>
-                            <p class="text-xs text-gray-500 dark:text-gray-400">Purchase Order Details</p>
+                            <h3
+                                class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                                <ShoppingCart class="w-5 h-5 text-blue-500" /> Purchase Order
+                            </h3>
+                            <div class="flex items-center gap-2 mt-1">
+                                <p
+                                    class="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest font-mono">
+                                    {{ selectedPO.po_number }}</p>
+                                <span
+                                    :class="['text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md whitespace-nowrap', statusBadge(selectedPO.status)]">{{
+                                    statusLabel(selectedPO.status) }}</span>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span :class="statusBadge(selectedPO.status)"
-                                class="text-[10px] font-bold px-2 py-1 rounded-full">{{ statusLabel(selectedPO.status)
-                                }}</span>
-                            <button @click="showPODetailModal = false">
-                                <X class="w-5 h-5 text-gray-400" />
-                            </button>
-                        </div>
+                        <button @click="showPODetailModal = false"
+                            class="p-2 bg-white dark:bg-slate-700 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 shadow-sm transition-all">
+                            <X class="w-4 h-4" />
+                        </button>
                     </div>
-                    <div class="p-6 space-y-4">
-                        <div class="grid grid-cols-2 gap-3 text-sm">
-                            <div>
-                                <p class="text-xs text-gray-400 font-semibold uppercase">Supplier</p>
-                                <p class="text-gray-800 dark:text-white font-medium mt-0.5">{{ selectedPO.supplier_name
+                    <div class="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1">
+                        <div
+                            class="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+                            <div class="col-span-2">
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Supplier
+                                </p>
+                                <p class="text-sm font-black text-slate-800 dark:text-white">{{ selectedPO.supplier_name
                                     }}</p>
                             </div>
                             <div>
-                                <p class="text-xs text-gray-400 font-semibold uppercase">Issue Date</p>
-                                <p class="text-gray-800 dark:text-white font-medium mt-0.5">{{ selectedPO.issued_date }}
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Issue
+                                    Date</p>
+                                <p class="text-sm font-bold text-slate-800 dark:text-white">{{ selectedPO.issued_date }}
                                 </p>
                             </div>
                             <div>
-                                <p class="text-xs text-gray-400 font-semibold uppercase">Expected Delivery</p>
-                                <p class="text-gray-800 dark:text-white font-medium mt-0.5">{{
+                                <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Delivery
+                                    Date</p>
+                                <p class="text-sm font-bold text-slate-800 dark:text-white">{{
                                     selectedPO.expected_delivery }}
                                 </p>
                             </div>
-                            <div>
-                                <p class="text-xs text-gray-400 font-semibold uppercase">RFQ Reference</p>
-                                <p class="text-gray-800 dark:text-white font-medium mt-0.5">{{ selectedPO.rfq_ref || '—'
-                                    }}</p>
+                        </div>
+
+                        <div
+                            class="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm text-left">
+                                    <thead
+                                        class="bg-slate-50 dark:bg-slate-800 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-200 dark:border-slate-700">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left">Item Details</th>
+                                            <th class="px-4 py-3 text-right">Qty</th>
+                                            <th class="px-4 py-3 text-right hidden sm:table-cell">Unit Px</th>
+                                            <th class="px-4 py-3 text-right">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                        <tr v-for="item in selectedPO.items" :key="item.id">
+                                            <td class="px-4 py-3 font-bold text-slate-800 dark:text-white">
+                                                {{ item.material_name }}
+                                                <span
+                                                    class="block sm:hidden text-[10px] text-slate-400 font-medium mt-0.5">@
+                                                    {{
+                                                    formatCurrency(item.unit_price) }}</span>
+                                            </td>
+                                            <td
+                                                class="px-4 py-3 text-right font-medium text-slate-600 dark:text-slate-300">
+                                                {{
+                                                item.qty }} <span class="text-[10px] text-slate-400">{{ item.unit
+                                                    }}</span></td>
+                                            <td
+                                                class="px-4 py-3 text-right font-medium text-slate-600 dark:text-slate-300 hidden sm:table-cell">
+                                                {{ formatCurrency(item.unit_price) }}</td>
+                                            <td class="px-4 py-3 text-right font-black text-slate-800 dark:text-white">
+                                                {{
+                                                formatCurrency(item.total) }}</td>
+                                        </tr>
+                                    </tbody>
+                                    <tfoot class="bg-slate-50 dark:bg-slate-800/50">
+                                        <tr>
+                                            <td colspan="2" class="hidden sm:table-cell"></td>
+                                            <td colspan="1"
+                                                class="sm:hidden text-right px-4 py-2 text-[10px] font-bold text-slate-400 uppercase">
+                                                Subtotal</td>
+                                            <td
+                                                class="hidden sm:table-cell px-4 py-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest border-t border-slate-200 dark:border-slate-700">
+                                                Subtotal</td>
+                                            <td
+                                                class="px-4 py-2 text-right font-bold text-slate-800 dark:text-white border-t border-slate-200 dark:border-slate-700">
+                                                {{ formatCurrency(selectedPO.subtotal) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="2" class="hidden sm:table-cell"></td>
+                                            <td colspan="1"
+                                                class="sm:hidden text-right px-4 py-2 text-[10px] font-bold text-slate-400 uppercase">
+                                                Tax ({{ selectedPO.tax_rate }}%)</td>
+                                            <td
+                                                class="hidden sm:table-cell px-4 py-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                Tax ({{ selectedPO.tax_rate }}%)</td>
+                                            <td class="px-4 py-2 text-right font-bold text-slate-800 dark:text-white">{{
+                                                formatCurrency(selectedPO.tax_amount) }}</td>
+                                        </tr>
+                                        <tr class="bg-blue-50/50 dark:bg-blue-900/10">
+                                            <td colspan="2"
+                                                class="hidden sm:table-cell border-t border-slate-200 dark:border-slate-700">
+                                            </td>
+                                            <td colspan="1"
+                                                class="sm:hidden text-right px-4 py-3 text-xs font-black text-blue-600 dark:text-blue-500 uppercase tracking-widest border-t border-slate-200 dark:border-slate-700">
+                                                Grand Total</td>
+                                            <td
+                                                class="hidden sm:table-cell px-4 py-3 text-right text-[10px] font-black text-blue-600 dark:text-blue-500 uppercase tracking-widest border-t border-slate-200 dark:border-slate-700">
+                                                Grand Total</td>
+                                            <td
+                                                class="px-4 py-3 text-right font-black text-lg text-blue-700 dark:text-blue-400 border-t border-slate-200 dark:border-slate-700">
+                                                {{ formatCurrency(selectedPO.grand_total) }}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
                             </div>
                         </div>
-                        <div class="border border-gray-200 dark:border-gray-600 rounded-xl overflow-hidden">
-                            <table class="w-full text-sm">
-                                <thead
-                                    class="bg-gray-50 dark:bg-gray-700/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
-                                    <tr>
-                                        <th class="px-4 py-2.5 text-left">Item</th>
-                                        <th class="px-4 py-2.5 text-right">Qty</th>
-                                        <th class="px-4 py-2.5 text-right">Unit Price</th>
-                                        <th class="px-4 py-2.5 text-right">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                                    <tr v-for="item in selectedPO.items" :key="item.id"
-                                        class="bg-white dark:bg-gray-800">
-                                        <td class="px-4 py-3 text-gray-800 dark:text-white font-medium">{{
-                                            item.material_name }}
-                                        </td>
-                                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{{ item.qty }}
-                                            {{
-                                            item.unit }}</td>
-                                        <td class="px-4 py-3 text-right text-gray-600 dark:text-gray-400">{{
-                                            formatCurrency(item.unit_price) }}</td>
-                                        <td class="px-4 py-3 text-right font-semibold text-gray-800 dark:text-white">{{
-                                            formatCurrency(item.total) }}</td>
-                                    </tr>
-                                </tbody>
-                                <tfoot class="bg-gray-50 dark:bg-gray-700/30 text-sm">
-                                    <tr>
-                                        <td colspan="3" class="px-4 py-2 text-right text-gray-500">Subtotal</td>
-                                        <td class="px-4 py-2 text-right font-medium text-gray-800 dark:text-white">{{
-                                            formatCurrency(selectedPO.subtotal) }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="3" class="px-4 py-2 text-right text-gray-500">Tax ({{
-                                            selectedPO.tax_rate
-                                            }}%)</td>
-                                        <td class="px-4 py-2 text-right font-medium text-gray-800 dark:text-white">{{
-                                            formatCurrency(selectedPO.tax_amount) }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="3"
-                                            class="px-4 py-2 text-right font-bold text-gray-700 dark:text-gray-200">
-                                            Grand Total</td>
-                                        <td
-                                            class="px-4 py-2 text-right font-bold text-blue-600 dark:text-blue-400 text-base">
-                                            {{
-                                            formatCurrency(selectedPO.grand_total) }}</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                        <p v-if="selectedPO.notes" class="text-xs text-gray-500 dark:text-gray-400 italic">Notes: {{
-                            selectedPO.notes }}</p>
-                        <div class="flex gap-3 justify-end">
-                            <button
-                                class="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all">
-                                <Printer class="w-4 h-4" /> Print PO
-                            </button>
-                            <button v-if="selectedPO.status === 'draft'"
-                                @click="sendPO(selectedPO); showPODetailModal = false"
-                                class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all">
-                                <Send class="w-4 h-4" /> Send to Supplier
-                            </button>
-                        </div>
+                    </div>
+                    <div
+                        class="px-5 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex flex-col-reverse sm:flex-row justify-between gap-3 bg-slate-50 dark:bg-slate-800 flex-shrink-0">
+                        <button
+                            class="w-full sm:w-auto px-6 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors shadow-sm flex items-center justify-center gap-2">
+                            <Printer class="w-4 h-4" /> Print Document
+                        </button>
+                        <button v-if="selectedPO.status === 'draft'"
+                            @click="sendPO(selectedPO); showPODetailModal = false" :disabled="isLoading"
+                            class="w-full sm:w-auto bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-black shadow-lg shadow-blue-500/20 flex justify-center items-center gap-2 hover:bg-blue-700 transition-colors disabled:opacity-50">
+                            <Send class="w-4 h-4" />
+                            <span>{{ isLoading ? 'Sending...' : 'Send to Supplier' }}</span>
+                        </button>
                     </div>
                 </div>
             </div>
         </transition>
 
-        <!-- ════════════════════════════════════════════════════════════════ -->
-        <!--  MODAL: PROCESS PAYMENT                                         -->
-        <!-- ════════════════════════════════════════════════════════════════ -->
         <transition name="modal-fade">
             <div v-if="showPaymentModal && paymentTargetInvoice"
-                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
                 @click.self="showPaymentModal = false">
                 <div
-                    class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-700">
+                    class="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <div
-                        class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-                        <h3 class="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                        class="flex items-center justify-between px-5 sm:px-6 py-4 sm:py-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
+                        <h3
+                            class="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
                             <DollarSign class="w-5 h-5 text-blue-500" /> Process Payment
                         </h3>
-                        <button @click="showPaymentModal = false">
-                            <X class="w-5 h-5 text-gray-400" />
+                        <button @click="showPaymentModal = false"
+                            class="p-2 bg-white dark:bg-slate-700 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 shadow-sm transition-all">
+                            <X class="w-4 h-4" />
                         </button>
                     </div>
-                    <div class="p-6 space-y-4">
+                    <div class="p-5 sm:p-6 space-y-5">
                         <div
-                            class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="font-bold text-blue-800 dark:text-blue-300 text-sm">{{
-                                        paymentForm.invoice_number
-                                        }}</p>
-                                    <p class="text-blue-600 dark:text-blue-400 text-xs mt-0.5">{{
-                                        paymentForm.supplier_name }}
-                                    </p>
-                                </div>
-                                <p class="text-2xl font-bold text-blue-700 dark:text-blue-300">{{
+                            class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="font-black text-blue-800 dark:text-blue-300 text-sm truncate">{{
+                                    paymentForm.supplier_name }}</p>
+                                <p class="text-blue-600 dark:text-blue-400 text-xs font-mono font-bold mt-0.5">INV: {{
+                                    paymentForm.invoice_number }}</p>
+                            </div>
+                            <div class="sm:text-right flex-shrink-0">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-blue-500 mb-0.5">Amount
+                                    Due</p>
+                                <p class="text-2xl font-black text-blue-700 dark:text-blue-400 leading-none">{{
                                     formatCurrency(paymentForm.amount) }}</p>
                             </div>
                         </div>
 
                         <div>
                             <label
-                                class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Payment
-                                Method</label>
+                                class="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Payment
+                                Method *</label>
                             <div class="grid grid-cols-2 gap-2">
                                 <button v-for="method in paymentMethods" :key="method"
                                     @click="paymentForm.method = method"
-                                    :class="['px-3 py-2 rounded-lg text-xs font-medium border-2 transition-all', paymentForm.method === method ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-blue-300 dark:hover:border-blue-700']">
+                                    :class="['px-3 py-2.5 rounded-xl text-xs font-bold border-2 transition-all', paymentForm.method === method ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 shadow-sm' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800']">
                                     {{ method }}
                                 </button>
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label
-                                    class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Payment
-                                    Date</label>
+                                    class="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Payment
+                                    Date *</label>
                                 <input type="date" v-model="paymentForm.payment_date"
-                                    class="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                                    class="w-full px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 font-bold dark:text-white" />
                             </div>
                             <div>
                                 <label
-                                    class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Reference
+                                    class="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Reference
                                     / TXN # <span class="text-red-500">*</span></label>
-                                <input type="text" v-model="paymentForm.bank_reference" placeholder="e.g., TXN-00123456"
-                                    class="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
+                                <input type="text" v-model="paymentForm.bank_reference" placeholder="e.g. TXN-1234"
+                                    class="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 font-bold dark:text-white" />
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label
+                                    class="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Remarks
+                                    <span class="normal-case font-medium text-slate-400">(optional)</span></label>
+                                <input type="text" v-model="paymentForm.remarks"
+                                    placeholder="Any additional payment notes..."
+                                    class="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 font-medium dark:text-white" />
                             </div>
                         </div>
-
-                        <div>
-                            <label
-                                class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Remarks</label>
-                            <input type="text" v-model="paymentForm.remarks" placeholder="Optional remarks..."
-                                class="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" />
-                        </div>
-
-                        <div class="flex gap-3 justify-end pt-2">
-                            <button @click="showPaymentModal = false"
-                                class="px-4 py-2.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all">Cancel</button>
-                            <button @click="submitPayment" :disabled="isLoading"
-                                class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all shadow-sm">
-                                <DollarSign class="w-4 h-4" />
-                                <span>{{ isLoading ? 'Processing...' : 'Confirm Payment' }}</span>
-                            </button>
-                        </div>
+                    </div>
+                    <div
+                        class="px-5 sm:px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex flex-col-reverse sm:flex-row gap-3 bg-slate-50 dark:bg-slate-800">
+                        <button @click="showPaymentModal = false"
+                            class="w-full sm:w-auto px-6 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors shadow-sm">Cancel</button>
+                        <button @click="submitPayment" :disabled="isLoading || !paymentForm.bank_reference.trim()"
+                            class="w-full sm:flex-1 bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-black shadow-lg shadow-blue-500/20 flex justify-center items-center gap-2 hover:bg-blue-700 transition-colors disabled:opacity-50">
+                            <CheckCircle class="w-4 h-4" />
+                            <span>{{ isLoading ? 'Processing...' : 'Confirm Payment' }}</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1741,16 +1860,6 @@ const submitPayment = async () => {
 .modal-fade-enter-from,
 .modal-fade-leave-to {
     opacity: 0;
-}
-
-.modal-fade-enter-active .bg-white,
-.modal-fade-leave-active .bg-white {
-    transition: transform 0.2s ease;
-}
-
-.modal-fade-enter-from .bg-white,
-.modal-fade-leave-to .bg-white {
-    transform: scale(0.96) translateY(8px);
 }
 
 .accordion-enter-active,
@@ -1780,5 +1889,14 @@ const submitPayment = async () => {
 .slide-toast-leave-to {
     opacity: 0;
     transform: translateX(20px);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
 </style>
