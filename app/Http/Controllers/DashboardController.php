@@ -107,7 +107,11 @@ class DashboardController extends Controller
                 });
 
             // All managers and staff (exclude trainees — they appear in the trainee tab)
-            $allEmployees = User::whereIn('position', ['manager', 'staff'])
+            // Eager load auditLogs so the modal can view deactivation/reactivation history
+            $allEmployees = User::with(['auditLogs' => function ($query) {
+                $query->orderBy('created_at', 'desc'); // Order logs from newest to oldest
+            }])
+                ->whereIn('position', ['manager', 'staff'])
                 ->orderBy('role')
                 ->orderBy('position')
                 ->orderBy('name')
@@ -122,7 +126,9 @@ class DashboardController extends Controller
                         'department' => $user->department,
                         'employee_id' => $user->employee_id,
                         'is_active' => (bool) $user->is_active,
+                        'status' => $user->status, // Send explicitly so Vue 'checkActive' works flawlessly
                         'join_date' => $user->join_date,
+                        'audit_logs' => $user->auditLogs, // Send the relationship data to frontend
                         'profile_photo_url' => $user->profile_photo_path
                             ? asset('storage/'.$user->profile_photo_path)
                             : null,
@@ -601,43 +607,49 @@ class DashboardController extends Controller
         ]);
     }
 
+    // app/Http/Controllers/DashboardController.php
+
     private function handleCrmDashboard(string $position)
     {
-        if ($position === 'manager') {
-            $totalLeads = \App\Models\CrmLead::count();
-            $wonLeads = \App\Models\CrmLead::where('status', 'Closed-Won')->count();
-            $conversionRate = $totalLeads > 0 ? round(($wonLeads / $totalLeads) * 100) : 0;
+        // Common stats
+        $totalLeads = \App\Models\CrmLead::count();
+        $leadsWon = \App\Models\CrmLead::where('status', 'Closed-Won')->count();
+        $totalPartners = \App\Models\Client::count() + $leadsWon;
 
-            return Inertia::render('Dashboard/CRM/Manager/index', [
-                'user' => Auth::user(),
-                'stats' => [
-                    'totalPipelineValue' => (float) \App\Models\CrmLead::whereNotIn('status', ['Closed-Won', 'Lost'])
-                        ->sum('estimated_value'),
-                    'activeInquiries' => \App\Models\CrmLead::where('status', 'Inquiry')->count(),
-                    'pendingApprovals' => \App\Models\PurchaseOrder::whereIn('status', ['credit_review', 'tier_assignment'])->count(),
-                    'conversionRate' => (int) $conversionRate,
-                ],
-                'dailyActivityCount' => \App\Models\CrmInteraction::whereDate('created_at', Carbon::today())->count(),
-                'leaderboard' => User::where('role', 'CRM')
-                    ->where('position', 'staff')
-                    ->withCount(['leads as won_deals' => fn ($q) => $q->where('status', 'Closed-Won')])
-                    ->orderBy('won_deals', 'desc')
-                    ->get()
-                    ->map(fn ($u) => [
-                        'id' => $u->id,
-                        'name' => $u->name,
-                        'email' => $u->email,
-                        'won_deals' => $u->won_deals,
-                    ]),
-            ]);
+        // Pending registrations (clients with status 'pending')
+        $pendingRegistrations = \App\Models\Client::where('status', 'pending')->get();
+
+        // Business partners (active clients) – used in the Partners tab
+        $businessPartners = \App\Models\Client::where('status', 'active')->get();
+
+        // All leads (excluding converted/archived) – used in Leads tab
+        $leads = \App\Models\CrmLead::whereNotIn('status', ['Converted', 'Archived'])->get();
+
+        // For the calendar: gather all upcoming interviews from leads in Negotiation
+        $upcomingInterviews = \App\Models\LeadInterview::with('lead')
+            ->where('scheduled_at', '>=', now())
+            ->orderBy('scheduled_at')
+            ->get();
+
+        // Approval queue – only for managers
+        $pendingApprovals = [];
+        if ($position === 'manager') {
+            $pendingApprovals = \App\Models\CrmApproval::where('status', 'pending')->with('user')->get();
         }
 
-        return Inertia::render('Dashboard/CRM/Employee/index', [
-            'user' => Auth::user(),
+        return Inertia::render('Dashboard/CRM/Index', [
             'stats' => [
-                'myLeads' => Auth::user()->leads()->count(),
-                'myActivities' => \App\Models\CrmInteraction::where('user_id', Auth::id())->count(),
+                'totalLeads' => $totalLeads,
+                'leadsWon' => $leadsWon,
+                'totalPartners' => $totalPartners,
             ],
+            'businessPartners' => $businessPartners,
+            'leads' => $leads,
+            'pendingRegistrations' => $pendingRegistrations,
+            'upcomingInterviews' => $upcomingInterviews,
+            'pendingApprovals' => $pendingApprovals,
+            'userRole' => auth()->user()->role,
+            'userPosition' => $position,
         ]);
     }
 

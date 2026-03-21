@@ -36,7 +36,7 @@ import {
     ShieldCheck,
     Building2,
     RefreshCw,
-    ClipboardCheck,
+    ClipboardCheck, // Added for Approval Queue
 } from 'lucide-vue-next'
 
 const page = usePage()
@@ -186,19 +186,26 @@ const navItems = computed(() => {
         items.push({ label: 'Warehouse', href: userPosition === 'manager' ? route('war.manager.dashboard') : route('war.employee.dashboard'), icon: Warehouse })
     }
 
+    // ===================== UPDATED CRM SECTION =====================
     if (userRole === 'CRM') {
+        // Common items for both manager and staff
+        items.push(
+            // { label: 'CRM Dashboard', href: route('crm.dashboard'), icon: LayoutDashboard },
+            { label: 'Lead & Deals', href: route('crm.lead'), icon: FileUser },
+            { label: 'Customer Profiles', href: route('crm.customerprofile'), icon: Users }
+        );
+
+        // Manager-only items
         if (userPosition === 'manager') {
             items.push(
-                { label: 'Quality Oversight', href: route('crm.oversight'), icon: Clock },
-                { label: 'Strategic Analytics', href: route('crm.strategy'), icon: ChartNoAxesCombined }
-            )
-        } else {
-            items.push(
-                { label: 'Lead & Deals', href: route('crm.lead'), icon: FileUser },
-                { label: 'Customer Profiles', href: route('crm.customerprofile'), icon: Users }
-            )
+                { label: 'Approval Queue', href: route('crm.approval.queue'), icon: ClipboardCheck },
+                // Optional: keep the old pages for now (can be removed later)
+
+            );
         }
     }
+    // ===============================================================
+
     if (userRole === 'ECO') {
         if (userPosition === 'manager') {
             items.push(

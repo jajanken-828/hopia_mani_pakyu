@@ -175,6 +175,12 @@ class User extends Authenticatable
         return $this->hasMany(AuditLog::class, 'target_id');
     }
 
+    public function auditLogs()
+    {
+        // The foreign key is 'target_id' based on your SQL file
+        return $this->hasMany(AuditLog::class, 'target_id');
+    }
+
     /**
      * Get appropriate dashboard path based on department and position
      */

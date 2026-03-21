@@ -5,6 +5,7 @@ namespace App\Http\Controllers\crm\staff;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\CreditAccount;
+use App\Models\CrmApproval;    // <-- Add this import
 use App\Models\CrmLead;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,9 +16,13 @@ class LeadController extends Controller
 {
     public function lead()
     {
+        // Eager load notes, interviews, approvalFiles with their user relationships
+        $leads = CrmLead::with(['notes.user', 'interviews.user', 'approvalFiles.user'])
+            ->whereNotIn('status', ['Converted', 'Archived'])
+            ->get();
+
         return Inertia::render('Dashboard/CRM/Employee/lead', [
-            // Only fetch leads for the logged-in staff
-            'leads' => CrmLead::where('assigned_staff_id', Auth::id())->get(),
+            'leads' => $leads,
         ]);
     }
 
@@ -94,7 +99,7 @@ class LeadController extends Controller
                 'is_good_payer' => 1,
             ]);
 
-            // 3. Update status to 'Converted' so it disappears from 'Closed-Won' in the UI
+            // 3. Update lead status to 'Converted' so it disappears from the pipeline
             $lead = CrmLead::find($validated['lead_id']);
             $lead->update(['status' => 'Converted']);
 
@@ -105,6 +110,158 @@ class LeadController extends Controller
             DB::rollBack();
 
             return back()->withErrors(['error' => 'Failed to convert lead: '.$e->getMessage()]);
+        }
+    }
+
+    // ========== NEW METHODS FOR UNIFIED CRM ==========
+
+    // Add note to lead (with approval for staff)
+    public function addNote(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'note' => 'required|string|max:2000',
+        ]);
+
+        $lead = CrmLead::findOrFail($id);
+
+        if (auth()->user()->position === 'manager') {
+            // Manager: add directly
+            $lead->notes()->create([
+                'user_id' => auth()->id(),
+                'note' => $validated['note'],
+            ]);
+
+            return back()->with('message', 'Note added.');
+        } else {
+            // Staff: create approval
+            CrmApproval::create([
+                'user_id' => auth()->id(),
+                'action' => 'add_note',
+                'data' => [
+                    'lead_id' => $lead->id,
+                    'note' => $validated['note'],
+                ],
+                'status' => 'pending',
+            ]);
+
+            return back()->with('message', 'Note submitted for approval.');
+        }
+    }
+
+    // Schedule interview for lead (with approval for staff)
+    public function scheduleInterview(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'scheduled_at' => 'required|date',
+            'location' => 'nullable|string|max:255',
+            'notes' => 'nullable|string',
+        ]);
+
+        $lead = CrmLead::findOrFail($id);
+
+        if (auth()->user()->position === 'manager') {
+            $lead->interviews()->create([
+                'user_id' => auth()->id(),
+                'scheduled_at' => $validated['scheduled_at'],
+                'location' => $validated['location'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            return back()->with('message', 'Interview scheduled.');
+        } else {
+            CrmApproval::create([
+                'user_id' => auth()->id(),
+                'action' => 'schedule_interview',
+                'data' => array_merge(['lead_id' => $lead->id], $validated),
+                'status' => 'pending',
+            ]);
+
+            return back()->with('message', 'Interview request submitted for approval.');
+        }
+    }
+
+    // Upload approval file for lead (with approval for staff)
+    public function uploadApprovalFile(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'file' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120', // 5MB
+        ]);
+
+        $lead = CrmLead::findOrFail($id);
+
+        if (auth()->user()->position === 'manager') {
+            $path = $request->file('file')->store('lead_approval_files', 'public');
+            $lead->approvalFiles()->create([
+                'file_path' => $path,
+                'original_name' => $request->file('file')->getClientOriginalName(),
+                'uploaded_by' => auth()->id(),
+            ]);
+
+            return back()->with('message', 'File uploaded.');
+        } else {
+            // Store file temporarily
+            $path = $request->file('file')->store('temp_approval_files', 'public');
+            CrmApproval::create([
+                'user_id' => auth()->id(),
+                'action' => 'upload_approval_file',
+                'data' => [
+                    'lead_id' => $lead->id,
+                    'file_path' => $path,
+                    'original_name' => $request->file('file')->getClientOriginalName(),
+                ],
+                'status' => 'pending',
+            ]);
+
+            return back()->with('message', 'File upload submitted for approval.');
+        }
+    }
+
+    // Accept lead (move to Closed-Won)
+    public function acceptLead($id)
+    {
+        $lead = CrmLead::findOrFail($id);
+
+        if (auth()->user()->position === 'manager') {
+            $lead->update(['status' => 'Closed-Won']);
+
+            return back()->with('message', 'Lead moved to Closed-Won.');
+        } else {
+            CrmApproval::create([
+                'user_id' => auth()->id(),
+                'action' => 'accept_lead',
+                'data' => ['lead_id' => $lead->id],
+                'status' => 'pending',
+            ]);
+
+            return back()->with('message', 'Accept request submitted for approval.');
+        }
+    }
+
+    // Reject lead (move to Lost)
+    public function rejectLead(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'reject_reason' => 'required|string|max:255',
+        ]);
+
+        $lead = CrmLead::findOrFail($id);
+
+        if (auth()->user()->position === 'manager') {
+            $lead->update(['status' => 'Lost', 'lost_reason' => $validated['reject_reason']]);
+
+            return back()->with('message', 'Lead marked as Lost.');
+        } else {
+            CrmApproval::create([
+                'user_id' => auth()->id(),
+                'action' => 'reject_lead',
+                'data' => [
+                    'lead_id' => $lead->id,
+                    'lost_reason' => $validated['reject_reason'],
+                ],
+                'status' => 'pending',
+            ]);
+
+            return back()->with('message', 'Rejection submitted for approval.');
         }
     }
 }

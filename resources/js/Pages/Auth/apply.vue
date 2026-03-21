@@ -1,10 +1,15 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import {
-    User, Home, Briefcase, FileCheck, Upload,
-    Trash2, ShieldCheck, ChevronLeft, Save, CheckCircle2
+    FileCheck, Upload, Trash2, ShieldCheck, Save, CheckCircle2
 } from 'lucide-vue-next';
+import InputError from '@/Components/InputError.vue';
+import InputLabel from '@/Components/InputLabel.vue';
+import PrimaryButton from '@/Components/PrimaryButton.vue';
+import TextInput from '@/Components/TextInput.vue';
+import { toast } from 'vue3-toastify';
+import 'vue3-toastify/dist/index.css';
 
 const isLoaded = ref(false);
 const showSuccessModal = ref(false);
@@ -14,9 +19,10 @@ const form = useForm({
     middle_name: '',
     last_name: '',
     email: '',
+    phone_country: '+63',
+    phone_raw: '',
     phone_number: '',
     street_address: '',
-    street_address_line2: '',
     city: '',
     state_province: '',
     postal_zip_code: '',
@@ -30,10 +36,97 @@ const form = useForm({
     status: 'pending'
 });
 
+const inputWarnings = ref({
+    first_name: '',
+    middle_name: '',
+    last_name: '',
+    email: '',
+    phone_raw: '',
+    street_address: '',
+    city: '',
+    state_province: '',
+    postal_zip_code: '',
+    expected_salary: ''
+});
+
+let warningTimeouts = {};
+
 onMounted(() => {
     isLoaded.value = true;
 });
 
+const triggerWarning = (field, message) => {
+    inputWarnings.value[field] = message;
+    if (warningTimeouts[field]) clearTimeout(warningTimeouts[field]);
+    warningTimeouts[field] = setTimeout(() => {
+        inputWarnings.value[field] = '';
+    }, 3000);
+};
+
+// --- 1. PHYSICAL KEYPRESS BLOCKS ---
+const blockNumbersAndSpecial = (e, field) => {
+    if (e.key.length === 1 && !/^[a-zA-Z\sñÑ-]$/.test(e.key)) {
+        e.preventDefault();
+        triggerWarning(field, 'Numbers and special characters are not allowed.');
+    }
+};
+
+const blockNonNumeric = (e, field) => {
+    if (e.key.length === 1 && !/^\d$/.test(e.key)) {
+        e.preventDefault();
+        triggerWarning(field, 'Letters and special characters are not allowed.');
+    }
+};
+
+const blockSpecialForAddress = (e) => {
+    if (e.key.length === 1 && !/^[a-zA-Z0-9\sñÑ.,#-]$/.test(e.key)) {
+        e.preventDefault();
+        triggerWarning('street_address', 'Invalid character. Use alphanumeric and basic punctuation.');
+    }
+};
+
+const blockSpecialForEmail = (e) => {
+    if (e.key.length === 1 && !/^[a-zA-Z0-9@.\-]$/.test(e.key)) {
+        e.preventDefault();
+        triggerWarning('email', 'Invalid character. Only letters, numbers, @, ., and - are allowed.');
+    }
+};
+
+// --- 2. PASTE SANITIZATION WATCHERS ---
+const sanitizeName = (val, field) => {
+    const filtered = val.replace(/[^a-zA-Z\sñÑ-]/g, '');
+    if (val !== filtered) {
+        form[field] = filtered;
+        triggerWarning(field, 'Invalid characters removed.');
+    }
+};
+watch(() => form.first_name, (val) => sanitizeName(val, 'first_name'));
+watch(() => form.middle_name, (val) => sanitizeName(val, 'middle_name'));
+watch(() => form.last_name, (val) => sanitizeName(val, 'last_name'));
+watch(() => form.city, (val) => sanitizeName(val, 'city'));
+watch(() => form.state_province, (val) => sanitizeName(val, 'state_province'));
+
+watch(() => form.street_address, (val) => {
+    const filtered = val.replace(/[^a-zA-Z0-9\sñÑ.,#-]/g, '');
+    if (val !== filtered) form.street_address = filtered;
+});
+
+watch(() => form.email, (val) => {
+    const filtered = val.replace(/[^a-zA-Z0-9@.\-]/g, '');
+    if (val !== filtered) form.email = filtered;
+});
+
+watch(() => form.phone_raw, (val) => {
+    const filtered = val.replace(/\D/g, '').substring(0, 12);
+    if (val !== filtered) form.phone_raw = filtered;
+});
+
+watch(() => form.postal_zip_code, (val) => {
+    const filtered = val.replace(/\D/g, '').substring(0, 4);
+    if (val !== filtered) form.postal_zip_code = filtered;
+});
+
+// --- 3. HARD SUBMIT LOCKS & FILE HANDLERS ---
 const handleFileUpload = (e, type) => {
     const file = e.target.files[0];
     if (file) {
@@ -46,17 +139,53 @@ const removeFile = (type) => {
 };
 
 const submitForm = () => {
+    if (!/^[a-zA-Z\sñÑ-]+$/.test(form.first_name) || !/^[a-zA-Z\sñÑ-]+$/.test(form.last_name)) {
+        toast.error('First Name and Last Name are required and must only contain letters.');
+        return;
+    }
+
+    if (!form.street_address || !form.city || !form.state_province) {
+        toast.error('Complete residential details are required.');
+        return;
+    }
+
+    if (!form.position_applied) {
+        toast.error('Please select the position you are applying for.');
+        return;
+    }
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(form.email)) {
+        toast.error('Please enter a valid email address.');
+        triggerWarning('email', 'Invalid email format.');
+        return;
+    }
+
+    if (form.phone_raw.length !== 12 || !/^\d{12}$/.test(form.phone_raw)) {
+        toast.error('Phone number must be exactly 12 digits.');
+        triggerWarning('phone_raw', 'Must be exactly 12 digits.');
+        return;
+    }
+
+    if (form.postal_zip_code.length !== 4) {
+        toast.error('Postal/Zip code must be exactly 4 digits.');
+        triggerWarning('postal_zip_code', 'Must be exactly 4 digits.');
+        return;
+    }
+
+    form.phone_number = `${form.phone_country}${form.phone_raw}`;
+
     form.post(route('applicants.public.store'), {
         forceFormData: true,
         onSuccess: () => {
             showSuccessModal.value = true;
-            // Delay redirect to allow the user to see the success message
             setTimeout(() => {
                 router.visit('/');
             }, 3000);
         },
         onError: (errors) => {
-            console.log(errors);
+            const errorMsg = Object.values(errors)[0] || 'Application submission failed. Please check your inputs.';
+            toast.error(errorMsg);
         }
     });
 };
@@ -64,287 +193,356 @@ const submitForm = () => {
 
 <template>
 
-    <Head title="Join Our Team | Monti Textile Career" />
+    <Head title="Join Our Team | Monti Corp Careers" />
 
-    <div
-        class="relative min-h-screen flex flex-col md:flex-row bg-[#f8fafc] dark:bg-slate-950 font-sans selection:bg-blue-100">
+    <div class="relative min-h-screen flex flex-col bg-cover bg-center bg-no-repeat"
+        style="background-image: url('/images/threads.jpg');">
+
+        <div class="absolute inset-0 bg-black/40"></div>
 
         <Transition enter-active-class="transition duration-300 ease-out" enter-from-class="opacity-0 scale-95"
             enter-to-class="opacity-100 scale-100" leave-active-class="transition duration-200 ease-in"
             leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
             <div v-if="showSuccessModal"
-                class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/60 backdrop-blur-sm">
+                class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-md">
                 <div
-                    class="bg-white dark:bg-slate-900 rounded-[3rem] p-10 max-w-sm w-full shadow-2xl text-center border border-slate-100 dark:border-slate-800">
+                    class="bg-slate-900/90 backdrop-blur-xl border border-white/20 rounded-[2rem] p-10 max-w-sm w-full shadow-2xl shadow-black text-center">
                     <div
-                        class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-500/10 mb-6">
-                        <CheckCircle2 class="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
+                        class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-500/20 mb-6 ring-4 ring-emerald-500/10">
+                        <CheckCircle2 class="w-10 h-10 text-emerald-400" />
                     </div>
-                    <h3 class="text-2xl font-black text-slate-900 dark:text-white mb-2">Application Received</h3>
-                    <p class="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">Your professional profile has
-                        been encrypted and sent to our HR node. Redirecting you shortly...</p>
+                    <h3 class="text-2xl font-black text-white mb-2 tracking-tight">Application Received</h3>
+                    <p class="text-slate-300 mb-8 leading-relaxed font-medium">Your professional profile has been
+                        securely sent to our HR node. Redirecting you shortly...</p>
                     <Link href="/"
-                        class="inline-flex items-center justify-center w-full py-4 bg-slate-900 dark:bg-blue-600 text-white font-bold rounded-2xl hover:opacity-90 transition-all active:scale-95">
+                        class="inline-flex items-center justify-center w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl transition-all active:scale-95 shadow-lg shadow-blue-500/20 tracking-widest uppercase text-sm">
                         Return Home Now
                     </Link>
                 </div>
             </div>
         </Transition>
 
-        <div class="relative hidden md:flex md:w-[35%] bg-blue-700 overflow-hidden items-center justify-center p-12">
-            <div class="absolute inset-0 opacity-10 pointer-events-none"
-                style="background-image: radial-gradient(#ffffff 0.5px, transparent 0.5px); background-size: 30px 30px;">
-            </div>
-
-            <div class="relative z-10 transition-all duration-1000 transform"
-                :class="isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'">
-
-                <Link href="/">
-                    <div class="size-16 mb-6 p-2 bg-white rounded-xl shadow-2xl">
-                        <img src="/images/applogo.png" alt="Monti Logo" class="h-full w-full object-contain" />
-                    </div>
-                </Link>
-
-                <h1 class="text-5xl font-black text-white leading-tight mb-6">
-                    Start Your <br />
-                    <span class="text-blue-200">Journey</span> With Us.
-                </h1>
-
-                <p class="text-blue-100 text-lg mb-10 max-w-md leading-relaxed opacity-90">
-                    Apply now to become part of the Philippines' leading textile manufacturing innovation team.
-                </p>
-
-                <div class="space-y-4">
-                    <div class="flex items-center space-x-4 text-white/80 font-mono text-sm uppercase tracking-widest">
-                        <span class="h-px w-8 bg-blue-400"></span>
-                        <span>Career Node v1.0</span>
-                    </div>
+        <nav class="relative z-30 px-6 py-5 flex items-center">
+            <Link href="/" class="flex items-center gap-3 group">
+                <div
+                    class="size-10 sm:size-11 p-2.5 bg-white/90 backdrop-blur-sm rounded-xl shadow-md group-hover:scale-105 transition-transform duration-300">
+                    <img src="/images/applogo.png" alt="Monti Textile Logo" class="h-full w-full object-contain" />
                 </div>
-            </div>
-        </div>
+                <span class="font-black text-2xl tracking-tight text-white drop-shadow-md">
+                    Monti<span class="text-blue-300">Textile</span>
+                </span>
+            </Link>
+        </nav>
 
-        <div class="flex-1 flex flex-col h-screen overflow-hidden">
-            <div
-                class="p-6 lg:px-12 border-b border-slate-100 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-20 flex justify-between items-center">
-                <div>
-                    <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Application Portal
-                    </h2>
-                    <p class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">
-                        Personnel Onboarding System</p>
-                </div>
-                <Link href="/"
-                    class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-400">
-                    <ChevronLeft class="size-6" />
-                </Link>
-            </div>
+        <div class="relative z-10 flex-grow flex items-center justify-center px-5 pb-12 pt-4">
+            <div class="w-full max-w-4xl"
+                :class="{ 'opacity-0 translate-y-8': !isLoaded, 'opacity-100 translate-y-0': isLoaded }"
+                style="transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s;">
 
-            <div class="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/30 dark:bg-transparent">
-                <div class="max-w-4xl mx-auto p-6 lg:p-12 transition-all duration-700 delay-300"
-                    :class="isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'">
+                <div
+                    class="backdrop-blur-lg bg-white/10 border border-white/20 rounded-3xl shadow-2xl shadow-black/40 overflow-hidden">
+                    <div class="p-8 md:p-10 space-y-10">
 
-                    <form @submit.prevent="submitForm" class="space-y-10">
-                        <div
-                            class="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
-                            <div class="flex items-center mb-8">
-                                <div
-                                    class="h-12 w-12 bg-blue-600 rounded-2xl flex items-center justify-center mr-5 shadow-lg shadow-blue-500/20">
-                                    <User class="text-white h-6 w-6" />
+                        <div class="text-center mb-10">
+                            <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight drop-shadow-lg">
+                                Careers Application
+                            </h1>
+                            <p class="mt-3 text-slate-200 text-base max-w-2xl mx-auto">
+                                Fill out the details below to apply for a position. All applications are securely
+                                processed by our human resources department.
+                            </p>
+                        </div>
+
+                        <form @submit.prevent="submitForm" class="space-y-10">
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div class="md:col-span-3">
+                                    <h3
+                                        class="text-sm font-black uppercase tracking-widest text-blue-300 border-b border-white/20 pb-2 mb-2">
+                                        Personal Identity</h3>
                                 </div>
-                                <h4 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
-                                    Personal Identity</h4>
+
+                                <div>
+                                    <InputLabel for="first_name" value="First Name"
+                                        class="text-white/90 font-semibold" />
+                                    <TextInput id="first_name" type="text"
+                                        class="mt-1 block w-full py-3 px-4 bg-white/15 border border-white/30 text-white placeholder:text-slate-300 rounded-xl focus:border-blue-400 focus:ring-blue-400/40"
+                                        v-model="form.first_name" required autofocus placeholder="Juan"
+                                        @keypress="blockNumbersAndSpecial($event, 'first_name')" />
+                                    <p v-if="inputWarnings.first_name"
+                                        class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
+                                        inputWarnings.first_name }}</p>
+                                    <InputError class="mt-1 text-red-300" :message="form.errors.first_name" />
+                                </div>
+
+                                <div>
+                                    <InputLabel for="middle_name" value="Middle Name (Optional)"
+                                        class="text-white/90 font-semibold" />
+                                    <TextInput id="middle_name" type="text"
+                                        class="mt-1 block w-full py-3 px-4 bg-white/15 border border-white/30 text-white placeholder:text-slate-300 rounded-xl focus:border-blue-400 focus:ring-blue-400/40"
+                                        v-model="form.middle_name" placeholder="Santos"
+                                        @keypress="blockNumbersAndSpecial($event, 'middle_name')" />
+                                    <p v-if="inputWarnings.middle_name"
+                                        class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
+                                        inputWarnings.middle_name }}</p>
+                                    <InputError class="mt-1 text-red-300" :message="form.errors.middle_name" />
+                                </div>
+
+                                <div>
+                                    <InputLabel for="last_name" value="Last Name" class="text-white/90 font-semibold" />
+                                    <TextInput id="last_name" type="text"
+                                        class="mt-1 block w-full py-3 px-4 bg-white/15 border border-white/30 text-white placeholder:text-slate-300 rounded-xl focus:border-blue-400 focus:ring-blue-400/40"
+                                        v-model="form.last_name" required placeholder="Dela Cruz"
+                                        @keypress="blockNumbersAndSpecial($event, 'last_name')" />
+                                    <p v-if="inputWarnings.last_name"
+                                        class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
+                                        inputWarnings.last_name }}</p>
+                                    <InputError class="mt-1 text-red-300" :message="form.errors.last_name" />
+                                </div>
                             </div>
 
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div class="space-y-1.5">
-                                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">First
-                                        Name *</label>
-                                    <input v-model="form.first_name" type="text" required
-                                        class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 text-sm focus:ring-2 focus:ring-blue-600 transition-all">
+                                <div class="md:col-span-3">
+                                    <h3
+                                        class="text-sm font-black uppercase tracking-widest text-blue-300 border-b border-white/20 pb-2 mb-2">
+                                        Residential Details</h3>
                                 </div>
-                                <div class="space-y-1.5">
-                                    <label
-                                        class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Middle
-                                        Name</label>
-                                    <input v-model="form.middle_name" type="text"
-                                        class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 text-sm focus:ring-2 focus:ring-blue-600 transition-all">
-                                </div>
-                                <div class="space-y-1.5">
-                                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Last
-                                        Name *</label>
-                                    <input v-model="form.last_name" type="text" required
-                                        class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 text-sm focus:ring-2 focus:ring-blue-600 transition-all">
-                                </div>
-                            </div>
-                        </div>
 
-                        <div
-                            class="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
-                            <div class="flex items-center mb-8">
-                                <div
-                                    class="h-12 w-12 bg-indigo-500 rounded-2xl flex items-center justify-center mr-5 shadow-lg shadow-indigo-500/20">
-                                    <Home class="text-white h-6 w-6" />
+                                <div class="md:col-span-3">
+                                    <InputLabel for="street_address" value="Street Address"
+                                        class="text-white/90 font-semibold" />
+                                    <TextInput id="street_address" type="text"
+                                        class="mt-1 block w-full py-3 px-4 bg-white/15 border border-white/30 text-white placeholder:text-slate-300 rounded-xl focus:border-blue-400 focus:ring-blue-400/40"
+                                        v-model="form.street_address" required
+                                        placeholder="123 Main St., Brgy. San Jose" @keypress="blockSpecialForAddress" />
+                                    <p v-if="inputWarnings.street_address"
+                                        class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
+                                        inputWarnings.street_address }}</p>
+                                    <InputError class="mt-1 text-red-300" :message="form.errors.street_address" />
                                 </div>
-                                <h4 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
-                                    Residential Details</h4>
-                            </div>
-                            <div class="space-y-6">
-                                <div class="space-y-1.5">
-                                    <label
-                                        class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Street
-                                        Address *</label>
-                                    <input v-model="form.street_address" type="text" required
-                                        class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 text-sm">
-                                </div>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div class="space-y-1.5">
-                                        <label
-                                            class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">City
-                                            *</label>
-                                        <input v-model="form.city" type="text" required
-                                            class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 text-sm">
-                                    </div>
-                                    <div class="space-y-1.5">
-                                        <label
-                                            class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">State
-                                            / Province *</label>
-                                        <input v-model="form.state_province" type="text" required
-                                            class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 text-sm">
-                                    </div>
-                                    <div class="space-y-1.5">
-                                        <label
-                                            class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Postal
-                                            Code *</label>
-                                        <input v-model="form.postal_zip_code" type="text" required
-                                            class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 text-sm">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
 
-                        <div
-                            class="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
-                            <div class="flex items-center mb-8">
-                                <div
-                                    class="h-12 w-12 bg-blue-600 rounded-2xl flex items-center justify-center mr-5 shadow-lg shadow-blue-500/20">
-                                    <Briefcase class="text-white h-6 w-6" />
+                                <div>
+                                    <InputLabel for="city" value="City" class="text-white/90 font-semibold" />
+                                    <TextInput id="city" type="text"
+                                        class="mt-1 block w-full py-3 px-4 bg-white/15 border border-white/30 text-white placeholder:text-slate-300 rounded-xl focus:border-blue-400 focus:ring-blue-400/40"
+                                        v-model="form.city" required placeholder="General Trias"
+                                        @keypress="blockNumbersAndSpecial($event, 'city')" />
+                                    <p v-if="inputWarnings.city"
+                                        class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
+                                        inputWarnings.city }}</p>
+                                    <InputError class="mt-1 text-red-300" :message="form.errors.city" />
                                 </div>
-                                <h4 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
-                                    Professional Profile</h4>
+
+                                <div>
+                                    <InputLabel for="state_province" value="Province"
+                                        class="text-white/90 font-semibold" />
+                                    <TextInput id="state_province" type="text"
+                                        class="mt-1 block w-full py-3 px-4 bg-white/15 border border-white/30 text-white placeholder:text-slate-300 rounded-xl focus:border-blue-400 focus:ring-blue-400/40"
+                                        v-model="form.state_province" required placeholder="Cavite"
+                                        @keypress="blockNumbersAndSpecial($event, 'state_province')" />
+                                    <p v-if="inputWarnings.state_province"
+                                        class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
+                                        inputWarnings.state_province }}</p>
+                                    <InputError class="mt-1 text-red-300" :message="form.errors.state_province" />
+                                </div>
+
+                                <div>
+                                    <InputLabel for="postal_zip_code" value="Postal Code"
+                                        class="text-white/90 font-semibold" />
+                                    <TextInput id="postal_zip_code" type="text" maxlength="4"
+                                        class="mt-1 block w-full py-3 px-4 bg-white/15 border border-white/30 text-white placeholder:text-slate-300 rounded-xl focus:border-blue-400 focus:ring-blue-400/40 font-mono tracking-widest"
+                                        v-model="form.postal_zip_code" required placeholder="4107"
+                                        @keypress="blockNonNumeric($event, 'postal_zip_code')" />
+                                    <p v-if="inputWarnings.postal_zip_code"
+                                        class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
+                                        inputWarnings.postal_zip_code }}</p>
+                                    <InputError class="mt-1 text-red-300" :message="form.errors.postal_zip_code" />
+                                </div>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
-                                <div class="space-y-1.5">
-                                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Email
-                                        Address *</label>
-                                    <input v-model="form.email" type="email" required
-                                        class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 text-sm">
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="md:col-span-2">
+                                    <h3
+                                        class="text-sm font-black uppercase tracking-widest text-blue-300 border-b border-white/20 pb-2 mb-2">
+                                        Professional Profile</h3>
                                 </div>
-                                <div class="space-y-1.5">
-                                    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Phone
-                                        Number *</label>
-                                    <input v-model="form.phone_number" type="tel" required
-                                        class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 text-sm">
+
+                                <div>
+                                    <InputLabel for="email" value="Email Address" class="text-white/90 font-semibold" />
+                                    <TextInput id="email" type="email"
+                                        class="mt-1 block w-full py-3 px-4 bg-white/15 border border-white/30 text-white placeholder:text-slate-300 rounded-xl focus:border-blue-400 focus:ring-blue-400/40"
+                                        v-model="form.email" required placeholder="applicant@email.com"
+                                        @keypress="blockSpecialForEmail" />
+                                    <p v-if="inputWarnings.email"
+                                        class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
+                                        inputWarnings.email }}</p>
+                                    <InputError class="mt-1 text-red-300" :message="form.errors.email" />
                                 </div>
-                                <div class="space-y-1.5">
-                                    <label
-                                        class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Position
-                                        Applied *</label>
-                                    <input v-model="form.position_applied" type="text" required
-                                        class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 text-sm">
+
+                                <div>
+                                    <InputLabel for="phone_raw" value="Phone Number (12 Digits)"
+                                        class="text-white/90 font-semibold" />
+                                    <div class="flex gap-2 mt-1">
+                                        <select v-model="form.phone_country"
+                                            class="w-[35%] py-3 px-2 bg-white/15 border border-white/30 text-white rounded-xl focus:border-blue-400 focus:ring-blue-400/40 custom-select text-center">
+                                            <option value="+63">+63 (PH)</option>
+                                            <option value="+1">+1 (US/CA)</option>
+                                            <option value="+44">+44 (UK)</option>
+                                            <option value="+61">+61 (AU)</option>
+                                            <option value="+81">+81 (JP)</option>
+                                            <option value="+65">+65 (SG)</option>
+                                            <option value="+971">+971 (AE)</option>
+                                        </select>
+                                        <TextInput id="phone_raw" type="text" maxlength="12"
+                                            class="w-[65%] py-3 px-4 bg-white/15 border border-white/30 text-white placeholder:text-slate-300 rounded-xl focus:border-blue-400 focus:ring-blue-400/40 font-mono"
+                                            v-model="form.phone_raw" required placeholder="912345678901"
+                                            @keypress="blockNonNumeric($event, 'phone_raw')" />
+                                    </div>
+                                    <div class="flex justify-between items-center mt-1 ml-1 pr-1">
+                                        <p v-if="inputWarnings.phone_raw"
+                                            class="text-xs text-red-300 font-bold animate-pulse">{{
+                                            inputWarnings.phone_raw }}</p>
+                                        <p v-else class="text-xs text-slate-300 transition-opacity">Numbers only.</p>
+                                        <p :class="form.phone_raw.length === 12 ? 'text-blue-300' : 'text-slate-300'"
+                                            class="text-xs font-bold transition-colors">{{ form.phone_raw.length }} / 12
+                                        </p>
+                                    </div>
+                                    <InputError class="mt-1 text-red-300" :message="form.errors.phone_number" />
                                 </div>
-                                <div class="space-y-1.5">
-                                    <label
-                                        class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Expected
-                                        Monthly Salary *</label>
-                                    <input v-model="form.expected_salary" type="number" step="0.01" required
-                                        class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 text-sm">
+
+                                <div>
+                                    <InputLabel for="position_applied" value="Position Applied"
+                                        class="text-white/90 font-semibold" />
+                                    <select id="position_applied" v-model="form.position_applied"
+                                        class="mt-1 block w-full py-3 px-4 bg-white/15 border border-white/30 text-white rounded-xl focus:border-blue-400 focus:ring-blue-400/40 custom-select"
+                                        required>
+                                        <option value="" disabled>Select Position...</option>
+                                        <option value="Human Resource Staff">Human Resource Staff</option>
+                                        <option value="Human Resource Manager">Human Resource Manager</option>
+                                        <option value="Warehouse Staff">Warehouse Staff</option>
+                                        <option value="Warehouse Manager">Warehouse Manager</option>
+                                        <option value="Company Driver">Company Driver</option>
+                                        <option value="Customer Relationship Staff">Customer Relationship Staff</option>
+                                        <option value="Customer Relationship Manager">Customer Relationship Manager
+                                        </option>
+                                        <option value="Procurement Staff">Procurement Staff</option>
+                                        <option value="Procurement Manager">Procurement Manager</option>
+                                        <option value="Accounting Staff">Accounting Staff</option>
+                                        <option value="Accounting Manager">Accounting Manager</option>
+                                        <option value="Manufacturing Staff">Manufacturing Staff</option>
+                                        <option value="Manufacturing Manager">Manufacturing Manager</option>
+                                        <option value="Color Chemist">Color Chemist</option>
+                                        <option value="I.T. Personel">I.T. Personel</option>
+                                    </select>
+                                    <InputError class="mt-1 text-red-300" :message="form.errors.position_applied" />
                                 </div>
-                                <div class="space-y-1.5">
-                                    <label
-                                        class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Notice
-                                        Period *</label>
-                                    <select v-model="form.notice_period"
-                                        class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 text-sm">
+
+                                <div>
+                                    <InputLabel for="expected_salary" value="Expected Monthly Salary (PHP)"
+                                        class="text-white/90 font-semibold" />
+                                    <TextInput id="expected_salary" type="number" step="0.01"
+                                        class="mt-1 block w-full py-3 px-4 bg-white/15 border border-white/30 text-white placeholder:text-slate-300 rounded-xl focus:border-blue-400 focus:ring-blue-400/40 font-mono tracking-wider"
+                                        v-model="form.expected_salary" required placeholder="0.00" />
+                                    <InputError class="mt-1 text-red-300" :message="form.errors.expected_salary" />
+                                </div>
+
+                                <div>
+                                    <InputLabel for="notice_period" value="Notice Period"
+                                        class="text-white/90 font-semibold" />
+                                    <select id="notice_period" v-model="form.notice_period"
+                                        class="mt-1 block w-full py-3 px-4 bg-white/15 border border-white/30 text-white rounded-xl focus:border-blue-400 focus:ring-blue-400/40 custom-select"
+                                        required>
                                         <option value="immediate">Immediate</option>
                                         <option value="15_days">15 Days</option>
                                         <option value="30_days">30 Days</option>
                                         <option value="60_days">60 Days</option>
                                     </select>
+                                    <InputError class="mt-1 text-red-300" :message="form.errors.notice_period" />
                                 </div>
-                                <div class="space-y-1.5">
-                                    <label
-                                        class="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Textile
-                                        Experience *</label>
-                                    <select v-model="form.textile_experience" required
-                                        class="w-full px-5 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none ring-1 ring-slate-200 dark:ring-slate-700 text-sm">
-                                        <option value="" disabled>Select Option</option>
+
+                                <div>
+                                    <InputLabel for="textile_experience" value="Textile Experience"
+                                        class="text-white/90 font-semibold" />
+                                    <select id="textile_experience" v-model="form.textile_experience"
+                                        class="mt-1 block w-full py-3 px-4 bg-white/15 border border-white/30 text-white rounded-xl focus:border-blue-400 focus:ring-blue-400/40 custom-select"
+                                        required>
+                                        <option value="" disabled>Select Option...</option>
                                         <option value="yes">Yes, I have experience</option>
                                         <option value="no">No experience yet</option>
                                     </select>
+                                    <InputError class="mt-1 text-red-300" :message="form.errors.textile_experience" />
                                 </div>
                             </div>
-                        </div>
 
-                        <div
-                            class="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
-                            <div class="flex items-center mb-8">
-                                <div
-                                    class="h-12 w-12 bg-emerald-600 rounded-2xl flex items-center justify-center mr-5 shadow-lg shadow-emerald-500/20">
-                                    <FileCheck class="text-white h-6 w-6" />
+                            <div class="grid grid-cols-1 gap-6">
+                                <div>
+                                    <h3
+                                        class="text-sm font-black uppercase tracking-widest text-blue-300 border-b border-white/20 pb-2 mb-4">
+                                        Compliance Documents</h3>
                                 </div>
-                                <h4 class="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tight">
-                                    Compliance Documents</h4>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div v-for="type in ['sss', 'philhealth', 'pagibig']" :key="type" class="space-y-3">
-                                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">{{
-                                        type }} ID Upload</p>
-                                    <div :class="form[type + '_file'] ? 'border-emerald-500 bg-emerald-50/30' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'"
-                                        class="relative h-40 rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center p-6 transition-all group overflow-hidden">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div v-for="type in ['sss', 'philhealth', 'pagibig']" :key="type" class="space-y-2">
+                                        <p class="text-[10px] font-black text-white/70 uppercase tracking-[0.2em] ml-1">
+                                            {{ type }} ID Upload</p>
 
-                                        <template v-if="!form[type + '_file']">
-                                            <Upload
-                                                class="h-6 w-6 text-slate-300 group-hover:text-blue-500 transition-colors mb-3" />
-                                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                                                Select Image</p>
-                                            <input type="file" @change="(e) => handleFileUpload(e, type)"
-                                                class="absolute inset-0 opacity-0 cursor-pointer"
-                                                accept=".jpg,.jpeg,.png">
-                                        </template>
+                                        <div :class="form[type + '_file'] ? 'border-emerald-400/50 bg-emerald-500/10' : 'border-white/30 bg-white/5 hover:border-blue-400/50'"
+                                            class="relative h-32 rounded-xl border-2 border-dashed flex flex-col items-center justify-center p-4 transition-all group overflow-hidden">
 
-                                        <template v-else>
-                                            <div class="flex flex-col items-center text-center">
-                                                <div
-                                                    class="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-full mb-2">
-                                                    <FileCheck class="h-6 w-6 text-emerald-600" />
-                                                </div>
+                                            <template v-if="!form[type + '_file']">
+                                                <Upload
+                                                    class="h-5 w-5 text-white/50 group-hover:text-blue-300 transition-colors mb-2" />
                                                 <p
-                                                    class="text-[10px] font-black text-emerald-800 dark:text-emerald-400 truncate w-24">
-                                                    {{ form[type + '_file'].name }}</p>
-                                                <button @click="removeFile(type)" type="button"
-                                                    class="mt-3 p-2 bg-rose-100 text-rose-600 rounded-xl hover:bg-rose-200 transition-colors">
-                                                    <Trash2 class="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        </template>
+                                                    class="text-[10px] text-white/70 font-bold uppercase tracking-widest">
+                                                    Select Image</p>
+                                                <input type="file" @change="(e) => handleFileUpload(e, type)"
+                                                    class="absolute inset-0 opacity-0 cursor-pointer"
+                                                    accept=".jpg,.jpeg,.png,.pdf">
+                                            </template>
+
+                                            <template v-else>
+                                                <div class="flex flex-col items-center text-center">
+                                                    <div class="p-1.5 bg-emerald-500/20 rounded-full mb-1">
+                                                        <FileCheck class="h-5 w-5 text-emerald-300" />
+                                                    </div>
+                                                    <p class="text-[10px] font-black text-emerald-200 truncate w-24">{{
+                                                        form[type + '_file'].name }}</p>
+                                                    <button @click="removeFile(type)" type="button"
+                                                        class="mt-2 p-1.5 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/40 transition-colors z-10 relative">
+                                                        <Trash2 class="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                            </template>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="flex flex-col sm:flex-row justify-between items-center py-10 gap-6">
                             <div
-                                class="flex items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                <ShieldCheck class="h-5 w-5 text-emerald-500 mr-2" /> Data Encryption Active
+                                class="flex flex-col sm:flex-row items-center justify-between gap-6 pt-8 border-t border-white/10 mt-6">
+                                <div
+                                    class="flex items-center text-[10px] font-black uppercase tracking-widest text-white/70">
+                                    <ShieldCheck class="h-5 w-5 text-blue-300 mr-2" /> Data Encryption Active
+                                </div>
+
+                                <PrimaryButton
+                                    class="w-full sm:w-auto px-10 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-lg shadow-blue-700/30 transition-all duration-200"
+                                    :class="{ 'opacity-60 cursor-wait': form.processing }" :disabled="form.processing">
+                                    <span v-if="form.processing">Processing...</span>
+                                    <span v-else class="flex items-center gap-2">
+                                        <Save class="w-4 h-4" /> Submit Application
+                                    </span>
+                                </PrimaryButton>
                             </div>
-                            <div class="flex gap-4 w-full sm:w-auto">
-                                <button type="submit" :disabled="form.processing"
-                                    class="w-full sm:w-auto flex items-center justify-center gap-3 px-12 py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-[1.5rem] font-bold text-sm shadow-2xl shadow-blue-500/30 active:scale-95 transition-all disabled:opacity-50">
-                                    <Save class="h-5 w-5" />
-                                    <span>{{ form.processing ? 'PROCESSING...' : 'SUBMIT APPLICATION' }}</span>
-                                </button>
+
+                            <div class="text-center mt-4 border-t border-white/10 pt-6">
+                                <Link href="/"
+                                    class="text-sm font-semibold text-slate-300 hover:text-white transition-colors">
+                                    &larr; Return to Home
+                                </Link>
                             </div>
-                        </div>
-                    </form>
+
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -352,21 +550,29 @@ const submitForm = () => {
 </template>
 
 <style scoped>
-.custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+.font-mono {
+    font-family: 'JetBrains Mono', monospace;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-slate-200 dark:bg-slate-800 rounded-full;
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px rgba(255, 255, 255, 0.08) inset !important;
+    -webkit-text-fill-color: white !important;
 }
 
 input,
 select,
 textarea {
-    @apply transition-all duration-300;
+    @apply transition-all duration-300 ease-in-out;
+}
+
+/* Ensure the <option> text is visible inside the transparent select field */
+.custom-select option {
+    background-color: #0f172a;
+    color: white;
 }
 </style>

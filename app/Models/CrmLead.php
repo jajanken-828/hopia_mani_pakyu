@@ -30,4 +30,19 @@ class CrmLead extends Model
     {
         return $this->morphMany(CrmInteraction::class, 'contactable');
     }
+
+    public function notes()
+    {
+        return $this->hasMany(LeadNote::class, 'lead_id');
+    }
+
+    public function interviews()
+    {
+        return $this->hasMany(LeadInterview::class, 'lead_id');
+    }
+
+    public function approvalFiles()
+    {
+        return $this->hasMany(LeadApprovalFile::class, 'lead_id');
+    }
 }

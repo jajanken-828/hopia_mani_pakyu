@@ -7,6 +7,7 @@ use App\Http\Controllers\client\InvoicesController;
 use App\Http\Controllers\client\OrdersController;
 use App\Http\Controllers\client\SupportController;
 use App\Http\Controllers\crm\manager\ApprovalController;
+use App\Http\Controllers\crm\manager\CrmApprovalController;
 use App\Http\Controllers\crm\manager\OversightController;
 use App\Http\Controllers\crm\manager\StrategyController;
 use App\Http\Controllers\crm\staff\CustomerprofileController;
@@ -27,6 +28,7 @@ use App\Http\Controllers\hrm\employee\LeaveController;
 use App\Http\Controllers\hrm\employee\TrainingController;
 use App\Http\Controllers\hrm\manager\AnalyticsController;
 use App\Http\Controllers\hrm\manager\ApplicantController;
+use App\Http\Controllers\hrm\manager\ManagerEmployeeController;
 use App\Http\Controllers\hrm\manager\OnboardingController;
 use App\Http\Controllers\hrm\manager\PayrollController;
 use App\Http\Controllers\inv\InventoryController as InvInventoryController;
@@ -76,10 +78,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-
-    // NEW: Specific route for the Employee Login UI (pointing to USERS/app.vue)
-    // routes/web.php
-
 });
 
 /*
@@ -296,6 +294,11 @@ Route::prefix('dashboard/hrm')->name('hrm.')->middleware(['auth', 'verified'])->
             ->middleware(['role:HRM', 'position:manager'])
             ->name('manager.onboarding');
     });
+
+    // ✅ FIXED: removed duplicate 'hrm/' from the URI
+    Route::post('/employees/{id}/toggle-status', [ManagerEmployeeController::class, 'toggleStatus'])
+        ->middleware(['role:HRM', 'position:manager'])
+        ->name('employees.toggle-status');
 
     Route::get('/payroll', [PayrollController::class, 'payroll'])
         ->middleware(['role:HRM', 'position:manager'])
@@ -514,32 +517,36 @@ Route::prefix('dashboard/war')->name('war.')->middleware(['auth', 'verified'])->
 
 // Inside the CRM group
 Route::prefix('dashboard/crm')->name('crm.')->middleware(['auth', 'verified'])->group(function () {
-    Route::get('/manager', [DashboardController::class, 'index'])
-        ->middleware(['role:CRM', 'position:manager'])
-        ->name('manager.dashboard');
+    // Unified dashboard for both manager and staff
+    Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::get('/approval', [ApprovalController::class, 'approval'])->name('approval');
-    Route::post('/approval/{id}/process', [ApprovalController::class, 'process'])->name('approval.process');
-    Route::get('/oversight', [OversightController::class, 'oversight'])->name('oversight');
-    Route::get('/strategy', [StrategyController::class, 'strategy'])->name('strategy');
-
-    Route::get('/staff', [DashboardController::class, 'index'])
-        ->middleware(['role:CRM', 'position:staff'])
-        ->name('employee.dashboard');
-    Route::get('/my-day', [StaffDayController::class, 'index'])->name('staff.day');
+    // Lead management (including notes, interviews, files, accept/reject)
     Route::get('/lead', [LeadController::class, 'lead'])->name('lead');
     Route::post('/lead/store', [LeadController::class, 'store'])->name('lead.store');
     Route::patch('/lead/{id}/status', [LeadController::class, 'updateStatus'])->name('lead.status');
-
     Route::post('/lead/convert', [LeadController::class, 'convertToClient'])->name('lead.convert');
 
-    // Customer profile – optional ID
-    Route::get('/customerprofile/{id?}', [CustomerprofileController::class, 'customerprofile'])
-        ->name('customerprofile');
+    // New routes for lead actions
+    Route::post('/lead/{id}/note', [LeadController::class, 'addNote'])->name('lead.add-note');
+    Route::post('/lead/{id}/interview', [LeadController::class, 'scheduleInterview'])->name('lead.schedule-interview');
+    Route::post('/lead/{id}/file', [LeadController::class, 'uploadApprovalFile'])->name('lead.upload-file');
+    Route::post('/lead/{id}/accept', [LeadController::class, 'acceptLead'])->name('lead.accept');
+    Route::post('/lead/{id}/reject', [LeadController::class, 'rejectLead'])->name('lead.reject');
 
-    // Store interaction (one definition only)
-    Route::post('/interaction/store', [CustomerprofileController::class, 'storeInteraction'])
-        ->name('interaction.store');
+    // Customer profiles (all partners)
+    Route::get('/customerprofile/{id?}', [CustomerprofileController::class, 'customerprofile'])->name('customerprofile');
+    Route::post('/interaction/store', [CustomerprofileController::class, 'storeInteraction'])->name('interaction.store');
+
+    // Approval queue for managers
+    Route::get('/approvals', [CrmApprovalController::class, 'index'])->name('approval.queue');
+    Route::post('/approvals/{id}/process', [CrmApprovalController::class, 'process'])->name('approval.process');
+
+    // Optional: keep old pages if still needed (rename old approval.process to avoid conflict)
+    Route::get('/approval', [ApprovalController::class, 'approval'])->name('approval');
+    Route::post('/approval/{id}/process', [ApprovalController::class, 'process'])->name('approval.old.process'); // renamed
+    Route::get('/oversight', [OversightController::class, 'oversight'])->name('oversight');
+    Route::get('/strategy', [StrategyController::class, 'strategy'])->name('strategy');
+    Route::get('/my-day', [StaffDayController::class, 'index'])->name('staff.day');
 });
 
 // E-Commerce (ECO)
