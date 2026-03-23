@@ -10,6 +10,7 @@ use App\Models\Scm\ScmPurchaseOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class InventoryController extends Controller
@@ -33,7 +34,7 @@ class InventoryController extends Controller
                 ->map(function (WarehouseMaterial $wm) {
                     $mat = $wm->material;
                     $qty = (float) $wm->quantity;
-                    $reorder = $mat->reorder_point;
+                    $reorder = $mat->reorder_point ?? 0;
 
                     if ($qty <= 0) {
                         $status = 'Out of Stock';
@@ -88,32 +89,42 @@ class InventoryController extends Controller
             'cost' => (float) $m->unit_cost,
         ])->values()->toArray();
 
-        // FETCH INCOMING DELIVERIES (Filters out fully received items)
+        // FETCH INCOMING DELIVERIES (Bulletproofed material resolution & pending filters)
         $incomingDeliveries = ScmPurchaseOrder::with('items')
             ->whereIn('status', ['shipping', 'delivered', 'partially_received'])
             ->orderBy('updated_at', 'desc')
             ->get()
             ->map(function ($po) {
-                // Calculate pending quantities for each item in the PO
                 $pendingItems = $po->items->map(function ($item) {
+
+                    // 1. Bulletproof Material ID Lookup (Fallback to SKU/Name if missing)
+                    $materialId = $item->material_id;
+                    if (! $materialId) {
+                        $mat = Material::where('mat_id', $item->sku ?? '')
+                            ->orWhere('name', $item->name ?? $item->material_name ?? '')
+                            ->first();
+                        $materialId = $mat ? $mat->id : null;
+                    }
+
                     $received = (float) ($item->received_qty ?? 0);
-                    $pending = max(0, (float) $item->qty - $received);
+                    $qty = (float) ($item->qty ?? 0);
+                    $pending = max(0, $qty - $received);
 
                     return [
                         'id' => $item->id,
-                        'material_id' => $item->material_id,
-                        'material_name' => $item->material_name,
-                        'qty' => $item->qty, // Originally Ordered
+                        'material_id' => $materialId,
+                        'material_name' => $item->name ?? $item->material_name ?? 'Unknown Material',
+                        'qty' => $qty, // Originally Ordered
                         'received_qty' => $received, // Total Received Historically
                         'pending_qty' => $pending, // Left to Receive NOW
-                        'unit' => $item->unit,
+                        'unit' => $item->unit ?? 'unit',
                     ];
-                })->filter(fn ($item) => $item['pending_qty'] > 0)->values(); // Only show items that still need receiving
+                })->filter(fn ($item) => $item['pending_qty'] > 0 && $item['material_id'])->values();
 
                 return [
                     'id' => $po->id,
                     'po_number' => $po->po_number,
-                    'supplier_name' => $po->supplier_name,
+                    'supplier_name' => $po->supplier_name ?? 'Vendor',
                     'status' => $po->status,
                     'items' => $pendingItems,
                 ];
@@ -129,21 +140,22 @@ class InventoryController extends Controller
         ]);
     }
 
-    // ── Receive Incoming Deliveries (Handles Partials) ────────────────────────
+    // ── Receive Incoming Deliveries (Bulletproof Transaction) ────────────────────────
 
     public function receiveDelivery(Request $request)
     {
-        $validated = $request->validate([
-            'po_id' => 'required|exists:scm_purchase_orders,id',
-            'warehouse_id' => 'required|exists:warehouses,id',
-            'items' => 'required|array',
-            'items.*.item_id' => 'required|exists:scm_purchase_order_items,id',
-            'items.*.material_id' => 'required|exists:materials,id',
-            'items.*.received_qty' => 'required|numeric|min:0',
-        ]);
-
-        DB::beginTransaction();
         try {
+            $validated = $request->validate([
+                'po_id' => 'required',
+                'warehouse_id' => 'required|exists:warehouses,id',
+                'items' => 'required|array',
+                'items.*.item_id' => 'required',
+                'items.*.material_id' => 'required|exists:materials,id',
+                'items.*.received_qty' => 'required|numeric|min:0',
+            ]);
+
+            DB::beginTransaction();
+
             $po = ScmPurchaseOrder::with('items')->findOrFail($validated['po_id']);
             $hasReceivedSomething = false;
 
@@ -161,40 +173,49 @@ class InventoryController extends Controller
                     $wm->quantity = ($wm->quantity ?? 0) + $rcvd;
                     $wm->save();
 
-                    // 2. Add 'Received Quantity' to the Purchase Order Item History
+                    // 2. Add 'Received Quantity' to the Purchase Order Item History (Schema-safe)
                     $poItem = $po->items->where('id', $itemData['item_id'])->first();
                     if ($poItem) {
-                        $poItem->received_qty = ($poItem->received_qty ?? 0) + $rcvd;
-                        $poItem->save();
+                        if (Schema::hasColumn($poItem->getTable(), 'received_qty')) {
+                            $poItem->received_qty = ($poItem->received_qty ?? 0) + $rcvd;
+                            $poItem->save();
+                        }
                     }
                 }
             }
 
-            // 3. Determine if the PO is FULLY received or just PARTIALLY received
+            // 3. Determine PO Status safely
             $po->refresh();
             $allFullyReceived = true;
 
-            foreach ($po->items as $item) {
-                if (($item->received_qty ?? 0) < $item->qty) {
-                    $allFullyReceived = false;
-                    break;
+            if (Schema::hasColumn($po->items()->getRelated()->getTable(), 'received_qty')) {
+                foreach ($po->items as $item) {
+                    if ((float) ($item->received_qty ?? 0) < (float) ($item->qty ?? 0)) {
+                        $allFullyReceived = false;
+                        break;
+                    }
                 }
+            } else {
+                $allFullyReceived = true; // Default to fully received if no tracking column exists
             }
 
             if ($allFullyReceived) {
-                $po->update(['status' => 'received']);
+                $po->update(['status' => 'delivered']);
             } elseif ($hasReceivedSomething) {
                 $po->update(['status' => 'partially_received']);
             }
 
             DB::commit();
 
-            return redirect()->back()->with('success', 'Delivery received and inventory updated!');
+            return redirect()->back()->with('message', 'Delivery received and inventory updated!');
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->back()->withErrors($e->errors());
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Receiving failed: '.$e->getMessage());
+            Log::error('Receive delivery failed: '.$e->getMessage());
 
-            return redirect()->back()->withErrors(['error' => 'Failed to process receiving.']);
+            return redirect()->back()->withErrors(['error' => 'Processing failed: '.$e->getMessage()]);
         }
     }
 
@@ -213,7 +234,7 @@ class InventoryController extends Controller
 
         Warehouse::create($data);
 
-        return redirect()->back()->with('success', 'Warehouse created.');
+        return redirect()->back()->with('message', 'Warehouse created successfully.');
     }
 
     // ── Add Item to Warehouse ─────────────────────────────────────────────────
@@ -231,10 +252,10 @@ class InventoryController extends Controller
             'material_id' => $data['material_id'],
         ]);
 
-        $wm->quantity = $wm->quantity + (float) $data['quantity'];
+        $wm->quantity = ($wm->quantity ?? 0) + (float) $data['quantity'];
         $wm->save();
 
-        return redirect()->back()->with('success', 'Item added to warehouse.');
+        return redirect()->back()->with('message', 'Item added to warehouse.');
     }
 
     // ── Remove Item from Warehouse ────────────────────────────────────────────
@@ -243,6 +264,6 @@ class InventoryController extends Controller
     {
         WarehouseMaterial::findOrFail($wmId)->delete();
 
-        return redirect()->back()->with('success', 'Item removed.');
+        return redirect()->back()->with('message', 'Item removed.');
     }
 }

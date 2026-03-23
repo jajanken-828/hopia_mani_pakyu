@@ -8,13 +8,15 @@ import {
     X, Edit2, Trash2, BarChart2, ArrowUpDown, Truck,
     ArrowLeft, CheckSquare, ClipboardCheck, DollarSign
 } from 'lucide-vue-next';
+import { toast } from 'vue3-toastify';
+import 'vue3-toastify/dist/index.css';
 
 // ─── Props from Inertia ───────────────────────────────────────────────────────
 const props = defineProps({
     warehouses: { type: Array, default: () => [] },
     inventoryData: { type: Object, default: () => ({}) },
     masterMaterials: { type: Array, default: () => [] },
-    incomingDeliveries: { type: Array, default: () => [] }, // New Prop for Incoming POs
+    incomingDeliveries: { type: Array, default: () => [] },
 });
 
 // ─── Reactive copies ──────────────────────────────────────────────────────────
@@ -65,8 +67,8 @@ const selectDelivery = (delivery) => {
         item_id: item.id,
         material_id: item.material_id,
         material_name: item.material_name,
-        expected_qty: item.qty,
-        received_qty: item.qty, // Pre-fill with expected quantity
+        expected_qty: item.pending_qty, // Correctly mapped to pending to avoid over-receiving
+        received_qty: item.pending_qty, // Pre-fill with what is left
         unit: item.unit
     }));
 };
@@ -74,9 +76,14 @@ const selectDelivery = (delivery) => {
 const submitReceiveDelivery = () => {
     receiveForm.post(route('inv.manager.inventory.receive'), {
         preserveScroll: true,
-        onSuccess: () => {
+        onSuccess: (page) => {
             showReceiveModal.value = false;
             selectedDelivery.value = null;
+            toast.success(page.props.flash?.message || 'Delivery received and stock updated!');
+        },
+        onError: (errors) => {
+            const msg = errors.error || Object.values(errors)[0] || 'Failed to receive delivery.';
+            toast.error(msg);
         }
     });
 };
@@ -134,7 +141,9 @@ const addWarehouse = () => {
         onSuccess: () => {
             newWarehouse.value = { name: '', location: '', manager: '' };
             showAddWarehouse.value = false;
+            toast.success('Warehouse created successfully.');
         },
+        onError: () => toast.error('Failed to create warehouse.'),
         onFinish: () => (processing.value = false),
     });
 };
@@ -151,7 +160,9 @@ const addItem = () => {
         onSuccess: () => {
             newItem.value = { material_id: '', quantity: '' };
             showAddItem.value = false;
+            toast.success('Item added to warehouse.');
         },
+        onError: () => toast.error('Failed to add item.'),
         onFinish: () => (processing.value = false),
     });
 };
@@ -160,6 +171,7 @@ const deleteItem = (wmId) => {
     if (!confirm('Remove this item from the warehouse?')) return;
     router.delete(route('inv.manager.inventory.item.destroy', { wmId }), {
         preserveScroll: true,
+        onSuccess: () => toast.success('Item removed.'),
     });
 };
 
@@ -422,7 +434,7 @@ const fmt = (n) => Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2,
                     class="px-5 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                     <p class="text-xs text-slate-400 font-medium">
                         Showing <span class="font-bold text-slate-600 dark:text-slate-300">{{ filteredInventory.length
-                        }}</span> of <span class="font-bold text-slate-600 dark:text-slate-300">{{
+                            }}</span> of <span class="font-bold text-slate-600 dark:text-slate-300">{{
                                 activeInventory.length }}</span> items
                     </p>
                     <div class="flex items-center gap-1.5">
@@ -454,7 +466,7 @@ const fmt = (n) => Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2,
                                 </h3>
                                 <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                     {{ selectedDelivery ? `PO: ${selectedDelivery.po_number}` :
-                                    'Purchaseordersarrivingfromsuppliers.' }}
+                                        'Purchase orders arriving from suppliers.' }}
                                 </p>
                             </div>
                         </div>
@@ -485,7 +497,8 @@ const fmt = (n) => Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2,
                                 <p class="text-sm font-bold text-slate-800 dark:text-slate-200">{{
                                     delivery.supplier_name }}</p>
                                 <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
-                                    <Package class="w-3.5 h-3.5" /> {{ delivery.items?.length || 0 }} items to receive
+                                    <Package class="w-3.5 h-3.5" /> {{ delivery.items?.length || 0 }} items left to
+                                    receive
                                 </p>
                             </div>
                             <div class="flex items-end">
@@ -520,9 +533,10 @@ const fmt = (n) => Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2,
                                     <div class="sm:col-span-2">
                                         <p class="text-sm font-bold text-slate-800 dark:text-white">{{
                                             item.material_name }}</p>
-                                        <p class="text-[10px] text-slate-500 font-medium mt-0.5">Expected: {{
-                                            item.expected_qty
-                                        }} {{ item.unit }}</p>
+                                        <p class="text-[10px] text-slate-500 font-medium mt-0.5">Pending left to
+                                            receive: <span class="font-black text-slate-700 dark:text-slate-300">{{
+                                                item.expected_qty
+                                                }} {{ item.unit }}</span></p>
                                     </div>
                                     <div>
                                         <label
@@ -533,7 +547,7 @@ const fmt = (n) => Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2,
                                                 :max="item.expected_qty"
                                                 class="w-full pl-3 pr-10 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-emerald-500/20 font-black text-emerald-700 dark:text-emerald-400" />
                                             <span class="absolute right-3 text-xs font-bold text-slate-400">{{ item.unit
-                                            }}</span>
+                                                }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -549,7 +563,7 @@ const fmt = (n) => Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2,
                             :disabled="receiveForm.processing || !receiveForm.warehouse_id"
                             class="flex-[2] inline-flex items-center justify-center gap-2 py-3 text-sm font-black rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20 disabled:opacity-50">
                             <ClipboardCheck class="w-4 h-4" /> {{ receiveForm.processing ? 'Updating...' :
-                                'Confirm&UpdateStock'
+                                'Confirm & Update Stock'
                             }}
                         </button>
                     </div>
@@ -648,7 +662,7 @@ const fmt = (n) => Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2,
                                     <div>
                                         <p class="text-sm font-bold text-slate-700 dark:text-slate-300">{{ m.name }}</p>
                                         <p class="text-[11px] text-slate-400 mt-0.5">{{ m.category }} · ₱{{ fmt(m.cost)
-                                        }} per {{ m.unit }}</p>
+                                            }} per {{ m.unit }}</p>
                                     </div>
                                 </div>
                             </template>

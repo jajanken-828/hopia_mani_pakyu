@@ -271,7 +271,7 @@ const submitForm = () => {
                                         @keypress="blockNumbersAndSpecial($event, 'first_name')" />
                                     <p v-if="inputWarnings.first_name"
                                         class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
-                                        inputWarnings.first_name }}</p>
+                                            inputWarnings.first_name }}</p>
                                     <InputError class="mt-1 text-red-300" :message="form.errors.first_name" />
                                 </div>
 
@@ -284,7 +284,7 @@ const submitForm = () => {
                                         @keypress="blockNumbersAndSpecial($event, 'middle_name')" />
                                     <p v-if="inputWarnings.middle_name"
                                         class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
-                                        inputWarnings.middle_name }}</p>
+                                            inputWarnings.middle_name }}</p>
                                     <InputError class="mt-1 text-red-300" :message="form.errors.middle_name" />
                                 </div>
 
@@ -296,7 +296,7 @@ const submitForm = () => {
                                         @keypress="blockNumbersAndSpecial($event, 'last_name')" />
                                     <p v-if="inputWarnings.last_name"
                                         class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
-                                        inputWarnings.last_name }}</p>
+                                            inputWarnings.last_name }}</p>
                                     <InputError class="mt-1 text-red-300" :message="form.errors.last_name" />
                                 </div>
                             </div>
@@ -317,7 +317,7 @@ const submitForm = () => {
                                         placeholder="123 Main St., Brgy. San Jose" @keypress="blockSpecialForAddress" />
                                     <p v-if="inputWarnings.street_address"
                                         class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
-                                        inputWarnings.street_address }}</p>
+                                            inputWarnings.street_address }}</p>
                                     <InputError class="mt-1 text-red-300" :message="form.errors.street_address" />
                                 </div>
 
@@ -329,7 +329,7 @@ const submitForm = () => {
                                         @keypress="blockNumbersAndSpecial($event, 'city')" />
                                     <p v-if="inputWarnings.city"
                                         class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
-                                        inputWarnings.city }}</p>
+                                            inputWarnings.city }}</p>
                                     <InputError class="mt-1 text-red-300" :message="form.errors.city" />
                                 </div>
 
@@ -342,7 +342,7 @@ const submitForm = () => {
                                         @keypress="blockNumbersAndSpecial($event, 'state_province')" />
                                     <p v-if="inputWarnings.state_province"
                                         class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
-                                        inputWarnings.state_province }}</p>
+                                            inputWarnings.state_province }}</p>
                                     <InputError class="mt-1 text-red-300" :message="form.errors.state_province" />
                                 </div>
 
@@ -355,7 +355,7 @@ const submitForm = () => {
                                         @keypress="blockNonNumeric($event, 'postal_zip_code')" />
                                     <p v-if="inputWarnings.postal_zip_code"
                                         class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
-                                        inputWarnings.postal_zip_code }}</p>
+                                            inputWarnings.postal_zip_code }}</p>
                                     <InputError class="mt-1 text-red-300" :message="form.errors.postal_zip_code" />
                                 </div>
                             </div>
@@ -375,7 +375,7 @@ const submitForm = () => {
                                         @keypress="blockSpecialForEmail" />
                                     <p v-if="inputWarnings.email"
                                         class="text-xs text-red-300 font-bold mt-1 ml-1 animate-pulse">{{
-                                        inputWarnings.email }}</p>
+                                            inputWarnings.email }}</p>
                                     <InputError class="mt-1 text-red-300" :message="form.errors.email" />
                                 </div>
 
@@ -401,7 +401,7 @@ const submitForm = () => {
                                     <div class="flex justify-between items-center mt-1 ml-1 pr-1">
                                         <p v-if="inputWarnings.phone_raw"
                                             class="text-xs text-red-300 font-bold animate-pulse">{{
-                                            inputWarnings.phone_raw }}</p>
+                                                inputWarnings.phone_raw }}</p>
                                         <p v-else class="text-xs text-slate-300 transition-opacity">Numbers only.</p>
                                         <p :class="form.phone_raw.length === 12 ? 'text-blue-300' : 'text-slate-300'"
                                             class="text-xs font-bold transition-colors">{{ form.phone_raw.length }} / 12
@@ -433,6 +433,10 @@ const submitForm = () => {
                                         <option value="Manufacturing Manager">Manufacturing Manager</option>
                                         <option value="Color Chemist">Color Chemist</option>
                                         <option value="I.T. Personel">I.T. Personel</option>
+                                        <option value="Procurement Staff">Procurement Staff</option>
+                                        <option value="Procurement Manager">Procurement Manager</option>
+                                        <option value="Project Automation Staff">Project Automation Staff</option>
+                                        <option value="Project Automation Manager">Project Automation Manager</option>
                                     </select>
                                     <InputError class="mt-1 text-red-300" :message="form.errors.position_applied" />
                                 </div>

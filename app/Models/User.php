@@ -210,6 +210,12 @@ class User extends Authenticatable
             ['CRM', 'staff'] => route('crm.employee.dashboard'),
             ['ECO', 'manager'] => route('eco.manager.dashboard'),
             ['ECO', 'staff'] => route('eco.employee.dashboard'),
+            ['PRO', 'manager'] => route('pro.manager.dashboard'),
+            ['PRO', 'staff'] => route('pro.employee.dashboard'),
+            ['PROJ', 'manager'] => route('proj.manager.dashboard'),
+            ['PROJ', 'staff'] => route('proj.employee.dashboard'),
+            ['IT', 'manager'] => route('it.manager.dashboard'),
+            ['IT', 'staff'] => route('it.employee.dashboard'),
             default => route('dashboard'),
         };
     }

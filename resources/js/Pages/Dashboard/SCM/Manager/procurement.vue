@@ -455,7 +455,7 @@ const submitPayment = () => {
                 <span v-if="localMaterialRequests.filter(r => r.status === 'pending').length > 0"
                     class="flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 px-3 py-1.5 rounded-full font-medium border border-amber-100 dark:border-amber-800/30">
                     <AlertTriangle class="w-3.5 h-3.5" /> {{localMaterialRequests.filter(r => r.status ===
-                    'pending').length }} Pending Requests
+                        'pending').length}} Pending Requests
                 </span>
                 <span v-if="rfqResponseCount > 0"
                     class="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-full font-medium border border-blue-100 dark:border-blue-800/30">
@@ -674,21 +674,21 @@ const submitPayment = () => {
                                 Pending Actions
                                 <span
                                     :class="['ml-1.5 px-2 py-0.5 rounded-full text-[10px] transition-colors', mrTab === 'pending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400']">{{
-                                    countMR('pending') }}</span>
+                                        countMR('pending') }}</span>
                             </button>
                             <button @click="mrTab = 'processing'"
                                 :class="['pb-3 text-sm font-black border-b-2 transition-all whitespace-nowrap', mrTab === 'processing' ? 'border-amber-500 text-amber-600 dark:text-amber-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300']">
                                 On Process
                                 <span
                                     :class="['ml-1.5 px-2 py-0.5 rounded-full text-[10px] transition-colors', mrTab === 'processing' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400']">{{
-                                    countMR('processing') }}</span>
+                                        countMR('processing') }}</span>
                             </button>
                             <button @click="mrTab = 'completed'"
                                 :class="['pb-3 text-sm font-black border-b-2 transition-all whitespace-nowrap', mrTab === 'completed' ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300']">
                                 Completed
                                 <span
                                     :class="['ml-1.5 px-2 py-0.5 rounded-full text-[10px] transition-colors', mrTab === 'completed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400']">{{
-                                    countMR('completed') }}</span>
+                                        countMR('completed') }}</span>
                             </button>
                         </div>
 
@@ -709,7 +709,7 @@ const submitPayment = () => {
                                                 statusLabel(req.status) }}</span>
                                     </div>
                                     <p class="font-semibold text-slate-800 dark:text-white text-sm">{{ req.material_name
-                                    }}</p>
+                                        }}</p>
                                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{{ req.category }}
                                         &nbsp;·&nbsp; Requested: <strong>{{ Number(req.required_qty).toLocaleString() }}
                                             {{ req.unit }}</strong> &nbsp;·&nbsp; In Stock: <strong>{{
@@ -724,14 +724,14 @@ const submitPayment = () => {
                                             req.notes }}</p>
                                 </div>
                                 <div class="flex items-center gap-2 flex-shrink-0 mt-2 sm:mt-0">
-                                    <div class="text-left sm:text-right mr-2 sm:block flex-1 sm:flex-none">
+                                    <!-- <div class="text-left sm:text-right mr-2 sm:block flex-1 sm:flex-none">
                                         <p class="text-xs text-slate-400 font-medium">Reorder Gap</p>
                                         <p
                                             :class="['text-sm font-bold', req.current_stock < req.required_qty ? 'text-red-600' : 'text-emerald-600']">
                                             {{ req.current_stock < req.required_qty ? '-' + (req.required_qty -
                                                 req.current_stock).toLocaleString() + ' ' + req.unit : 'Sufficient' }}
                                                 </p>
-                                    </div>
+                                    </div> -->
                                     <button v-if="req.status === 'pending'" @click="openCreateRFQ(req)"
                                         class="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition-all shadow-sm flex-1 sm:flex-none">
                                         <Send class="w-3.5 h-3.5" /> Create RFQ
@@ -932,7 +932,7 @@ const submitPayment = () => {
                                         <span v-for="item in po.items" :key="item.id"
                                             class="flex items-center gap-1.5 font-medium">
                                             <Package class="w-3 h-3 text-slate-400" /> {{ item.material_name }}: {{
-                                            item.qty }} {{
+                                                item.qty }} {{
                                                 item.unit }} @ {{
                                                 formatCurrency(item.unit_price) }}
                                         </span>
@@ -1048,7 +1048,7 @@ const submitPayment = () => {
                                             <div class="flex items-center gap-2 mt-1">
                                                 <span
                                                     class="text-xs font-mono font-semibold text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">{{
-                                                    inv.invoice_number }}</span>
+                                                        inv.invoice_number }}</span>
                                             </div>
                                             <p
                                                 class="text-[10px] text-red-600 dark:text-red-400 font-semibold uppercase tracking-wider mt-2">
@@ -1084,13 +1084,13 @@ const submitPayment = () => {
                                         <div>
                                             <span
                                                 class="font-mono text-[10px] font-bold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded">{{
-                                                pay.payment_number }}</span>
+                                                    pay.payment_number }}</span>
                                             <p class="font-bold text-sm text-slate-800 dark:text-white mt-1">{{
                                                 pay.supplier_name }}</p>
                                         </div>
                                         <span
                                             :class="['text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md', statusBadge(pay.status)]">{{
-                                            pay.status }}</span>
+                                                pay.status }}</span>
                                     </div>
                                     <div class="grid grid-cols-2 gap-2 text-xs mb-3">
                                         <div>
@@ -1101,14 +1101,15 @@ const submitPayment = () => {
                                         <div>
                                             <p class="text-[9px] text-slate-400 uppercase font-bold">Date</p>
                                             <p class="text-slate-600 dark:text-slate-300 font-medium">{{ pay.paid_date
-                                                }}</p>
+                                            }}</p>
                                         </div>
                                         <div class="col-span-2">
                                             <p class="text-[9px] text-slate-400 uppercase font-bold">Method / Ref</p>
                                             <p class="text-slate-600 dark:text-slate-300 font-medium">{{ pay.method }}
                                                 <span class="text-slate-400 mx-1">•</span> <span class="font-mono">{{
                                                     pay.bank_reference
-                                                    }}</span></p>
+                                                }}</span>
+                                            </p>
                                         </div>
                                     </div>
                                     <div
@@ -1117,7 +1118,7 @@ const submitPayment = () => {
                                             Paid</p>
                                         <p class="font-black text-emerald-600 dark:text-emerald-400 text-base">{{
                                             formatCurrency(pay.amount)
-                                            }}</p>
+                                        }}</p>
                                     </div>
                                 </div>
                             </div>
@@ -1214,7 +1215,7 @@ const submitPayment = () => {
                             </h3>
                             <p class="text-[10px] sm:text-xs font-bold text-slate-500 mt-1 uppercase tracking-widest">{{
                                 rfqTargetRequest?.req_number }} <span class="text-slate-300 mx-1">•</span> {{
-                                rfqTargetRequest?.material_name }}</p>
+                                    rfqTargetRequest?.material_name }}</p>
                         </div>
                         <button @click="showRFQModal = false"
                             class="p-2 bg-white dark:bg-slate-700 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-600 shadow-sm transition-all">
@@ -1241,7 +1242,7 @@ const submitPayment = () => {
                                         class="w-full pl-3 pr-12 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 font-bold dark:text-white" />
                                     <span
                                         class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">{{
-                                        rfqForm.unit }}</span>
+                                            rfqForm.unit }}</span>
                                 </div>
                             </div>
                             <div>
@@ -1343,7 +1344,7 @@ const submitPayment = () => {
                                         <p
                                             class="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                                             {{
-                                            sup.representative_name }} <span class="mx-1">•</span> {{ sup.email }}</p>
+                                                sup.representative_name }} <span class="mx-1">•</span> {{ sup.email }}</p>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3 pl-8 sm:pl-0 flex-shrink-0">
@@ -1370,7 +1371,7 @@ const submitPayment = () => {
                             :class="['w-full sm:flex-1 py-3 rounded-xl text-sm font-black flex justify-center items-center gap-2 transition-all', rfqForm.selected_suppliers.length > 0 ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed']">
                             <Send class="w-4 h-4" />
                             <span>{{ isLoading ? 'Sending...' : `Send RFQ (${rfqForm.selected_suppliers.length})`
-                                }}</span>
+                            }}</span>
                         </button>
                     </div>
                 </div>
@@ -1415,7 +1416,7 @@ const submitPayment = () => {
                                 <p class="text-sm font-bold text-slate-800 dark:text-white">{{
                                     Number(selectedRFQ.required_qty).toLocaleString() }} <span
                                         class="text-xs text-slate-500">{{
-                                        selectedRFQ.unit }}</span></p>
+                                            selectedRFQ.unit }}</span></p>
                             </div>
                             <div>
                                 <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Deadline
@@ -1437,7 +1438,7 @@ const submitPayment = () => {
                                 <span>Supplier Responses</span>
                                 <span
                                     class="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-md text-[10px] uppercase tracking-widest">{{
-                                    selectedRFQ.responses?.length || 0 }} Total</span>
+                                        selectedRFQ.responses?.length || 0 }} Total</span>
                             </p>
 
                             <div v-if="!selectedRFQ.responses?.length"
@@ -1452,7 +1453,7 @@ const submitPayment = () => {
                                             res.supplier_name }}</p>
                                         <span
                                             :class="['text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md whitespace-nowrap', statusBadge(res.status)]">{{
-                                            statusLabel(res.status) }}</span>
+                                                statusLabel(res.status) }}</span>
                                     </div>
                                     <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
                                         <div>
@@ -1514,12 +1515,12 @@ const submitPayment = () => {
                                         class="font-semibold text-emerald-600 dark:text-emerald-500 text-xs">Supplier</span>
                                     <strong class="font-black truncate max-w-[180px]">{{
                                         selectedQuotationToAccept.supplier_name
-                                        }}</strong>
+                                    }}</strong>
                                 </p>
                                 <p class="flex justify-between items-center"><span
                                         class="font-semibold text-emerald-600 dark:text-emerald-500 text-xs">Material</span>
                                     <strong class="font-black truncate max-w-[180px]">{{ acceptingRFQ?.material_name
-                                        }}</strong>
+                                    }}</strong>
                                 </p>
                                 <p class="flex justify-between items-center"><span
                                         class="font-semibold text-emerald-600 dark:text-emerald-500 text-xs">Quantity</span>
@@ -1531,7 +1532,7 @@ const submitPayment = () => {
                                             class="font-black uppercase tracking-widest text-[10px] text-emerald-600 dark:text-emerald-500">Subtotal</span>
                                         <strong class="font-bold">{{
                                             formatCurrency(selectedQuotationToAccept.total_price)
-                                            }}</strong>
+                                        }}</strong>
                                     </p>
                                     <p class="flex justify-between items-center mt-1"><span
                                             class="font-black uppercase tracking-widest text-[10px] text-emerald-600 dark:text-emerald-500">Tax
@@ -1635,7 +1636,7 @@ const submitPayment = () => {
                                     {{ selectedPO.po_number }}</p>
                                 <span
                                     :class="['text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md whitespace-nowrap', statusBadge(selectedPO.status)]">{{
-                                    statusLabel(selectedPO.status) }}</span>
+                                        statusLabel(selectedPO.status) }}</span>
                             </div>
                         </div>
                         <button @click="showPODetailModal = false"
@@ -1650,7 +1651,7 @@ const submitPayment = () => {
                                 <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Supplier
                                 </p>
                                 <p class="text-sm font-black text-slate-800 dark:text-white">{{ selectedPO.supplier_name
-                                    }}</p>
+                                }}</p>
                             </div>
                             <div>
                                 <p class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Issue
@@ -1687,19 +1688,19 @@ const submitPayment = () => {
                                                 <span
                                                     class="block sm:hidden text-[10px] text-slate-400 font-medium mt-0.5">@
                                                     {{
-                                                    formatCurrency(item.unit_price) }}</span>
+                                                        formatCurrency(item.unit_price) }}</span>
                                             </td>
                                             <td
                                                 class="px-4 py-3 text-right font-medium text-slate-600 dark:text-slate-300">
                                                 {{
-                                                item.qty }} <span class="text-[10px] text-slate-400">{{ item.unit
-                                                    }}</span></td>
+                                                    item.qty }} <span class="text-[10px] text-slate-400">{{ item.unit
+                                                }}</span></td>
                                             <td
                                                 class="px-4 py-3 text-right font-medium text-slate-600 dark:text-slate-300 hidden sm:table-cell">
                                                 {{ formatCurrency(item.unit_price) }}</td>
                                             <td class="px-4 py-3 text-right font-black text-slate-800 dark:text-white">
                                                 {{
-                                                formatCurrency(item.total) }}</td>
+                                                    formatCurrency(item.total) }}</td>
                                         </tr>
                                     </tbody>
                                     <tfoot class="bg-slate-50 dark:bg-slate-800/50">

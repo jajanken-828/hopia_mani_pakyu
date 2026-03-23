@@ -36,7 +36,9 @@ import {
     ShieldCheck,
     Building2,
     RefreshCw,
-    ClipboardCheck, // Added for Approval Queue
+    ClipboardCheck,
+    FileText,
+    Send,
 } from 'lucide-vue-next'
 
 const page = usePage()
@@ -47,7 +49,7 @@ const client = computed(() => page.props.auth.client)
 const supplier = computed(() => page.props.auth.supplier || (page.props.auth.user?.business_name ? page.props.auth.user : null))
 const currentUrl = computed(() => page.url)
 
-// State for the Workforce dropdown
+// State for the Workforce dropdown (HRM specifically)
 const isWorkforceOpen = ref(false)
 const toggleWorkforce = () => {
     isWorkforceOpen.value = !isWorkforceOpen.value
@@ -61,7 +63,9 @@ const isClient = computed(() => !!client.value)
 const isSupplier = computed(() => !!supplier.value || currentUrl.value.startsWith('/supplier'))
 
 const navItems = computed(() => {
-    // --- Supplier Navigation ---
+    // ─────────────────────────────────────────────────────────────────
+    // 1. Supplier Navigation (B2B Vendor Hub)
+    // ─────────────────────────────────────────────────────────────────
     if (isSupplier.value) {
         return [
             { label: 'Vendor Hub', href: route('supplier.dashboard'), icon: LayoutDashboard },
@@ -69,7 +73,9 @@ const navItems = computed(() => {
         ]
     }
 
-    // --- Client Navigation (B2B) ---
+    // ─────────────────────────────────────────────────────────────────
+    // 2. Client Navigation (B2B Customer Portal)
+    // ─────────────────────────────────────────────────────────────────
     if (isClient.value) {
         return [
             { label: 'Dashboard', href: route('client.dashboard'), icon: LayoutDashboard },
@@ -79,7 +85,9 @@ const navItems = computed(() => {
         ]
     }
 
-    // --- Employee ID Portal Navigation ---
+    // ─────────────────────────────────────────────────────────────────
+    // 3. Unified Employee Portal Navigation (Self-Service)
+    // ─────────────────────────────────────────────────────────────────
     if (isEmployeePortal.value) {
         return [
             { label: 'Employee Dashboard', href: route('employee.ui.dashboard'), icon: Clock },
@@ -89,7 +97,9 @@ const navItems = computed(() => {
         ]
     }
 
-    // --- Standard ERP Navigation ---
+    // ─────────────────────────────────────────────────────────────────
+    // 4. Standard Enterprise ERP Navigation
+    // ─────────────────────────────────────────────────────────────────
     const items = [
         { label: 'Main Dashboard', href: route('dashboard'), icon: LayoutDashboard },
     ]
@@ -97,16 +107,17 @@ const navItems = computed(() => {
     const userRole = user.value?.role?.toUpperCase()
     const userPosition = user.value?.position?.toLowerCase()
 
-    // --- Trainee Navigation ---
+    // --- Trainee Specific Routing ---
     if (userPosition === 'trainee') {
         items.push(
             { label: 'Time In/Out', href: route('trainee.timekeeping'), icon: Clock },
             { label: 'Attendance', href: route('trainee.attendance'), icon: CalendarDays },
             { label: 'Payslips', href: route('trainee.payslip'), icon: HandCoins }
         );
-        return items;
+        return items; // Trainees cannot see normal module links
     }
 
+    // --- Human Resources (HRM) ---
     if (userRole === 'HRM') {
         if (userPosition === 'manager') {
             items.push(
@@ -142,11 +153,12 @@ const navItems = computed(() => {
         }
     }
 
+    // --- Supply Chain Management (SCM) ---
     if (userRole === 'SCM') {
         if (userPosition === 'manager') {
             items.push(
-                { label: 'Procurement', href: route('scm.manager.procurement'), icon: Truck },
-                { label: 'Supplier Management', href: route('scm.manager.vendor'), icon: ChartNoAxesCombined },
+                { label: 'Payment Approval', href: route('scm.manager.payments'), icon: HandCoins },
+                { label: 'Vendor Management', href: route('scm.manager.vendor'), icon: ChartNoAxesCombined },
                 { label: 'Close', href: route('scm.manager.close'), icon: DoorOpen }
             )
         } else if (userPosition === 'staff') {
@@ -159,10 +171,12 @@ const navItems = computed(() => {
         }
     }
 
+    // --- Financial Operations (FIN) ---
     if (userRole === 'FIN') {
         items.push({ label: 'Finance', href: userPosition === 'manager' ? route('fin.manager.dashboard') : route('fin.employee.dashboard'), icon: Wallet })
     }
 
+    // --- Manufacturing Plant (MAN) ---
     if (userRole === 'MAN') {
         items.push({ label: 'Manufacturing', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: Factory })
         items.push({ label: 'Production Orders', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: ClipboardList })
@@ -170,6 +184,7 @@ const navItems = computed(() => {
         items.push({ label: 'Maintenance', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: Receipt })
     }
 
+    // --- Inventory & Logistics (INV) ---
     if (userRole === 'INV') {
         items.push({ label: 'Inventory', href: userPosition === 'manager' ? route('inv.manager.inventory') : route('inv.employee.dashboard'), icon: Boxes })
         if (userPosition === 'manager') {
@@ -178,34 +193,28 @@ const navItems = computed(() => {
         }
     }
 
+    // --- Order Fulfillment (ORD) ---
     if (userRole === 'ORD') {
         items.push({ label: 'Orders', href: userPosition === 'manager' ? route('ord.manager.dashboard') : route('ord.employee.dashboard'), icon: ShoppingCart })
     }
 
+    // --- Warehouse Management (WAR) ---
     if (userRole === 'WAR') {
         items.push({ label: 'Warehouse', href: userPosition === 'manager' ? route('war.manager.dashboard') : route('war.employee.dashboard'), icon: Warehouse })
     }
 
-    // ===================== UPDATED CRM SECTION =====================
+    // --- Customer Relationship Management (CRM) ---
     if (userRole === 'CRM') {
-        // Common items for both manager and staff
         items.push(
-            // { label: 'CRM Dashboard', href: route('crm.dashboard'), icon: LayoutDashboard },
             { label: 'Lead & Deals', href: route('crm.lead'), icon: FileUser },
             { label: 'Customer Profiles', href: route('crm.customerprofile'), icon: Users }
         );
-
-        // Manager-only items
         if (userPosition === 'manager') {
-            items.push(
-                { label: 'Approval Queue', href: route('crm.approval.queue'), icon: ClipboardCheck },
-                // Optional: keep the old pages for now (can be removed later)
-
-            );
+            items.push({ label: 'Approval Queue', href: route('crm.approval.queue'), icon: ClipboardCheck });
         }
     }
-    // ===============================================================
 
+    // --- E-Commerce & B2B Portal (ECO) ---
     if (userRole === 'ECO') {
         if (userPosition === 'manager') {
             items.push(
@@ -218,6 +227,33 @@ const navItems = computed(() => {
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // NEW MODULES (PRO, PROJ, IT)
+    // ─────────────────────────────────────────────────────────────────
+
+    // --- Procurement Module (PRO) ---
+    if (userRole === 'PRO') {
+        if (userPosition === 'manager') {
+            items.push(
+                { label: 'Material Requests', href: route('pro.manager.material-requests'), icon: ClipboardList },
+                { label: 'Supplier Quotations', href: route('pro.manager.supplier-quotations'), icon: FileText },
+                { label: 'Receipt', href: route('pro.manager.receipt'), icon: Send }
+            )
+        } else if (userPosition === 'staff') {
+            items.push({ label: 'Procurement Staff', href: route('pro.employee.dashboard'), icon: ShoppingCart })
+        }
+    }
+
+    // --- Project Automation (PROJ) ---
+    if (userRole === 'PROJ') {
+        items.push({ label: 'Projects', href: userPosition === 'manager' ? route('proj.manager.dashboard') : route('proj.employee.dashboard'), icon: LayoutDashboard })
+    }
+
+    // --- IT & Systems Admin (IT) ---
+    if (userRole === 'IT') {
+        items.push({ label: 'IT & Systems', href: userPosition === 'manager' ? route('it.manager.dashboard') : route('it.employee.dashboard'), icon: Settings })
+    }
+
     return items
 })
 
@@ -226,7 +262,7 @@ const isActive = (href) => {
     return currentUrl.value === href || currentUrl.value.startsWith(href + '/')
 }
 
-// --- Display helpers that work for all user types ---
+// --- Display Helpers ---
 const displayName = computed(() => {
     if (isSupplier.value) return supplier.value?.representative_name
     if (isClient.value) return client.value?.company_name
@@ -234,6 +270,14 @@ const displayName = computed(() => {
 })
 
 const displayInitial = computed(() => displayName.value?.charAt(0) ?? '?')
+
+// Dynamically fetch and display actual uploaded user image if it exists
+const userPhotoUrl = computed(() => {
+    if (user.value?.profile_photo_path) return `/storage/${user.value.profile_photo_path}`;
+    if (supplier.value?.profile_photo_path) return `/storage/${supplier.value.profile_photo_path}`;
+    if (client.value?.profile_photo_path) return `/storage/${client.value.profile_photo_path}`;
+    return null;
+})
 
 const displayDepartment = computed(() => {
     if (isSupplier.value) return 'Supplier'
@@ -329,6 +373,7 @@ const logoutRoute = computed(() => {
                             class="group relative flex items-center justify-between px-3 py-2.5 text-[13px] font-bold rounded-xl transition-all duration-300">
                             <div v-if="isActive(item.href)" :class="isSupplier ? 'bg-emerald-600' : 'bg-blue-600'"
                                 class="absolute left-0 top-1/4 bottom-1/4 w-0.5 rounded-r-full"></div>
+
                             <div class="flex items-center relative z-10">
                                 <div :class="[
                                     isActive(item.href)
@@ -352,8 +397,12 @@ const logoutRoute = computed(() => {
                 <div
                     class="bg-white dark:bg-gray-900 rounded-2xl p-2.5 border border-gray-100 dark:border-gray-800 shadow-lg group">
                     <div class="flex items-center gap-2.5 relative z-10">
+
                         <div class="relative">
-                            <div :class="isSupplier
+                            <img v-if="userPhotoUrl" :src="userPhotoUrl" alt="Profile"
+                                class="h-9 w-9 rounded-xl object-cover shadow-lg"
+                                :class="isSupplier ? 'shadow-emerald-500/30' : 'shadow-blue-500/30'" />
+                            <div v-else :class="isSupplier
                                 ? 'from-emerald-600 to-teal-700 shadow-emerald-500/30'
                                 : 'from-blue-600 to-indigo-700 shadow-blue-500/30'"
                                 class="h-9 w-9 rounded-xl bg-gradient-to-br flex items-center justify-center text-white text-xs font-black shadow-lg uppercase">
@@ -363,6 +412,7 @@ const logoutRoute = computed(() => {
                                 class="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full">
                             </div>
                         </div>
+
                         <div class="flex-1 min-w-0">
                             <p
                                 class="text-[11px] font-black text-gray-900 dark:text-white truncate uppercase tracking-tighter">
@@ -439,7 +489,7 @@ const logoutRoute = computed(() => {
     border-radius: 10px;
 }
 
-/* Modal Transition */
+/* Modal Entry/Exit Animations */
 .modal-fade-enter-active,
 .modal-fade-leave-active {
     transition: opacity 0.2s ease;

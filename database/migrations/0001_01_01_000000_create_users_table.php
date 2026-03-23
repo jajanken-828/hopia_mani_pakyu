@@ -22,7 +22,7 @@ return new class extends Migration
             // Original roles – no ADMIN
             $table->enum('role', [
                 'HRM', 'SCM', 'FIN', 'MAN',
-                'INV', 'ORD', 'WAR', 'CRM', 'ECO',
+                'INV', 'ORD', 'WAR', 'CRM', 'ECO', 'PRO', 'PROJ', 'IT',
             ])->default('HRM');
 
             // Original positions – no 'it'

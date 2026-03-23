@@ -56,7 +56,7 @@ watch(() => form.identity, (val) => {
     let filtered = val.replace(/[^a-zA-Z0-9@.\-_]/g, '');
 
     // Auto capitalize if they are typing an Employee ID
-    if (filtered.toLowerCase().startsWith('emp')) {
+    if (filtered.toLowerCase().startsWith('monti')) {
         filtered = filtered.toUpperCase();
     }
 
@@ -89,9 +89,9 @@ const submit = () => {
         }
     } else {
         // Basic EMP ID check
-        if (!form.identity.startsWith('EMP')) {
-            toast.error('Employee ID must start with EMP (e.g. EMP-1234-5).');
-            triggerWarning('Must start with EMP.');
+        if (!form.identity.startsWith('MONTI')) {
+            toast.error('Employee ID must start with MONTI (e.g. MONTI-1234-5).');
+            triggerWarning('Must start with MONTI.');
             return;
         }
     }
