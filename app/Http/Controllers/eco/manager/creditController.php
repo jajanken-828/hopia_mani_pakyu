@@ -4,6 +4,7 @@ namespace App\Http\Controllers\eco\manager;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\ClientQuotation;
 use App\Models\CreditAccount;
 use App\Models\PurchaseOrder;
 use Illuminate\Http\Request;
@@ -14,34 +15,39 @@ class CreditController extends Controller
 {
     /**
      * Display the Credit Architect ledger and pending order verifications.
+     *
+     * @return \Inertia\Response
      */
     public function credit(Request $request)
     {
+        // Build query for credit accounts with optional search
+        $creditAccounts = CreditAccount::with('client')
+            ->when($request->search, function ($query, $search) {
+                $query->whereHas('client', function ($q) use ($search) {
+                    $q->where('company_name', 'like', "%{$search}%");
+                })->orWhere('id', 'like', "%{$search}%");
+            })
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+        // Orders that need credit approval before tiering
+        $pendingOrders = PurchaseOrder::with('client')
+            ->where('status', 'credit_review')
+            ->latest()
+            ->get();
+
         return Inertia::render('Dashboard/ECO/Manager/credit', [
-            // Standard Credit Ledger accounts with client relationship
-            'creditAccounts' => CreditAccount::with('client')
-                ->when($request->search, function ($query, $search) {
-                    $query->whereHas('client', function ($q) use ($search) {
-                        $q->where('company_name', 'like', "%{$search}%");
-                    })->orWhere('id', 'like', "%{$search}%");
-                })
-                ->latest()
-                ->paginate(10)
-                ->withQueryString(),
-
-            // Fetch Purchase Orders specifically in the 'credit_review' stage
-            'pendingOrders' => PurchaseOrder::with('client')
-                ->where('status', 'credit_review')
-                ->latest()
-                ->get(),
-
+            'creditAccounts' => $creditAccounts,
+            'pendingOrders' => $pendingOrders,
             'filters' => $request->only(['search']),
         ]);
     }
 
     /**
      * Handle the Credit Verification step of the B2B Workflow.
-     * Updated: Creates/Updates a Credit Account record upon approval.
+     *
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function verifyOrder(Request $request, PurchaseOrder $po)
     {
@@ -50,14 +56,13 @@ class CreditController extends Controller
         ]);
 
         if ($request->action === 'approve') {
-            // 1. Move to Tier Management (HR Manager Process)
+            // Move order to tier assignment stage
             $po->update([
                 'status' => 'tier_assignment',
                 'notes' => 'Credit check passed by ECO Manager.',
             ]);
 
-            // 2. Reflect directly in the Credit Accounts table
-            // Fixed: Removed 'customer_name' to match migration schema
+            // Update or create credit account for this client
             CreditAccount::updateOrCreate(
                 ['client_id' => $po->client_id],
                 [
@@ -69,7 +74,7 @@ class CreditController extends Controller
             return back()->with('success', "Order {$po->po_number} approved and moved to Tier Management.");
         }
 
-        // Action: Reject - End the process for poor credit standing
+        // Reject order
         $po->update([
             'status' => 'rejected',
             'notes' => 'Order rejected by ECO Manager due to credit risk.',
@@ -79,7 +84,33 @@ class CreditController extends Controller
     }
 
     /**
+     * Retrieve full financial history for a client (orders, quotations, credit account).
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function clientHistory(Client $client)
+    {
+        $orders = PurchaseOrder::where('client_id', $client->id)
+            ->latest()
+            ->get();
+
+        $quotations = ClientQuotation::where('client_id', $client->id)
+            ->latest()
+            ->get();
+
+        $creditAccount = CreditAccount::where('client_id', $client->id)->first();
+
+        return response()->json([
+            'orders' => $orders,
+            'quotations' => $quotations,
+            'credit_account' => $creditAccount,
+        ]);
+    }
+
+    /**
      * Store a new manual credit account entry in the ledger.
+     *
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function store(Request $request)
     {
@@ -94,11 +125,12 @@ class CreditController extends Controller
     }
 
     /**
-     * Toggle the active status of a credit account.
+     * Toggle the active status of a credit account (good payer flag).
+     *
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function toggleStatus(CreditAccount $account)
     {
-        // Note: Migration uses 'is_good_payer' boolean rather than 'status' string
         $account->update([
             'is_good_payer' => ! $account->is_good_payer,
         ]);
@@ -108,6 +140,8 @@ class CreditController extends Controller
 
     /**
      * Remove a credit account from the ledger.
+     *
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function destroy(CreditAccount $account)
     {

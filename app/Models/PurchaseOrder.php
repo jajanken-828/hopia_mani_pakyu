@@ -44,4 +44,9 @@ class PurchaseOrder extends Model
     {
         return $this->belongsTo(Client::class);
     }
+
+    public function queue()
+    {
+        return $this->hasOne(OrderQueue::class, 'purchase_order_id');
+    }
 }

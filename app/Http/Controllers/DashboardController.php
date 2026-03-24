@@ -361,7 +361,7 @@ class DashboardController extends Controller
     private function handleScmDashboard(string $position)
     {
         if ($position === 'manager') {
-            // Fetch pending material requests (status = pending) forwarded to SCM
+            // Fetch pending material requests (status = pending) that need to be forwarded to PRO
             $materialRequests = MaterialRequest::where('status', 'pending')
                 ->with('material')
                 ->orderByRaw("FIELD(urgency, 'High', 'Medium', 'Low')")
@@ -389,15 +389,33 @@ class DashboardController extends Controller
                     'due_date' => $inv->due_date,
                 ]);
 
+            // Fetch orders that have passed INV check and are ready for manufacturing approval
+            $readyOrders = PurchaseOrder::with(['client', 'items'])
+                ->whereHas('queue', function ($q) {
+                    $q->where('stage', 'inv_checked')
+                        ->where('inv_check_sufficient', true);
+                })
+                ->orderBy('created_at', 'asc')
+                ->get()
+                ->map(fn ($order) => [
+                    'id' => $order->id,
+                    'po_number' => $order->po_number,
+                    'client_name' => $order->client->company_name,
+                    'total_amount' => $order->total_amount,
+                    'created_at' => $order->created_at,
+                ]);
+
             $stats = [
                 'pendingMaterialRequests' => $materialRequests->count(),
                 'pendingPayments' => $invoices->count(),
+                'readyOrdersCount' => $readyOrders->count(),
             ];
 
             return Inertia::render('Dashboard/SCM/Manager/Index', [
                 'stats' => $stats,
                 'materialRequests' => $materialRequests,
                 'invoices' => $invoices,
+                'readyOrders' => $readyOrders,
             ]);
         }
 
@@ -699,85 +717,12 @@ class DashboardController extends Controller
     */
     private function handleEcoDashboard(string $position)
     {
-        $view = $position === 'manager' ? 'Dashboard/ECO/Manager/index' : 'Dashboard/ECO/Employee/index';
+        // Redirect to appropriate ECO dashboard based on position
+        if ($position === 'manager') {
+            return redirect()->route('eco.manager.dashboard');
+        }
 
-        $invProducts = InvProduct::with(['sizes', 'bom', 'specs', 'images'])
-            ->orderBy('id')
-            ->get()
-            ->map(function (InvProduct $p) {
-                return [
-                    'id' => $p->id,
-                    'product_id' => $p->product_id,
-                    'sku' => $p->sku,
-                    'name' => $p->name,
-                    'category' => $p->category,
-                    'subcategory' => $p->subcategory,
-                    'status' => $p->status,
-                    'color_tag' => $p->color_tag,
-                    'colorHex' => $p->color_hex,
-                    'colorName' => $p->color_name,
-                    'weight' => $p->weight,
-                    'dimensions' => $p->dimensions,
-                    'batch_size' => $p->batch_size,
-                    'leadTime' => $p->lead_time,
-                    'unitCost' => (float) $p->unit_cost,
-                    'sellingPrice' => (float) $p->selling_price,
-                    'stockOnHand' => $p->stock_on_hand,
-                    'moq' => $p->moq,
-                    'certification' => $p->certification,
-                    'description' => $p->description,
-                    'sizes' => $p->sizes->pluck('size')->toArray(),
-                    'materials' => $p->bom->map(fn ($b) => [
-                        'sku' => $b->sku_ref,
-                        'name' => $b->name,
-                        'qty' => (float) $b->qty,
-                        'unit' => $b->unit,
-                        'category' => $b->category,
-                        'warehouse' => $b->warehouse_note,
-                        'cost' => (float) $b->unit_cost,
-                        'stockStatus' => $b->stock_status,
-                    ])->toArray(),
-                    'specs' => $p->specs->map(fn ($s) => [
-                        'label' => $s->label,
-                        'value' => $s->value,
-                    ])->toArray(),
-                    'images' => $p->images->sortBy('sort_order')->map(fn ($img) => [
-                        'id' => $img->id,
-                        'url' => asset('storage/'.$img->path),
-                    ])->values()->toArray(),
-                ];
-            })->values()->toArray();
-
-        $pendingCompanies = Client::whereIn('status', ['pending', 'Pending'])->latest()->get();
-        $verifiedCompanies = Client::whereNotIn('status', ['pending', 'Pending'])->latest()->get();
-
-        $pendingCreditCount = PurchaseOrder::where('status', 'credit_review')->count();
-        $pendingTieringCount = PurchaseOrder::where('status', 'tier_assignment')->count();
-
-        $todaySales = PurchaseOrder::where('status', 'approved')->whereDate('created_at', Carbon::today())->sum('total_amount');
-        $monthlyRevenue = PurchaseOrder::where('status', 'approved')->whereMonth('created_at', Carbon::now()->month)->sum('total_amount');
-
-        $pipelineDetails = PurchaseOrder::with('client')
-            ->whereIn('status', ['credit_review', 'tier_assignment'])
-            ->latest()
-            ->get();
-
-        return Inertia::render($view, [
-            'user' => Auth::user(),
-            'invProducts' => $invProducts,
-            'pendingCompanies' => $pendingCompanies,
-            'verifiedCompanies' => $verifiedCompanies,
-            'onlineSales' => PurchaseOrder::with('client')->latest()->take(5)->get(),
-            'pipelineDetails' => $pipelineDetails,
-            'stats' => [
-                'todaySales' => number_format($todaySales, 2),
-                'monthlyRevenue' => number_format($monthlyRevenue, 2),
-                'activeProducts' => InvProduct::where('status', 'Active')->count(),
-                'lowStockCount' => InvProduct::where('stock_on_hand', '<', 50)->count(),
-                'pendingCredit' => $pendingCreditCount,
-                'pendingTiering' => $pendingTieringCount,
-            ],
-        ]);
+        return redirect()->route('eco.employee.dashboard');
     }
 
     /*

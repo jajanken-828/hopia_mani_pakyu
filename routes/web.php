@@ -5,6 +5,9 @@ use App\Http\Controllers\Auth\SupplierAuthController;
 use App\Http\Controllers\client\DashboardController as ClientDashboardController;
 use App\Http\Controllers\client\InvoicesController;
 use App\Http\Controllers\client\OrdersController;
+use App\Http\Controllers\client\ProductController as ClientProductController; // Aliased
+use App\Http\Controllers\client\ProfileController as ClientProfileController; // Aliased (client profile)
+use App\Http\Controllers\client\QuotationController; // Client quotation controller
 use App\Http\Controllers\client\SupportController;
 use App\Http\Controllers\crm\manager\CrmApprovalController;
 use App\Http\Controllers\crm\manager\OversightController;
@@ -13,9 +16,13 @@ use App\Http\Controllers\crm\staff\CustomerprofileController;
 use App\Http\Controllers\crm\staff\LeadController;
 use App\Http\Controllers\crm\staff\StaffDayController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\eco\EcoDashboardController;
 use App\Http\Controllers\eco\manager\BookController;
 use App\Http\Controllers\eco\manager\ClientVerificationController;
 use App\Http\Controllers\eco\manager\CreditController;
+use App\Http\Controllers\eco\manager\OrderManagementController;
+use App\Http\Controllers\eco\manager\QuotationController as EcoQuotationController; // Aliased to avoid conflict with client controller
+use App\Http\Controllers\eco\manager\StoreController;
 use App\Http\Controllers\eco\staff\CustomerController;
 use App\Http\Controllers\eco\staff\OrdermngController;
 use App\Http\Controllers\eco\staff\ProductsController;
@@ -31,18 +38,20 @@ use App\Http\Controllers\hrm\manager\ManagerEmployeeController;
 use App\Http\Controllers\hrm\manager\OnboardingController;
 use App\Http\Controllers\hrm\manager\PayrollController;
 use App\Http\Controllers\inv\InventoryController as InvInventoryController;
+use App\Http\Controllers\inv\manager\ProductionPlanningController;
 use App\Http\Controllers\inv\MaterialController;
-use App\Http\Controllers\inv\ProductController;
+use App\Http\Controllers\inv\ProductController as InvProductController; // Aliased
 use App\Http\Controllers\pro\manager\ProcurementController;
-use App\Http\Controllers\ProfileController;
+// ProfileController is already imported by auth.php, do not duplicate
 use App\Http\Controllers\scm\employee\InboundController;
 use App\Http\Controllers\scm\employee\InventoryController as ScmInventoryController;
 use App\Http\Controllers\scm\employee\RecievingController;
 use App\Http\Controllers\scm\employee\VerificationController;
-use App\Http\Controllers\scm\manager\CloseController; // New SCM payment controller
-use App\Http\Controllers\scm\manager\PaymentController; // New SCM forwarding controller
+use App\Http\Controllers\scm\manager\CloseController;
+use App\Http\Controllers\scm\manager\PaymentController;
+use App\Http\Controllers\scm\manager\SalesOrderController;
 use App\Http\Controllers\scm\manager\ScmManagerController;
-use App\Http\Controllers\scm\manager\VendorController; // New PRO procurement controller
+use App\Http\Controllers\scm\manager\VendorController;
 use App\Http\Controllers\SUPPLIERS\SupplierDashboardController;
 use App\Http\Controllers\trainee\TraineeAttendanceController;
 use App\Http\Controllers\trainee\TraineePayslipController;
@@ -339,9 +348,16 @@ Route::prefix('dashboard/scm')->name('scm.')->middleware(['auth', 'verified'])->
 
         Route::get('/manager', [DashboardController::class, 'index'])->name('manager.dashboard');
 
+        // Sales Orders from ECO
+        Route::get('/sales-orders', [SalesOrderController::class, 'index'])->name('manager.sales-orders');
+        Route::post('/sales-orders/{order}/forward-to-inv', [SalesOrderController::class, 'forwardToINV'])->name('manager.sales-orders.forward');
+
         // Forward material requests to PRO
         Route::post('/material-requests/{id}/forward', [ScmManagerController::class, 'forwardMaterialRequest'])
             ->name('manager.material-request.forward');
+
+        Route::post('/orders/{order}/approve-manufacturing', [ScmManagerController::class, 'approveManufacturing'])
+            ->name('manager.approve-manufacturing');
 
         // Payment approval
         Route::get('/manager/payments', [PaymentController::class, 'index'])->name('manager.payments');
@@ -420,6 +436,15 @@ Route::prefix('dashboard/inv')->name('inv.')->middleware(['auth', 'verified'])->
         ->middleware(['role:INV', 'position:manager'])
         ->name('manager.dashboard');
 
+    // Production Planning (Sales Orders from SCM)
+    Route::get('/production-planning', [ProductionPlanningController::class, 'index'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.production-planning');
+
+    Route::post('/production-planning/{order}/check', [ProductionPlanningController::class, 'checkAvailability'])
+        ->middleware(['role:INV', 'position:manager'])
+        ->name('manager.production-planning.check');
+
     // ── Warehouse Operations ────────────────────────────────────────────────
     Route::get('/inventory', [InvInventoryController::class, 'inventory'])
         ->middleware(['role:INV', 'position:manager'])
@@ -463,25 +488,11 @@ Route::prefix('dashboard/inv')->name('inv.')->middleware(['auth', 'verified'])->
         ->name('manager.material.delegate');
 
     // ── Master Products Database ────────────────────────────────────────────
-    Route::get('/product', [ProductController::class, 'product'])
-        ->middleware(['role:INV', 'position:manager'])
-        ->name('manager.product');
-
-    Route::post('/product', [ProductController::class, 'store'])
-        ->middleware(['role:INV', 'position:manager'])
-        ->name('manager.product.store');
-
-    Route::post('/product/{id}/update', [ProductController::class, 'update'])
-        ->middleware(['role:INV', 'position:manager'])
-        ->name('manager.product.update');
-
-    Route::delete('/product/image/{imageId}', [ProductController::class, 'destroyImage'])
-        ->middleware(['role:INV', 'position:manager'])
-        ->name('manager.product.image.destroy');
-
-    Route::delete('/product/{id}', [ProductController::class, 'destroy'])
-        ->middleware(['role:INV', 'position:manager'])
-        ->name('manager.product.destroy');
+    Route::get('/product', [InvProductController::class, 'product'])->name('manager.product');
+    Route::post('/product', [InvProductController::class, 'store'])->name('manager.product.store');
+    Route::post('/product/{id}/update', [InvProductController::class, 'update'])->name('manager.product.update');
+    Route::delete('/product/image/{imageId}', [InvProductController::class, 'destroyImage'])->name('manager.product.image.destroy');
+    Route::delete('/product/{id}', [InvProductController::class, 'destroy'])->name('manager.product.destroy');
 
     Route::get('/staff', [DashboardController::class, 'index'])
         ->middleware(['role:INV', 'position:staff'])
@@ -581,9 +592,19 @@ Route::prefix('dashboard/crm')->name('crm.')->middleware(['auth', 'verified'])->
 */
 Route::prefix('dashboard/eco')->name('eco.')->middleware(['auth', 'verified'])->group(function () {
 
-    // ── ECO Manager Routes ──────────────────────────────────────────────────
+    // ── ECO Manager Routes (Unified) ────────────────────────────────────────
     Route::middleware(['role:ECO', 'position:manager'])->prefix('manager')->name('manager.')->group(function () {
-        Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        // Unified dashboard
+        Route::get('/', [EcoDashboardController::class, 'index'])->name('dashboard');
+
+        // Storefront
+        Route::get('/store', [StoreController::class, 'index'])->name('store');
+
+        // Order Management (queue)
+        Route::get('/orders', [OrderManagementController::class, 'index'])->name('orders');
+        Route::post('/orders/{order}/approve', [OrderManagementController::class, 'approveOrder'])->name('order.approve');
+        Route::post('/orders/{order}/reject', [OrderManagementController::class, 'rejectOrder'])->name('order.reject');
+        Route::post('/orders/{order}/send-to-scm', [OrderManagementController::class, 'sendToSCM'])->name('order.send-to-scm');
 
         // Pricing Book Tiering
         Route::get('/book', [BookController::class, 'book'])->name('book');
@@ -597,13 +618,19 @@ Route::prefix('dashboard/eco')->name('eco.')->middleware(['auth', 'verified'])->
         Route::post('/credit/verify/{po}', [CreditController::class, 'verifyOrder'])->name('credit.verify');
         Route::patch('/credit/{account}/toggle', [CreditController::class, 'toggleStatus'])->name('credit.toggle-status');
         Route::delete('/credit/{account}', [CreditController::class, 'destroy'])->name('credit.destroy');
+        Route::get('/credit/client/{client}/history', [CreditController::class, 'clientHistory'])->name('credit.client-history');
+
+        // Quotation Management (NEW - using aliased controller)
+        Route::get('/quotations', [EcoQuotationController::class, 'index'])->name('quotations');
+        Route::get('/quotations/{id}', [EcoQuotationController::class, 'show'])->name('quotations.show');
+        Route::post('/quotations/{id}/respond', [EcoQuotationController::class, 'respond'])->name('quotations.respond');
 
         // B2B Client Verification Setup
         Route::get('/verification', [ClientVerificationController::class, 'index'])->name('verification.index');
         Route::patch('/clients/{client}/status', [ClientVerificationController::class, 'updateStatus'])->name('clients.status.update');
     });
 
-    // ── ECO Staff Routes ────────────────────────────────────────────────────
+    // ── ECO Staff Routes (will be phased out, but keep for now) ─────────────
     Route::middleware(['role:ECO', 'position:staff'])->group(function () {
         Route::get('/staff', [DashboardController::class, 'index'])->name('employee.dashboard');
 
@@ -708,7 +735,14 @@ Route::post('client/logout', [ClientAuthController::class, 'logout'])
 */
 Route::middleware('auth:client')->prefix('partner')->name('client.')->group(function () {
     Route::get('/dashboard', [ClientDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/products', [ClientProductController::class, 'index'])->name('products');
+    Route::post('/quotations', [QuotationController::class, 'store'])->name('quotations.store');
+    Route::post('/quotations/{quotation}/accept', [QuotationController::class, 'accept'])->name('quotations.accept');
+    Route::post('/quotations/{quotation}/reject', [QuotationController::class, 'reject'])->name('quotations.reject');
+    Route::get('/profile', [ClientProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ClientProfileController::class, 'update'])->name('profile.update');
     Route::get('/orders', [OrdersController::class, 'orders'])->name('orders');
+    Route::post('/orders/{order}/accept', [OrdersController::class, 'acceptPurchaseOrder'])->name('orders.accept'); // NEW
     Route::post('/purchase-order', [ClientDashboardController::class, 'placeOrder'])->name('purchase-order.store');
     Route::post('/quotation/{po}/accept', [ClientDashboardController::class, 'acceptQuotation'])->name('quotation.accept');
     Route::get('/invoices', [InvoicesController::class, 'invoices'])->name('invoices');

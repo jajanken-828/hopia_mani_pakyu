@@ -39,6 +39,9 @@ import {
     ClipboardCheck,
     FileText,
     Send,
+    ShoppingBag,
+    User,
+    TrendingUp
 } from 'lucide-vue-next'
 
 const page = usePage()
@@ -79,8 +82,10 @@ const navItems = computed(() => {
     if (isClient.value) {
         return [
             { label: 'Dashboard', href: route('client.dashboard'), icon: LayoutDashboard },
+            { label: 'Products', href: route('client.products'), icon: ShoppingBag },
             { label: 'Orders', href: route('client.orders'), icon: ShoppingCart },
             { label: 'Invoices', href: route('client.invoices'), icon: Receipt },
+            { label: 'Profile', href: route('client.profile.edit'), icon: User },
             { label: 'Support', href: route('client.support'), icon: HelpCircle },
         ]
     }
@@ -157,6 +162,7 @@ const navItems = computed(() => {
     if (userRole === 'SCM') {
         if (userPosition === 'manager') {
             items.push(
+                { label: 'Sales Orders', href: route('scm.manager.sales-orders'), icon: ShoppingCart },
                 { label: 'Payment Approval', href: route('scm.manager.payments'), icon: HandCoins },
                 { label: 'Vendor Management', href: route('scm.manager.vendor'), icon: ChartNoAxesCombined },
                 { label: 'Close', href: route('scm.manager.close'), icon: DoorOpen }
@@ -188,8 +194,11 @@ const navItems = computed(() => {
     if (userRole === 'INV') {
         items.push({ label: 'Inventory', href: userPosition === 'manager' ? route('inv.manager.inventory') : route('inv.employee.dashboard'), icon: Boxes })
         if (userPosition === 'manager') {
-            items.push({ label: 'Master Materials', href: route('inv.manager.material'), icon: Spool })
-            items.push({ label: 'Master Products', href: route('inv.manager.product'), icon: Building2 })
+            items.push(
+                { label: 'Production Planning', href: route('inv.manager.production-planning'), icon: TrendingUp },
+                { label: 'Master Materials', href: route('inv.manager.material'), icon: Spool },
+                { label: 'Master Products', href: route('inv.manager.product'), icon: Building2 }
+            )
         }
     }
 
@@ -218,12 +227,18 @@ const navItems = computed(() => {
     if (userRole === 'ECO') {
         if (userPosition === 'manager') {
             items.push(
+
+                { label: 'Store', href: route('eco.manager.store'), icon: ShoppingBag },
+                { label: 'Quotations', href: route('eco.manager.quotations'), icon: FileText },
+                { label: 'Orders', href: route('eco.manager.orders'), icon: ShoppingCart },
                 { label: 'Credit MGMT', href: route('eco.manager.credit'), icon: CreditCard },
-                { label: 'Book MGMT', href: route('eco.manager.book'), icon: Book },
+                { label: 'Book MGMT', href: route('eco.manager.book'), icon: Book }
             )
         } else {
-            items.push({ label: 'Online Store', href: route('eco.employee.products'), icon: Globe })
-            items.push({ label: 'Order Management', href: route('eco.employee.ordermng'), icon: ShoppingBasket })
+            items.push(
+                { label: 'Online Store', href: route('eco.employee.products'), icon: Globe },
+                { label: 'Order Management', href: route('eco.employee.ordermng'), icon: ShoppingBasket }
+            )
         }
     }
 

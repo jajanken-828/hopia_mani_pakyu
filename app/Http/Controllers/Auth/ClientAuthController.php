@@ -76,4 +76,14 @@ class ClientAuthController extends Controller
             'email' => 'Invalid Credentials.',
         ]);
     }
+
+    public function logout(Request $request)
+    {
+        Auth::guard('client')->logout();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return redirect()->route('client.login');
+    }
 }
