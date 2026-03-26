@@ -41,7 +41,8 @@ import {
     Send,
     ShoppingBag,
     User,
-    TrendingUp
+    TrendingUp,
+    XCircle
 } from 'lucide-vue-next'
 
 const page = usePage()
@@ -111,6 +112,7 @@ const navItems = computed(() => {
 
     const userRole = user.value?.role?.toUpperCase()
     const userPosition = user.value?.position?.toLowerCase()
+    const manufacturingRole = user.value?.manufacturing_role
 
     // --- Trainee Specific Routing ---
     if (userPosition === 'trainee') {
@@ -184,10 +186,78 @@ const navItems = computed(() => {
 
     // --- Manufacturing Plant (MAN) ---
     if (userRole === 'MAN') {
-        items.push({ label: 'Manufacturing', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: Factory })
-        items.push({ label: 'Production Orders', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: ClipboardList })
-        items.push({ label: 'Machine Status', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: Settings })
-        items.push({ label: 'Maintenance', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: Receipt })
+        if (userPosition === 'manager') {
+            // Manager links
+            items.push(
+                { label: 'Manufacturing Dashboard', href: route('man.manager.dashboard'), icon: Factory },
+                { label: 'Production Orders', href: route('man.manager.production'), icon: ClipboardList },
+                { label: 'Rejected Items', href: route('man.manager.rejected'), icon: XCircle }
+            );
+        } else {
+            // Staff: show links based on manufacturing_role
+            const roleToRoutes = {
+                knitting_yarn: {
+                    dashboard: 'man.staff.knitting-yarn.dashboard',
+                    work: 'man.staff.knitting-yarn.page',
+                    reports: 'man.staff.knitting-yarn.reports'
+                },
+                dyeing_color: {
+                    dashboard: 'man.staff.dyeing-color.dashboard',
+                    work: 'man.staff.dyeing-color.page',
+                    reports: 'man.staff.dyeing-color.reports'
+                },
+                dyeing_fabric_softener: {
+                    dashboard: 'man.staff.dyeing-fabric-softener.dashboard',
+                    work: 'man.staff.dyeing-fabric-softener.page',
+                    reports: 'man.staff.dyeing-fabric-softener.reports'
+                },
+                dyeing_squeezer: {
+                    dashboard: 'man.staff.dyeing-squeezer.dashboard',
+                    work: 'man.staff.dyeing-squeezer.page',
+                    reports: 'man.staff.dyeing-squeezer.reports'
+                },
+                dyeing_ironing: {
+                    dashboard: 'man.staff.dyeing-ironing.dashboard',
+                    work: 'man.staff.dyeing-ironing.page',
+                    reports: 'man.staff.dyeing-ironing.reports'
+                },
+                dyeing_forming: {
+                    dashboard: 'man.staff.dyeing-forming.dashboard',
+                    work: 'man.staff.dyeing-forming.page',
+                    reports: 'man.staff.dyeing-forming.reports'
+                },
+                dyeing_packaging: {
+                    dashboard: 'man.staff.dyeing-packaging.dashboard',
+                    work: 'man.staff.dyeing-packaging.page',
+                    reports: null
+                },
+                maintenance_checker: {
+                    dashboard: 'man.staff.maintenance-checker.dashboard',
+                    work: 'man.staff.maintenance-checker.page',
+                    reports: 'man.staff.maintenance-checker.reports'
+                },
+                checker_quality: {
+                    dashboard: 'man.staff.checker-quality.dashboard',
+                    work: 'man.staff.checker-quality.production',
+                    reports: null
+                }
+            };
+
+            const routes = roleToRoutes[manufacturingRole];
+            if (routes) {
+                items.push({ label: 'Manufacturing Dashboard', href: route(routes.dashboard), icon: Factory });
+                if (routes.work) {
+                    let workLabel = 'My Work';
+                    if (manufacturingRole === 'dyeing_packaging') workLabel = 'Packaging';
+                    if (manufacturingRole === 'checker_quality') workLabel = 'Production Control';
+                    items.push({ label: workLabel, href: route(routes.work), icon: ClipboardList });
+                }
+                if (routes.reports) {
+                    items.push({ label: 'Reports', href: route(routes.reports), icon: FileText });
+                }
+            }
+            // If no role is assigned, do NOT add any link – the controller will show a message.
+        }
     }
 
     // --- Inventory & Logistics (INV) ---

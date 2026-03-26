@@ -33,6 +33,7 @@ class User extends Authenticatable
         // Fields for promotion suggestion logic
         'promotion_suggested',
         'suggested_at',
+        'manufacturing_role',
     ];
 
     /**
@@ -179,6 +180,52 @@ class User extends Authenticatable
     {
         // The foreign key is 'target_id' based on your SQL file
         return $this->hasMany(AuditLog::class, 'target_id');
+    }
+
+    // Relationships for manufacturing
+    public function fabrics()
+    {
+        return $this->hasMany(Fabric::class, 'operator_id');
+    }
+
+    public function dyeJobs()
+    {
+        return $this->hasMany(DyeJob::class, 'operator_id');
+    }
+
+    public function softenerJobs()
+    {
+        return $this->hasMany(SoftenerJob::class, 'operator_id');
+    }
+
+    public function squeezerJobs()
+    {
+        return $this->hasMany(SqueezerJob::class, 'operator_id');
+    }
+
+    public function ironJobs()
+    {
+        return $this->hasMany(IronJob::class, 'operator_id');
+    }
+
+    public function formJobs()
+    {
+        return $this->hasMany(FormJob::class, 'operator_id');
+    }
+
+    public function packages()
+    {
+        return $this->hasMany(Package::class, 'operator_id');
+    }
+
+    public function reportedMachineReports()
+    {
+        return $this->hasMany(MachineReport::class, 'reported_by');
+    }
+
+    public function resolvedMachineReports()
+    {
+        return $this->hasMany(MachineReport::class, 'resolved_by');
     }
 
     /**

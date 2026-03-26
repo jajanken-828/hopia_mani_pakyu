@@ -452,17 +452,33 @@ class DashboardController extends Controller
     */
     private function handleManDashboard(string $position)
     {
-        $view = $position === 'manager' ? 'Dashboard/MAN/Manager/index' : 'Dashboard/MAN/Employee/index';
+        $user = Auth::user();
 
-        return Inertia::render($view, [
-            'user' => Auth::user(),
-            'productionLines' => [],
-            'stats' => [
-                'activeLines' => 0,
-                'dailyOutput' => 0,
-                'defectRate' => 0,
-            ],
-        ]);
+        if ($position === 'manager') {
+            return redirect()->route('man.manager.dashboard');
+        }
+
+        // For staff, redirect based on manufacturing_role
+        $role = $user->manufacturing_role;
+
+        $routes = [
+            'knitting_yarn' => 'man.staff.knitting-yarn.dashboard',
+            'dyeing_color' => 'man.staff.dyeing-color.dashboard',
+            'dyeing_fabric_softener' => 'man.staff.dyeing-fabric-softener.dashboard',
+            'dyeing_squeezer' => 'man.staff.dyeing-squeezer.dashboard',
+            'dyeing_ironing' => 'man.staff.dyeing-ironing.dashboard',
+            'dyeing_forming' => 'man.staff.dyeing-forming.dashboard',
+            'dyeing_packaging' => 'man.staff.dyeing-packaging.dashboard',
+            'maintenance_checker' => 'man.staff.maintenance-checker.dashboard',
+            'checker_quality' => 'man.staff.checker-quality.dashboard',
+        ];
+
+        if (isset($routes[$role])) {
+            return redirect()->route($routes[$role]);
+        }
+
+        // Fallback: render a generic staff view
+        return Inertia::render('Dashboard/MAN/Employee/Index');
     }
 
     /*
