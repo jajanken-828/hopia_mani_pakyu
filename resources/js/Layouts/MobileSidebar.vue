@@ -38,7 +38,13 @@ import {
     ShieldCheck,
     Building2,
     RefreshCw,
-    ClipboardCheck, // Added for Approval Queue
+    ClipboardCheck,
+    FileText,
+    Send,
+    ShoppingBag,
+    User,
+    TrendingUp,
+    XCircle
 } from 'lucide-vue-next'
 
 const page = usePage()
@@ -75,8 +81,10 @@ const navItems = computed(() => {
     if (isClient.value) {
         return [
             { label: 'Dashboard', href: route('client.dashboard'), icon: LayoutDashboard },
+            { label: 'Products', href: route('client.products'), icon: ShoppingBag },
             { label: 'Orders', href: route('client.orders'), icon: ShoppingCart },
             { label: 'Invoices', href: route('client.invoices'), icon: Receipt },
+            { label: 'Profile', href: route('client.profile.edit'), icon: User },
             { label: 'Support', href: route('client.support'), icon: HelpCircle },
         ]
     }
@@ -98,6 +106,7 @@ const navItems = computed(() => {
 
     const userRole = user.value?.role?.toUpperCase()
     const userPosition = user.value?.position?.toLowerCase()
+    const manufacturingRole = user.value?.manufacturing_role
 
     // --- Trainee Navigation ---
     if (userPosition === 'trainee') {
@@ -109,9 +118,11 @@ const navItems = computed(() => {
         return items;
     }
 
+    // --- Human Resources (HRM) ---
     if (userRole === 'HRM') {
         if (userPosition === 'manager') {
             items.push(
+                { label: 'Employee Management', href: route('hrm.manager.employee'), icon: Users },
                 { label: 'Onboarding', href: route('hrm.manager.onboarding'), icon: BarChart3 },
                 {
                     label: 'Workforce Management',
@@ -144,11 +155,14 @@ const navItems = computed(() => {
         }
     }
 
+    // --- Supply Chain Management (SCM) ---
     if (userRole === 'SCM') {
         if (userPosition === 'manager') {
             items.push(
-                { label: 'Procurement', href: route('scm.manager.procurement'), icon: Truck },
-                { label: 'Supplier Management', href: route('scm.manager.vendor'), icon: ChartNoAxesCombined },
+                { label: 'Operations', href: route('scm.manager.operations'), icon: LayoutDashboard },
+                { label: 'Sales Orders', href: route('scm.manager.sales-orders'), icon: ShoppingCart },
+                { label: 'Payment Approval', href: route('scm.manager.payments'), icon: HandCoins },
+                { label: 'Vendor Management', href: route('scm.manager.vendor'), icon: ChartNoAxesCombined },
                 { label: 'Close', href: route('scm.manager.close'), icon: DoorOpen }
             )
         } else if (userPosition === 'staff') {
@@ -161,64 +175,171 @@ const navItems = computed(() => {
         }
     }
 
+    // --- Financial Operations (FIN) ---
     if (userRole === 'FIN') {
         items.push({ label: 'Finance', href: userPosition === 'manager' ? route('fin.manager.dashboard') : route('fin.employee.dashboard'), icon: Wallet })
     }
 
+    // --- Manufacturing Plant (MAN) ---
     if (userRole === 'MAN') {
-        items.push({ label: 'Manufacturing', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: Factory })
-        items.push({ label: 'Production Orders', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: ClipboardList })
-        items.push({ label: 'Machine Status', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: Settings })
-        items.push({ label: 'Maintenance', href: userPosition === 'manager' ? route('man.manager.dashboard') : route('man.employee.dashboard'), icon: Receipt })
-    }
-
-    if (userRole === 'INV') {
-        items.push({ label: 'Inventory', href: userPosition === 'manager' ? route('inv.manager.inventory') : route('inv.employee.dashboard'), icon: Boxes })
         if (userPosition === 'manager') {
-            items.push({ label: 'Master Materials', href: route('inv.manager.material'), icon: Spool })
-            items.push({ label: 'Master Products', href: route('inv.manager.product'), icon: Building2 })
+            items.push(
+                { label: 'Manufacturing Dashboard', href: route('man.manager.dashboard'), icon: Factory },
+                { label: 'Production Orders', href: route('man.manager.production'), icon: ClipboardList },
+                { label: 'Rejected Items', href: route('man.manager.rejected'), icon: XCircle }
+            );
+        } else {
+            const roleToRoutes = {
+                knitting_yarn: {
+                    dashboard: 'man.staff.knitting-yarn.dashboard',
+                    work: 'man.staff.knitting-yarn.page',
+                    reports: 'man.staff.knitting-yarn.reports'
+                },
+                dyeing_color: {
+                    dashboard: 'man.staff.dyeing-color.dashboard',
+                    work: 'man.staff.dyeing-color.page',
+                    reports: 'man.staff.dyeing-color.reports'
+                },
+                dyeing_fabric_softener: {
+                    dashboard: 'man.staff.dyeing-fabric-softener.dashboard',
+                    work: 'man.staff.dyeing-fabric-softener.page',
+                    reports: 'man.staff.dyeing-fabric-softener.reports'
+                },
+                dyeing_squeezer: {
+                    dashboard: 'man.staff.dyeing-squeezer.dashboard',
+                    work: 'man.staff.dyeing-squeezer.page',
+                    reports: 'man.staff.dyeing-squeezer.reports'
+                },
+                dyeing_ironing: {
+                    dashboard: 'man.staff.dyeing-ironing.dashboard',
+                    work: 'man.staff.dyeing-ironing.page',
+                    reports: 'man.staff.dyeing-ironing.reports'
+                },
+                dyeing_forming: {
+                    dashboard: 'man.staff.dyeing-forming.dashboard',
+                    work: 'man.staff.dyeing-forming.page',
+                    reports: 'man.staff.dyeing-forming.reports'
+                },
+                dyeing_packaging: {
+                    dashboard: 'man.staff.dyeing-packaging.dashboard',
+                    work: 'man.staff.dyeing-packaging.page',
+                    reports: null
+                },
+                maintenance_checker: {
+                    dashboard: 'man.staff.maintenance-checker.dashboard',
+                    work: 'man.staff.maintenance-checker.page',
+                    reports: 'man.staff.maintenance-checker.reports'
+                },
+                checker_quality: {
+                    dashboard: 'man.staff.checker-quality.dashboard',
+                    work: 'man.staff.checker-quality.production',
+                    reports: null
+                }
+            };
+
+            const routes = roleToRoutes[manufacturingRole];
+            if (routes) {
+                items.push({ label: 'Manufacturing Dashboard', href: route(routes.dashboard), icon: Factory });
+                if (routes.work) {
+                    let workLabel = 'My Work';
+                    if (manufacturingRole === 'dyeing_packaging') workLabel = 'Packaging';
+                    if (manufacturingRole === 'checker_quality') workLabel = 'Production Control';
+                    items.push({ label: workLabel, href: route(routes.work), icon: ClipboardList });
+                }
+                if (routes.reports) {
+                    items.push({ label: 'Reports', href: route(routes.reports), icon: FileText });
+                }
+            }
         }
     }
 
+    // --- Inventory & Logistics (INV) ---
+    if (userRole === 'INV') {
+        items.push({ label: 'Inventory', href: userPosition === 'manager' ? route('inv.manager.inventory') : route('inv.employee.dashboard'), icon: Boxes })
+        if (userPosition === 'manager') {
+            items.push(
+                { label: 'Production Planning', href: route('inv.manager.production-planning'), icon: TrendingUp },
+                { label: 'Master Materials', href: route('inv.manager.material'), icon: Spool },
+                { label: 'Master Products', href: route('inv.manager.product'), icon: Building2 }
+            )
+        }
+    }
+
+    // --- Order Fulfillment (ORD) ---
     if (userRole === 'ORD') {
         items.push({ label: 'Orders', href: userPosition === 'manager' ? route('ord.manager.dashboard') : route('ord.employee.dashboard'), icon: ShoppingCart })
     }
 
+    // --- Warehouse Management (WAR) ---
     if (userRole === 'WAR') {
         items.push({ label: 'Warehouse', href: userPosition === 'manager' ? route('war.manager.dashboard') : route('war.employee.dashboard'), icon: Warehouse })
     }
 
-    // ===================== UPDATED CRM SECTION =====================
+    // --- Customer Relationship Management (CRM) ---
     if (userRole === 'CRM') {
-        // Common items for both manager and staff
         items.push(
-            { label: 'CRM Dashboard', href: route('crm.dashboard'), icon: LayoutDashboard },
             { label: 'Lead & Deals', href: route('crm.lead'), icon: FileUser },
             { label: 'Customer Profiles', href: route('crm.customerprofile'), icon: Users }
         );
-
-        // Manager-only items
         if (userPosition === 'manager') {
-            items.push(
-                { label: 'Approval Queue', href: route('crm.approval.queue'), icon: ClipboardCheck },
-                // Optional: keep the old pages for now (can be removed later)
-                { label: 'Quality Oversight', href: route('crm.oversight'), icon: Clock },
-                { label: 'Strategic Analytics', href: route('crm.strategy'), icon: ChartNoAxesCombined }
-            );
+            items.push({ label: 'Approval Queue', href: route('crm.approval.queue'), icon: ClipboardCheck });
         }
     }
-    // ===============================================================
 
+    // --- E-Commerce & B2B Portal (ECO) ---
     if (userRole === 'ECO') {
         if (userPosition === 'manager') {
             items.push(
+                { label: 'Store', href: route('eco.manager.store'), icon: ShoppingBag },
+                { label: 'Quotations', href: route('eco.manager.quotations'), icon: FileText },
+                { label: 'Orders', href: route('eco.manager.orders'), icon: ShoppingCart },
                 { label: 'Credit MGMT', href: route('eco.manager.credit'), icon: CreditCard },
-                { label: 'Book MGMT', href: route('eco.manager.book'), icon: Book },
+                { label: 'Book MGMT', href: route('eco.manager.book'), icon: Book }
             )
         } else {
-            items.push({ label: 'Online Store', href: route('eco.employee.products'), icon: Globe })
-            items.push({ label: 'Order Management', href: route('eco.employee.ordermng'), icon: ShoppingBasket })
+            items.push(
+                { label: 'Online Store', href: route('eco.employee.products'), icon: Globe },
+                { label: 'Order Management', href: route('eco.employee.ordermng'), icon: ShoppingBasket }
+            )
         }
+    }
+
+    // --- Procurement Module (PRO) ---
+    if (userRole === 'PRO') {
+        if (userPosition === 'manager') {
+            items.push(
+                // { label: 'Material Requests', href: route('pro.manager.material-requests'), icon: ClipboardList },
+                { label: 'Supplier Quotations', href: route('pro.manager.supplier-quotations'), icon: FileText },
+                { label: 'Receipt', href: route('pro.manager.receipt'), icon: Send }
+            )
+        } else if (userPosition === 'staff') {
+            items.push({ label: 'Procurement Staff', href: route('pro.employee.dashboard'), icon: ShoppingCart })
+        }
+    }
+
+    // --- Project Automation (PROJ) ---
+    if (userRole === 'PROJ') {
+        items.push({ label: 'Projects', href: userPosition === 'manager' ? route('proj.manager.dashboard') : route('proj.employee.dashboard'), icon: LayoutDashboard })
+    }
+
+    // --- IT & Systems Admin (IT) ---
+    if (userRole === 'IT') {
+        items.push({ label: 'IT & Systems', href: userPosition === 'manager' ? route('it.manager.dashboard') : route('it.employee.dashboard'), icon: Settings })
+    }
+
+    // --- CEO Super Admin Access ---
+    if (userRole === 'CEO') {
+        items.push(
+            { label: 'Human Resource', href: route('hrm.manager.dashboard'), icon: Users },
+            { label: 'Supply Chain', href: route('scm.manager.dashboard'), icon: Truck },
+            { label: 'Manufacturing', href: route('man.manager.dashboard'), icon: Factory },
+            { label: 'Inventory', href: route('inv.manager.dashboard'), icon: Boxes },
+            { label: 'Customer Relationship', href: route('crm.dashboard'), icon: Users },
+            { label: 'E‑Commerce', href: route('eco.manager.dashboard'), icon: ShoppingBag },
+            { label: 'Procurement', href: route('pro.manager.dashboard'), icon: ShoppingCart }
+            // Logistics module is commented out until its routes are defined
+            // { label: 'Logistics', href: route('log.staff.dashboard'), icon: Truck },
+        );
     }
 
     return items
@@ -236,6 +357,13 @@ const displayName = computed(() => {
 })
 
 const displayInitial = computed(() => displayName.value?.charAt(0) ?? '?')
+
+const userPhotoUrl = computed(() => {
+    if (user.value?.profile_photo_path) return `/storage/${user.value.profile_photo_path}`;
+    if (supplier.value?.profile_photo_path) return `/storage/${supplier.value.profile_photo_path}`;
+    if (client.value?.profile_photo_path) return `/storage/${client.value.profile_photo_path}`;
+    return null;
+})
 
 const displayDepartment = computed(() => {
     if (isSupplier.value) return 'Supplier'
@@ -271,11 +399,11 @@ const handleNavClick = () => {
 <template>
     <div class="md:hidden">
         <nav
-            class="fixed top-0 left-0 right-0 z-[60] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm h-16 flex items-center justify-between px-4 transition-colors duration-300">
+            class="fixed top-0 left-0 right-0 z-[60] bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50 shadow-sm h-16 flex items-center justify-between px-4 transition-colors duration-300">
             <div class="flex items-center gap-3">
                 <div :class="isSupplier ? 'bg-emerald-600 shadow-emerald-500/20' : 'bg-blue-600 shadow-blue-500/20'"
                     class="h-8 w-8 rounded-lg flex items-center justify-center shadow-lg">
-                    <LayoutDashboard class="h-4.5 w-4.5 text-white" />
+                    <img src="/images/applogo.png" alt="Logo" class="h-4.5 w-4.5 object-contain brightness-0 invert" />
                 </div>
                 <div class="flex flex-col">
                     <span
@@ -306,7 +434,7 @@ const handleNavClick = () => {
             enter-to-class="translate-x-0" leave-active-class="transition-transform duration-200 ease-in"
             leave-from-class="translate-x-0" leave-to-class="-translate-x-full">
             <aside v-if="isOpen"
-                class="fixed inset-y-0 left-0 z-[55] w-[80vw] max-w-sm bg-slate-50 dark:bg-gray-950 flex flex-col shadow-2xl h-full pt-16">
+                class="fixed inset-y-0 left-0 z-[55] w-[80vw] max-w-sm bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl flex flex-col shadow-2xl h-full pt-16 border-r border-gray-200/50 dark:border-gray-800/50">
 
                 <div class="flex-1 flex flex-col overflow-y-auto px-3 py-6 custom-scrollbar">
                     <div class="mb-4 px-2">
@@ -370,10 +498,13 @@ const handleNavClick = () => {
 
                 <div class="p-4 mt-auto border-t border-gray-100 dark:border-gray-800">
                     <div
-                        class="bg-white dark:bg-gray-900 rounded-2xl p-3 border border-gray-100 dark:border-gray-800 shadow-lg">
+                        class="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md rounded-2xl p-3 border border-gray-100/50 dark:border-gray-800/50 shadow-lg">
                         <div class="flex items-center gap-3 relative z-10">
                             <div class="relative flex-shrink-0">
-                                <div :class="isSupplier
+                                <img v-if="userPhotoUrl" :src="userPhotoUrl" alt="Profile"
+                                    class="h-10 w-10 rounded-xl object-cover shadow-lg"
+                                    :class="isSupplier ? 'shadow-emerald-500/30' : 'shadow-blue-500/30'" />
+                                <div v-else :class="isSupplier
                                     ? 'from-emerald-600 to-teal-700 shadow-emerald-500/30'
                                     : 'from-blue-600 to-indigo-700 shadow-blue-500/30'"
                                     class="h-10 w-10 rounded-xl bg-gradient-to-br flex items-center justify-center text-white text-sm font-black shadow-lg uppercase">
@@ -405,7 +536,7 @@ const handleNavClick = () => {
                             </div>
 
                             <button @click.stop="showLogoutModal = true; isOpen = false"
-                                class="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-300">
+                                class="p-2.5 rounded-xl bg-gray-100/80 dark:bg-gray-800/80 text-gray-400 hover:text-red-500 hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-all duration-300 backdrop-blur-sm">
                                 <LogOut class="h-4 w-4" />
                             </button>
                         </div>
@@ -420,15 +551,15 @@ const handleNavClick = () => {
                     class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
                     @click.self="showLogoutModal = false">
                     <div
-                        class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 w-full max-w-sm p-6 flex flex-col items-center text-center">
+                        class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 w-full max-w-sm p-6 flex flex-col items-center text-center transform transition-all duration-300 scale-100">
                         <div
-                            class="h-14 w-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
-                            <LogOut class="h-6 w-6 text-red-600 dark:text-red-400 ml-1" />
+                            class="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
+                            <LogOut class="h-6 w-6 text-red-600 dark:text-red-400" />
                         </div>
                         <h3 class="text-xl font-black text-gray-900 dark:text-white mb-2">Sign Out</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 px-2">Are you sure you want to sign out
-                            of your
-                            account?</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 px-2">
+                            Are you sure you want to sign out of your account?
+                        </p>
                         <div class="flex flex-col sm:flex-row gap-3 w-full">
                             <button @click="showLogoutModal = false"
                                 class="w-full sm:flex-1 py-3 text-sm font-bold rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">

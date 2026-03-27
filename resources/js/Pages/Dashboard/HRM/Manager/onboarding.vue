@@ -28,12 +28,21 @@ const isConfirmModalOpen = ref(false)
 const isViewModalOpen = ref(false)
 const isFailModalOpen = ref(false)
 const isAccountModalOpen = ref(false)
-const isRoleSelectionModalOpen = ref(false) // New: For role selection
+const isRoleSelectionModalOpen = ref(false)
 const selectedRole = ref('HRM') // Default selection
 const pendingMove = ref(null)
 const selectedApplicant = ref(null)
 
-const roles = ['HRM', 'SCM', 'FIN', 'CRM', 'ECO']
+// Role options with full names
+const roleOptions = [
+    { value: 'HRM', label: 'Human Resource' },
+    { value: 'SCM', label: 'Supply Chain' },
+    { value: 'FIN', label: 'Finance' },
+    { value: 'CRM', label: 'Customer Relationship' },
+    { value: 'ECO', label: 'E-Commerce' },
+    { value: 'IT', label: 'Information Technology' },
+    { value: 'PROJ', label: 'Project Manager' }
+]
 
 const triggerToast = (msg) => {
     toastMessage.value = msg;
@@ -218,8 +227,8 @@ const confirmAccountCreation = () => {
     if (!selectedApplicant.value) return;
 
     router.post(route('hrm.applicants.create-user', selectedApplicant.value.id), {
-        position: 'trainee', // Default as requested
-        role: selectedRole.value // Selection from the second modal
+        position: 'trainee',
+        role: selectedRole.value
     }, {
         preserveScroll: true,
         onSuccess: () => {
@@ -244,7 +253,6 @@ const stats = computed(() => [
 <template>
 
     <Head title="Recruitment Pipeline" />
-
     <AuthenticatedLayout>
         <Transition name="toast">
             <div v-if="showToast"
@@ -254,6 +262,7 @@ const stats = computed(() => [
             </div>
         </Transition>
 
+        <!-- View Applicant Modal -->
         <div v-if="isViewModalOpen" class="fixed inset-0 z-[120] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="isViewModalOpen = false"></div>
             <div
@@ -299,6 +308,7 @@ const stats = computed(() => [
             </div>
         </div>
 
+        <!-- Fail Modal -->
         <div v-if="isFailModalOpen" class="fixed inset-0 z-[120] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="isFailModalOpen = false"></div>
             <div class="relative w-full max-sm bg-white rounded-[2rem] p-8 shadow-2xl text-center">
@@ -317,6 +327,7 @@ const stats = computed(() => [
             </div>
         </div>
 
+        <!-- Account Creation Modal -->
         <div v-if="isAccountModalOpen" class="fixed inset-0 z-[120] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="isAccountModalOpen = false"></div>
             <div class="relative w-full max-w-sm bg-white rounded-[2rem] p-8 shadow-2xl text-center">
@@ -337,6 +348,7 @@ const stats = computed(() => [
             </div>
         </div>
 
+        <!-- Role Selection Modal (Updated with full names) -->
         <div v-if="isRoleSelectionModalOpen" class="fixed inset-0 z-[130] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="isRoleSelectionModalOpen = false">
             </div>
@@ -349,11 +361,12 @@ const stats = computed(() => [
                     <p class="text-slate-500 text-xs">Assign a module access role for this trainee.</p>
                 </div>
 
-                <div class="grid grid-cols-3 gap-2 mb-8">
-                    <button v-for="role in roles" :key="role" @click="selectedRole = role"
-                        :class="selectedRole === role ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-100 hover:border-blue-200'"
+                <!-- Role buttons - mobile‑friendly grid -->
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mb-8">
+                    <button v-for="option in roleOptions" :key="option.value" @click="selectedRole = option.value"
+                        :class="selectedRole === option.value ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-100 hover:border-blue-200'"
                         class="py-3 px-2 rounded-xl border text-xs font-black transition-all">
-                        {{ role }}
+                        {{ option.label }}
                     </button>
                 </div>
 
@@ -368,6 +381,7 @@ const stats = computed(() => [
             </div>
         </div>
 
+        <!-- Move Confirmation Modal -->
         <div v-if="isConfirmModalOpen" class="fixed inset-0 z-[110] flex items-center justify-center p-4">
             <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="cancelMove"></div>
             <div
@@ -391,6 +405,7 @@ const stats = computed(() => [
             </div>
         </div>
 
+        <!-- Header -->
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
                 <h1 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Recruitment
@@ -405,6 +420,7 @@ const stats = computed(() => [
             </button>
         </div>
 
+        <!-- Stats Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <div v-for="stat in stats" :key="stat.label"
                 class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 shadow-sm">
@@ -421,6 +437,7 @@ const stats = computed(() => [
             </div>
         </div>
 
+        <!-- Pipeline Columns -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div v-for="(list, stage) in pipeline" :key="stage" class="flex flex-col min-w-[300px]"
                 :data-status="stage">
@@ -492,6 +509,7 @@ const stats = computed(() => [
             </div>
         </div>
 
+        <!-- Add Applicant Modal (unchanged, but included for completeness) -->
         <div v-if="isModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
             <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="isModalOpen = false"></div>
             <div

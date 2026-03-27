@@ -22,7 +22,7 @@ return new class extends Migration
             // Original roles – no ADMIN
             $table->enum('role', [
                 'HRM', 'SCM', 'FIN', 'MAN',
-                'INV', 'ORD', 'WAR', 'CRM', 'ECO', 'PRO', 'PROJ', 'IT',
+                'INV', 'ORD', 'WAR', 'CRM', 'ECO', 'PRO', 'PROJ', 'IT', 'CEO',
             ])->default('HRM');
 
             // Original positions – no 'it'
@@ -57,10 +57,10 @@ return new class extends Migration
 
         // Default admin user
         DB::table('users')->insert([
-            'name' => 'Admin User',
-            'email' => 'admin@example.com',
+            'name' => 'Boss CEO MontiTextile',
+            'email' => 'iamceo@montierp.com',
             'password' => bcrypt('password'),
-            'role' => 'HRM',
+            'role' => 'CEO',
             'position' => 'manager',
             'email_verified_at' => now(),
             'is_active' => true,

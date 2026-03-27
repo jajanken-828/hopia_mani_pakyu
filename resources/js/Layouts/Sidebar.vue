@@ -128,6 +128,7 @@ const navItems = computed(() => {
     if (userRole === 'HRM') {
         if (userPosition === 'manager') {
             items.push(
+                { label: 'Employee Management', href: route('hrm.manager.employee'), icon: Users },
                 { label: 'Onboarding', href: route('hrm.manager.onboarding'), icon: BarChart3 },
                 {
                     label: 'Workforce Management',
@@ -164,6 +165,7 @@ const navItems = computed(() => {
     if (userRole === 'SCM') {
         if (userPosition === 'manager') {
             items.push(
+                { label: 'Operations', href: route('scm.manager.operations'), icon: LayoutDashboard },
                 { label: 'Sales Orders', href: route('scm.manager.sales-orders'), icon: ShoppingCart },
                 { label: 'Payment Approval', href: route('scm.manager.payments'), icon: HandCoins },
                 { label: 'Vendor Management', href: route('scm.manager.vendor'), icon: ChartNoAxesCombined },
@@ -187,14 +189,12 @@ const navItems = computed(() => {
     // --- Manufacturing Plant (MAN) ---
     if (userRole === 'MAN') {
         if (userPosition === 'manager') {
-            // Manager links
             items.push(
                 { label: 'Manufacturing Dashboard', href: route('man.manager.dashboard'), icon: Factory },
                 { label: 'Production Orders', href: route('man.manager.production'), icon: ClipboardList },
                 { label: 'Rejected Items', href: route('man.manager.rejected'), icon: XCircle }
             );
         } else {
-            // Staff: show links based on manufacturing_role
             const roleToRoutes = {
                 knitting_yarn: {
                     dashboard: 'man.staff.knitting-yarn.dashboard',
@@ -256,7 +256,6 @@ const navItems = computed(() => {
                     items.push({ label: 'Reports', href: route(routes.reports), icon: FileText });
                 }
             }
-            // If no role is assigned, do NOT add any link – the controller will show a message.
         }
     }
 
@@ -297,7 +296,6 @@ const navItems = computed(() => {
     if (userRole === 'ECO') {
         if (userPosition === 'manager') {
             items.push(
-
                 { label: 'Store', href: route('eco.manager.store'), icon: ShoppingBag },
                 { label: 'Quotations', href: route('eco.manager.quotations'), icon: FileText },
                 { label: 'Orders', href: route('eco.manager.orders'), icon: ShoppingCart },
@@ -312,15 +310,11 @@ const navItems = computed(() => {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────
-    // NEW MODULES (PRO, PROJ, IT)
-    // ─────────────────────────────────────────────────────────────────
-
     // --- Procurement Module (PRO) ---
     if (userRole === 'PRO') {
         if (userPosition === 'manager') {
             items.push(
-                { label: 'Material Requests', href: route('pro.manager.material-requests'), icon: ClipboardList },
+                // { label: 'Material Requests', href: route('pro.manager.material-requests'), icon: ClipboardList },
                 { label: 'Supplier Quotations', href: route('pro.manager.supplier-quotations'), icon: FileText },
                 { label: 'Receipt', href: route('pro.manager.receipt'), icon: Send }
             )
@@ -337,6 +331,22 @@ const navItems = computed(() => {
     // --- IT & Systems Admin (IT) ---
     if (userRole === 'IT') {
         items.push({ label: 'IT & Systems', href: userPosition === 'manager' ? route('it.manager.dashboard') : route('it.employee.dashboard'), icon: Settings })
+    }
+
+    // --- CEO Super Admin Access ---
+    if (userRole === 'CEO') {
+        items.push(
+
+            { label: 'Human Resource', href: route('hrm.manager.dashboard'), icon: Users },
+            { label: 'Supply Chain', href: route('scm.manager.dashboard'), icon: Truck },
+            { label: 'Manufacturing', href: route('man.manager.dashboard'), icon: Factory },
+            { label: 'Inventory', href: route('inv.manager.dashboard'), icon: Boxes },
+            { label: 'Customer Relationship', href: route('crm.dashboard'), icon: Users },
+            { label: 'E‑Commerce', href: route('eco.manager.dashboard'), icon: ShoppingBag },
+            { label: 'Procurement', href: route('pro.manager.dashboard'), icon: ShoppingCart }
+            // Logistics module is commented out until its routes are defined
+            // { label: 'Logistics', href: route('log.staff.dashboard'), icon: Truck },
+        );
     }
 
     return items
@@ -356,7 +366,6 @@ const displayName = computed(() => {
 
 const displayInitial = computed(() => displayName.value?.charAt(0) ?? '?')
 
-// Dynamically fetch and display actual uploaded user image if it exists
 const userPhotoUrl = computed(() => {
     if (user.value?.profile_photo_path) return `/storage/${user.value.profile_photo_path}`;
     if (supplier.value?.profile_photo_path) return `/storage/${supplier.value.profile_photo_path}`;
@@ -384,7 +393,6 @@ const sidebarLabel = computed(() => {
     return 'System'
 })
 
-// Ensures the correct logout route is triggered for the specific Auth Guard
 const logoutRoute = computed(() => {
     if (isClient.value) return route('client.logout')
     if (isSupplier.value) return route('supplier.logout')
@@ -395,40 +403,51 @@ const logoutRoute = computed(() => {
 <template>
     <aside class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-40 transition-all duration-300">
         <div
-            class="flex flex-col flex-grow bg-slate-50 dark:bg-gray-950 border-r border-gray-200/60 dark:border-gray-800/60 shadow-xl">
+            class="flex flex-col flex-grow bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl border-r border-gray-200/40 dark:border-gray-800/40 shadow-2xl">
 
-            <div class="flex items-center h-20 flex-shrink-0 px-4">
-                <div
-                    class="flex items-center gap-2.5 p-2 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 w-full">
-                    <div :class="isSupplier ? 'bg-emerald-600 shadow-emerald-500/20' : 'bg-blue-600 shadow-blue-500/20'"
-                        class="h-9 w-9 flex-shrink-0 rounded-lg flex items-center justify-center shadow-lg">
-                        <img src="/images/applogo.png" alt="Logo" class="h-6 w-6 object-contain brightness-0 invert" />
+            <!-- Logo Section with glassmorphic effect -->
+            <div class="flex items-center h-20 flex-shrink-0 px-4 pt-2">
+                <div class="relative w-full">
+                    <div
+                        class="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 dark:from-blue-400/10 dark:to-indigo-400/10 rounded-2xl blur-xl">
                     </div>
-                    <div class="flex flex-col overflow-hidden">
-                        <h2
-                            class="text-[13px] font-black text-gray-900 dark:text-white leading-tight tracking-tight uppercase">
-                            Monti <span :class="isSupplier ? 'text-emerald-600' : 'text-blue-600'">Textile</span>
-                        </h2>
-                        <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">
-                            {{ sidebarLabel }}
-                        </span>
+                    <div
+                        class="relative flex items-center gap-2.5 p-2 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-100/50 dark:border-gray-800/50 w-full">
+                        <div :class="isSupplier ? 'bg-emerald-600 shadow-emerald-500/30' : 'bg-blue-600 shadow-blue-500/30'"
+                            class="h-9 w-9 flex-shrink-0 rounded-xl flex items-center justify-center shadow-lg">
+                            <img src="/images/applogo.png" alt="Logo"
+                                class="h-6 w-6 object-contain brightness-0 invert" />
+                        </div>
+                        <div class="flex flex-col overflow-hidden">
+                            <h2
+                                class="text-[13px] font-black text-gray-900 dark:text-white leading-tight tracking-tight uppercase">
+                                Monti <span :class="isSupplier ? 'text-emerald-600' : 'text-blue-600'">Textile</span>
+                            </h2>
+                            <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">
+                                {{ sidebarLabel }}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
 
+            <!-- Scrollable Navigation -->
             <div class="flex-1 flex flex-col overflow-y-auto px-3 py-4 custom-scrollbar">
                 <div class="mb-3 px-2">
                     <p class="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em]">Main Menu</p>
                 </div>
                 <nav class="space-y-1">
                     <template v-for="item in navItems" :key="item.label">
+                        <!-- Dropdown Items -->
                         <div v-if="item.isDropdown" class="space-y-1">
                             <button @click="toggleWorkforce" :class="[
-                                isWorkforceOpen ? 'text-blue-600 bg-white/50 dark:bg-gray-900/50' : 'text-gray-500 dark:text-gray-400',
-                                'group w-full flex items-center justify-between px-3 py-2.5 text-[13px] font-bold rounded-xl hover:bg-white/50 dark:hover:bg-gray-900/50 transition-all duration-300'
+                                isWorkforceOpen
+                                    ? 'text-blue-600 bg-white/60 dark:bg-gray-900/60 shadow-sm'
+                                    : 'text-gray-500 dark:text-gray-400 hover:bg-white/40 dark:hover:bg-gray-900/40',
+                                'group w-full flex items-center justify-between px-3 py-2.5 text-[13px] font-bold rounded-xl transition-all duration-300 backdrop-blur-sm'
                             ]">
                                 <div class="flex items-center">
-                                    <div :class="[isWorkforceOpen ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600' : 'text-gray-400']"
+                                    <div :class="[isWorkforceOpen ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600' : 'text-gray-400']"
                                         class="p-1.5 rounded-lg mr-2.5 transition-colors duration-300">
                                         <component :is="item.icon" class="h-4.5 w-4.5" />
                                     </div>
@@ -440,7 +459,9 @@ const logoutRoute = computed(() => {
 
                             <div v-show="isWorkforceOpen" class="pl-10 space-y-1 mt-1 transition-all">
                                 <Link v-for="subItem in item.children" :key="subItem.label" :href="subItem.href" :class="[
-                                    isActive(subItem.href) ? 'text-blue-600' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                                    isActive(subItem.href)
+                                        ? 'text-blue-600'
+                                        : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
                                 ]" class="flex items-center py-2 text-[12px] font-bold transition-colors">
                                     <component :is="subItem.icon" class="h-3.5 w-3.5 mr-2.5" />
                                     {{ subItem.label }}
@@ -448,23 +469,24 @@ const logoutRoute = computed(() => {
                             </div>
                         </div>
 
+                        <!-- Regular Links -->
                         <Link v-else :href="item.href" :class="[
                             isActive(item.href)
                                 ? isSupplier
-                                    ? 'bg-white dark:bg-gray-900 text-emerald-600 shadow-sm ring-1 ring-gray-200/50 dark:ring-gray-800'
-                                    : 'bg-white dark:bg-gray-900 text-blue-600 shadow-sm ring-1 ring-gray-200/50 dark:ring-gray-800'
-                                : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-900/50 hover:text-gray-900 dark:hover:text-white'
+                                    ? 'bg-emerald-50/80 dark:bg-emerald-900/30 text-emerald-600 shadow-sm ring-1 ring-emerald-500/20'
+                                    : 'bg-blue-50/80 dark:bg-blue-900/30 text-blue-600 shadow-sm ring-1 ring-blue-500/20'
+                                : 'text-gray-500 dark:text-gray-400 hover:bg-white/40 dark:hover:bg-gray-900/40 hover:text-gray-900 dark:hover:text-white'
                         ]"
-                            class="group relative flex items-center justify-between px-3 py-2.5 text-[13px] font-bold rounded-xl transition-all duration-300">
-                            <div v-if="isActive(item.href)" :class="isSupplier ? 'bg-emerald-600' : 'bg-blue-600'"
+                            class="group relative flex items-center justify-between px-3 py-2.5 text-[13px] font-bold rounded-xl transition-all duration-300 backdrop-blur-sm">
+                            <div v-if="isActive(item.href)" :class="isSupplier ? 'bg-emerald-500' : 'bg-blue-500'"
                                 class="absolute left-0 top-1/4 bottom-1/4 w-0.5 rounded-r-full"></div>
 
                             <div class="flex items-center relative z-10">
                                 <div :class="[
                                     isActive(item.href)
                                         ? isSupplier
-                                            ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600'
-                                            : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600'
+                                            ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600'
+                                            : 'bg-blue-100 dark:bg-blue-900/50 text-blue-600'
                                         : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300'
                                 ]" class="p-1.5 rounded-lg transition-colors duration-300 mr-2.5">
                                     <component :is="item.icon" class="h-4.5 w-4.5 flex-shrink-0" />
@@ -478,71 +500,77 @@ const logoutRoute = computed(() => {
                 </nav>
             </div>
 
+            <!-- User Profile Card (glassmorphic) -->
             <div class="p-3 mt-auto flex-shrink-0">
-                <div
-                    class="bg-white dark:bg-gray-900 rounded-2xl p-2.5 border border-gray-100 dark:border-gray-800 shadow-lg group">
-                    <div class="flex items-center gap-2.5 relative z-10">
+                <div class="relative group">
+                    <div
+                        class="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 dark:from-blue-400/10 dark:to-indigo-400/10 rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                    </div>
+                    <div
+                        class="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-md rounded-2xl p-2.5 border border-gray-100/50 dark:border-gray-800/50 shadow-lg hover:shadow-xl transition-all duration-300">
+                        <div class="flex items-center gap-2.5">
+                            <div class="relative">
+                                <img v-if="userPhotoUrl" :src="userPhotoUrl" alt="Profile"
+                                    class="h-9 w-9 rounded-xl object-cover shadow-lg"
+                                    :class="isSupplier ? 'shadow-emerald-500/30' : 'shadow-blue-500/30'" />
+                                <div v-else :class="isSupplier
+                                    ? 'from-emerald-600 to-teal-700 shadow-emerald-500/30'
+                                    : 'from-blue-600 to-indigo-700 shadow-blue-500/30'"
+                                    class="h-9 w-9 rounded-xl bg-gradient-to-br flex items-center justify-center text-white text-xs font-black shadow-lg uppercase">
+                                    {{ displayInitial }}
+                                </div>
+                                <div
+                                    class="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full">
+                                </div>
+                            </div>
 
-                        <div class="relative">
-                            <img v-if="userPhotoUrl" :src="userPhotoUrl" alt="Profile"
-                                class="h-9 w-9 rounded-xl object-cover shadow-lg"
-                                :class="isSupplier ? 'shadow-emerald-500/30' : 'shadow-blue-500/30'" />
-                            <div v-else :class="isSupplier
-                                ? 'from-emerald-600 to-teal-700 shadow-emerald-500/30'
-                                : 'from-blue-600 to-indigo-700 shadow-blue-500/30'"
-                                class="h-9 w-9 rounded-xl bg-gradient-to-br flex items-center justify-center text-white text-xs font-black shadow-lg uppercase">
-                                {{ displayInitial }}
+                            <div class="flex-1 min-w-0">
+                                <p
+                                    class="text-[11px] font-black text-gray-900 dark:text-white truncate uppercase tracking-tighter">
+                                    {{ displayName }}
+                                </p>
+                                <div class="flex items-center gap-1 mb-0.5">
+                                    <Building2 class="h-2.5 w-2.5 text-gray-400" />
+                                    <span :class="isSupplier ? 'text-emerald-600' : 'text-blue-600'"
+                                        class="text-[8px] font-black uppercase truncate">
+                                        {{ displayDepartment }}
+                                    </span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <ShieldCheck :class="isSupplier ? 'text-emerald-500' : 'text-blue-500'"
+                                        class="h-2.5 w-2.5" />
+                                    <span class="text-[8px] font-black text-gray-400 uppercase truncate">
+                                        {{ displayPosition }}
+                                    </span>
+                                </div>
                             </div>
-                            <div
-                                class="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full">
-                            </div>
+
+                            <button @click="showLogoutModal = true"
+                                class="p-2 rounded-xl bg-gray-100/80 dark:bg-gray-800/80 text-gray-400 hover:text-red-500 hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-all duration-300 backdrop-blur-sm">
+                                <LogOut class="h-3.5 w-3.5" />
+                            </button>
                         </div>
-
-                        <div class="flex-1 min-w-0">
-                            <p
-                                class="text-[11px] font-black text-gray-900 dark:text-white truncate uppercase tracking-tighter">
-                                {{ displayName }}
-                            </p>
-                            <div class="flex items-center gap-1 mb-0.5">
-                                <Building2 class="h-2.5 w-2.5 text-gray-400" />
-                                <span :class="isSupplier ? 'text-emerald-600' : 'text-blue-600'"
-                                    class="text-[8px] font-black uppercase truncate">
-                                    {{ displayDepartment }}
-                                </span>
-                            </div>
-                            <div class="flex items-center gap-1">
-                                <ShieldCheck :class="isSupplier ? 'text-emerald-500' : 'text-blue-500'"
-                                    class="h-2.5 w-2.5" />
-                                <span class="text-[8px] font-black text-gray-400 uppercase truncate">
-                                    {{ displayPosition }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <button @click="showLogoutModal = true"
-                            class="p-2 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-300">
-                            <LogOut class="h-3.5 w-3.5" />
-                        </button>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- Enhanced Logout Modal -->
         <Teleport to="body">
             <transition name="modal-fade">
                 <div v-if="showLogoutModal"
                     class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
                     @click.self="showLogoutModal = false">
                     <div
-                        class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 w-full max-w-sm p-6 flex flex-col items-center text-center">
+                        class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 w-full max-w-sm p-6 flex flex-col items-center text-center transform transition-all duration-300 scale-100">
                         <div
-                            class="h-14 w-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
-                            <LogOut class="h-6 w-6 text-red-600 dark:text-red-400 ml-1" />
+                            class="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
+                            <LogOut class="h-6 w-6 text-red-600 dark:text-red-400" />
                         </div>
                         <h3 class="text-xl font-black text-gray-900 dark:text-white mb-2">Sign Out</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 px-2">Are you sure you want to sign out
-                            of your
-                            account?</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6 px-2">
+                            Are you sure you want to sign out of your account?
+                        </p>
                         <div class="flex gap-3 w-full">
                             <button @click="showLogoutModal = false"
                                 class="flex-1 py-3 text-sm font-bold rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
@@ -572,6 +600,10 @@ const logoutRoute = computed(() => {
 .custom-scrollbar::-webkit-scrollbar-thumb {
     background: rgba(156, 163, 175, 0.2);
     border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(156, 163, 175, 0.4);
 }
 
 /* Modal Entry/Exit Animations */

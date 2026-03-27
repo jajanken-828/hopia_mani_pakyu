@@ -12,17 +12,30 @@ class CheckRole
      * Handle an incoming request.
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  string  ...$roles
      */
-    public function handle(Request $request, Closure $next, string $role): Response
+    public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        if (! $request->user()) {
+        $user = $request->user();
+
+        if (! $user) {
             abort(403, 'Unauthorized.');
         }
 
-        // Convert role to uppercase to match database enum
-        $requiredRole = strtoupper($role);
+        // CEO has unrestricted access to all modules
+        if ($user->role === 'CEO') {
+            return $next($request);
+        }
 
-        if ($request->user()->role !== $requiredRole) {
+        // If no specific roles are required, allow any authenticated user
+        if (empty($roles)) {
+            return $next($request);
+        }
+
+        // Convert allowed roles to uppercase for case-insensitive matching
+        $allowedRoles = array_map('strtoupper', $roles);
+
+        if (! in_array($user->role, $allowedRoles)) {
             abort(403, 'You do not have permission to access this resource.');
         }
 
