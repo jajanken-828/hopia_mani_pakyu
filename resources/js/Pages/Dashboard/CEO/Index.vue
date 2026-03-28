@@ -1,359 +1,416 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 import {
-    ShoppingCart, DollarSign, Users, Package, TrendingUp,
-    BarChart3, PieChart, Activity, Truck, Factory, UserCheck,
-    Calendar, Zap, ArrowUp, ArrowDown, Clock, CheckCircle2
+    Filter, Download, Plus, ChevronDown, ArrowDownRight, ArrowUpRight,
+    Settings2, ArrowUpRightSquare, Clock, CheckCircle2, AlertTriangle,
+    X, Wallet, TrendingUp, Users, Factory, Package, ShoppingCart, Activity
 } from 'lucide-vue-next';
 
 const props = defineProps({
-    stats: Object,
+    stats: {
+        type: Object,
+        default: () => ({
+            totalOrders: 1248,
+            totalRevenue: 12135000,
+            activeEmployees: 42,
+            pendingLeads: 18
+        })
+    },
 });
 
-// Helper for greeting
-const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-};
-
-// Demo data for charts (replace with real props later)
+// Demo data mapped to the new aesthetic
 const revenueTrend = computed(() => ({
-    months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-    values: [450000, 520000, 480000, 610000, 590000, 720000],
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    values: [40, 75, 45, 90, 60, 50, 85], // Percentages for the bar chart
 }));
-const maxRevenue = computed(() => Math.max(...revenueTrend.value.values, 1));
 
-const orderStatuses = computed(() => ({
-    pending: 12,
-    processing: 8,
-    shipped: 15,
-    delivered: 42,
-}));
-const totalOrders = computed(() => {
-    const s = orderStatuses.value;
-    return s.pending + s.processing + s.shipped + s.delivered;
+// Activity metrics
+const activityStats = ref({
+    receipts: { value: '120.560,00', trend: '+11.5%', isUp: true },
+    contributions: { value: '37.272,00', trend: '+4.5%', isUp: true },
+    owes: { value: '9.230,00', trend: '-20.5%', isUp: false },
 });
+
+// Transaction History (Replacing Recent Activity with the table format)
+const transactions = ref([
+    { id: '#1298970', name: 'Guy Hawkins', role: 'Supplier', status: 'Completed', date: 'May 29, 2024', amount: '-$15.30', isNegative: true, avatar: 'GH' },
+    { id: '#1848230', name: 'Robert Fox', role: 'Logistics', status: 'Pending', date: 'May 11, 2024', amount: '-$23.00', isNegative: true, avatar: 'RF' },
+    { id: '#2948211', name: 'Jacob Jones', role: 'Client', status: 'Completed', date: 'May 09, 2024', amount: '+$140.00', isNegative: false, avatar: 'JJ' },
+    { id: '#3029122', name: 'Courtney Henry', role: 'Contractor', status: 'Completed', date: 'May 02, 2024', amount: '-$45.00', isNegative: true, avatar: 'CH' },
+]);
+
+// Department Modules
+const modules = ref([
+    { title: 'Human Resource', icon: Users, stats: { 'Total': '42', 'Open': '3', 'Attendance': '96%' }, color: 'text-blue-500', bg: 'bg-blue-50' },
+    { title: 'Supply Chain', icon: ShoppingCart, stats: { 'Suppliers': '24', 'Pending': '8', 'On-time': '94%' }, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    { title: 'Manufacturing', icon: Factory, stats: { 'Orders': '12', 'Running': '7/10', 'Defect': '2.5%' }, color: 'text-amber-500', bg: 'bg-amber-50' },
+    { title: 'Inventory', icon: Package, stats: { 'SKUs': '245', 'Alerts': '6', 'Value': '₱2.4M' }, color: 'text-purple-500', bg: 'bg-purple-50' },
+]);
+
+const showBanner = ref(true);
 </script>
 
 <template>
     <AuthenticatedLayout>
 
         <Head title="CEO Dashboard" />
-        <div class="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 sm:space-y-8">
-            <!-- Header -->
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 class="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
-                        Executive <span class="text-blue-600">Dashboard</span>
-                    </h1>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ getGreeting() }}, Monti Leadership</p>
-                </div>
-                <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                    <Calendar class="w-4 h-4" />
-                    <span>{{ new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-                        }}</span>
-                </div>
-            </div>
 
-            <!-- Key Metrics Row (Enhanced) -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                <div
-                    class="group bg-white dark:bg-zinc-900 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Orders</p>
-                            <p class="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mt-1">{{
-                                stats.totalOrders }}</p>
-                            <p class="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
-                                <ArrowUp class="w-3 h-3" /> +12%
-                            </p>
-                        </div>
-                        <div class="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-xl group-hover:bg-blue-200 transition">
-                            <ShoppingCart class="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                        </div>
-                    </div>
-                </div>
-                <div
-                    class="group bg-white dark:bg-zinc-900 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Revenue</p>
-                            <p class="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mt-1">₱{{
-                                stats.totalRevenue?.toLocaleString() }}</p>
-                            <p class="text-xs text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
-                                <ArrowUp class="w-3 h-3" /> +8%
-                            </p>
-                        </div>
-                        <div
-                            class="p-3 bg-emerald-100 dark:bg-emerald-900/20 rounded-xl group-hover:bg-emerald-200 transition">
-                            <DollarSign class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                        </div>
-                    </div>
-                </div>
-                <div
-                    class="group bg-white dark:bg-zinc-900 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Active Employees</p>
-                            <p class="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mt-1">{{
-                                stats.activeEmployees }}</p>
-                            <p class="text-xs text-purple-600 dark:text-purple-400 mt-1">+5 this quarter</p>
-                        </div>
-                        <div
-                            class="p-3 bg-purple-100 dark:bg-purple-900/20 rounded-xl group-hover:bg-purple-200 transition">
-                            <Users class="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                        </div>
-                    </div>
-                </div>
-                <div
-                    class="group bg-white dark:bg-zinc-900 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Pending Leads</p>
-                            <p class="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mt-1">{{
-                                stats.pendingLeads }}</p>
-                            <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">Needs attention</p>
-                        </div>
-                        <div
-                            class="p-3 bg-amber-100 dark:bg-amber-900/20 rounded-xl group-hover:bg-amber-200 transition">
-                            <Package class="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div class="min-h-screen bg-[#F6F6F8] p-4 sm:p-8 font-sans text-[#1A1A1A]">
+            <div class="max-w-[1400px] mx-auto space-y-8">
 
-            <!-- Module Cards (Enhanced) -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                <div
-                    class="bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/20 dark:to-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 p-5 hover:shadow-lg transition">
-                    <div class="flex items-center gap-3 mb-3">
-                        <div class="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
-                            <UserCheck class="w-5 h-5 text-blue-600" />
-                        </div>
-                        <h3 class="font-bold text-gray-900 dark:text-white">HRM</h3>
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                    <div>
+                        <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+                            Welcome back, Monti Leadership!
+                        </h1>
+                        <p class="text-gray-500 mt-2 font-medium">Control your investment, income, and expenses.</p>
                     </div>
-                    <div class="space-y-2 text-sm">
-                        <div class="flex justify-between"><span class="text-gray-500">Total Employees</span><span
-                                class="font-semibold">42</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">Open Positions</span><span
-                                class="font-semibold">3</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">Attendance Rate</span><span
-                                class="font-semibold text-green-600">96%</span></div>
-                    </div>
-                </div>
-                <div
-                    class="bg-gradient-to-br from-green-50 to-white dark:from-green-950/20 dark:to-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 p-5 hover:shadow-lg transition">
-                    <div class="flex items-center gap-3 mb-3">
-                        <div class="p-2 bg-green-100 dark:bg-green-900/30 rounded-xl">
-                            <Truck class="w-5 h-5 text-green-600" />
-                        </div>
-                        <h3 class="font-bold text-gray-900 dark:text-white">SCM</h3>
-                    </div>
-                    <div class="space-y-2 text-sm">
-                        <div class="flex justify-between"><span class="text-gray-500">Active Suppliers</span><span
-                                class="font-semibold">24</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">Pending Orders</span><span
-                                class="font-semibold">8</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">On‑time Delivery</span><span
-                                class="font-semibold">94%</span></div>
-                    </div>
-                </div>
-                <div
-                    class="bg-gradient-to-br from-yellow-50 to-white dark:from-yellow-950/20 dark:to-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 p-5 hover:shadow-lg transition">
-                    <div class="flex items-center gap-3 mb-3">
-                        <div class="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl">
-                            <Factory class="w-5 h-5 text-yellow-600" />
-                        </div>
-                        <h3 class="font-bold text-gray-900 dark:text-white">Manufacturing</h3>
-                    </div>
-                    <div class="space-y-2 text-sm">
-                        <div class="flex justify-between"><span class="text-gray-500">Active Orders</span><span
-                                class="font-semibold">12</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">Machines Running</span><span
-                                class="font-semibold">7/10</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">Defect Rate</span><span
-                                class="font-semibold">2.5%</span></div>
-                    </div>
-                </div>
-                <div
-                    class="bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/20 dark:to-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 p-5 hover:shadow-lg transition">
-                    <div class="flex items-center gap-3 mb-3">
-                        <div class="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl">
-                            <Package class="w-5 h-5 text-indigo-600" />
-                        </div>
-                        <h3 class="font-bold text-gray-900 dark:text-white">Inventory</h3>
-                    </div>
-                    <div class="space-y-2 text-sm">
-                        <div class="flex justify-between"><span class="text-gray-500">Total SKUs</span><span
-                                class="font-semibold">245</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">Low Stock Alerts</span><span
-                                class="font-semibold text-red-500">6</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">Inventory Value</span><span
-                                class="font-semibold">₱2.4M</span></div>
-                    </div>
-                </div>
-                <div
-                    class="bg-gradient-to-br from-red-50 to-white dark:from-red-950/20 dark:to-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 p-5 hover:shadow-lg transition">
-                    <div class="flex items-center gap-3 mb-3">
-                        <div class="p-2 bg-red-100 dark:bg-red-900/30 rounded-xl">
-                            <Activity class="w-5 h-5 text-red-600" />
-                        </div>
-                        <h3 class="font-bold text-gray-900 dark:text-white">CRM</h3>
-                    </div>
-                    <div class="space-y-2 text-sm">
-                        <div class="flex justify-between"><span class="text-gray-500">Active Leads</span><span
-                                class="font-semibold">{{ stats.pendingLeads }}</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">Conversion Rate</span><span
-                                class="font-semibold">22%</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">Customers</span><span
-                                class="font-semibold">18</span></div>
-                    </div>
-                </div>
-                <div
-                    class="bg-gradient-to-br from-teal-50 to-white dark:from-teal-950/20 dark:to-zinc-900 rounded-2xl border border-gray-100 dark:border-zinc-800 p-5 hover:shadow-lg transition">
-                    <div class="flex items-center gap-3 mb-3">
-                        <div class="p-2 bg-teal-100 dark:bg-teal-900/30 rounded-xl">
-                            <ShoppingCart class="w-5 h-5 text-teal-600" />
-                        </div>
-                        <h3 class="font-bold text-gray-900 dark:text-white">E‑Commerce</h3>
-                    </div>
-                    <div class="space-y-2 text-sm">
-                        <div class="flex justify-between"><span class="text-gray-500">Active Products</span><span
-                                class="font-semibold">127</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">Monthly Sales</span><span
-                                class="font-semibold">₱850K</span></div>
-                        <div class="flex justify-between"><span class="text-gray-500">Cart Abandonment</span><span
-                                class="font-semibold">34%</span></div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Charts Row (Real CSS Charts) -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Revenue Trend Bar Chart -->
-                <div
-                    class="bg-white dark:bg-zinc-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-zinc-800">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center gap-2">
-                            <BarChart3 class="w-4 h-4 text-blue-500" />
-                            <h3 class="text-sm font-bold text-gray-700 dark:text-gray-200">Revenue Trend (Last 6 Months)
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button
+                            class="flex items-center gap-2 px-5 py-2.5 bg-white text-gray-700 rounded-full font-semibold shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-gray-100 hover:bg-gray-50 transition">
+                            <Filter class="w-4 h-4" /> Filters
+                        </button>
+                        <button
+                            class="flex items-center gap-2 px-5 py-2.5 bg-white text-gray-700 rounded-full font-semibold shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-gray-100 hover:bg-gray-50 transition">
+                            <Download class="w-4 h-4" /> Exports
+                        </button>
+                        <button
+                            class="flex items-center gap-2 px-5 py-2.5 bg-[#F05A28] text-white rounded-full font-semibold shadow-md hover:bg-[#d94e22] transition transform hover:scale-105">
+                            <Plus class="w-4 h-4" /> Add card
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-12 gap-8">
+
+                    <div class="xl:col-span-4 flex flex-col gap-6">
+
+                        <div
+                            class="bg-white rounded-[2rem] p-7 shadow-[0_8px_30px_rgba(0,0,0,0.03)] border border-gray-50">
+                            <div class="flex justify-between items-center mb-8">
+                                <div>
+                                    <h2 class="text-xl font-bold text-gray-900">Summary</h2>
+                                    <p class="text-sm text-gray-400 font-medium">Track your performance.</p>
+                                </div>
+                                <button
+                                    class="flex items-center gap-1 text-sm font-semibold px-4 py-2 border border-gray-100 rounded-full hover:bg-gray-50">
+                                    Weekly
+                                    <ChevronDown class="w-4 h-4 text-gray-400" />
+                                </button>
+                            </div>
+
+                            <div class="flex gap-4 mb-10">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 text-sm text-gray-500 font-medium mb-1">
+                                        <div
+                                            class="w-6 h-6 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                            <ArrowDownRight class="w-3 h-3 text-gray-600" />
+                                        </div>
+                                        Total income
+                                    </div>
+                                    <div class="text-2xl font-bold tracking-tight">12.135,00</div>
+                                </div>
+                                <div class="w-px bg-gray-100"></div>
+                                <div class="flex-1 pl-2">
+                                    <div class="flex items-center gap-2 text-sm text-gray-500 font-medium mb-1">
+                                        <div
+                                            class="w-6 h-6 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                            <ArrowUpRight class="w-3 h-3 text-gray-600" />
+                                        </div>
+                                        Total paid
+                                    </div>
+                                    <div class="text-2xl font-bold tracking-tight">8.873,00</div>
+                                </div>
+                            </div>
+
+                            <div class="h-40 flex items-end justify-between gap-3 mt-4">
+                                <div v-for="(val, index) in revenueTrend.values" :key="index"
+                                    class="w-full relative group flex flex-col justify-end h-full">
+                                    <div class="w-full rounded-t-xl rounded-b-sm transition-all duration-500"
+                                        :class="index === 2 || index === 3 || index === 4 ? 'bg-[#F05A28]' : 'bg-[#EFECE5]'"
+                                        :style="{ height: `${val}%` }">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-6">
+                            <div
+                                class="bg-white rounded-[2rem] p-6 shadow-[0_8px_30px_rgba(0,0,0,0.03)] border border-gray-50">
+                                <div class="flex items-center gap-2 text-sm text-gray-500 font-medium mb-4">
+                                    <Clock class="w-4 h-4" /> Weekly average
+                                </div>
+                                <div class="flex items-center gap-1 text-sm font-bold text-gray-900 mb-1">
+                                    <ArrowDownRight class="w-4 h-4 text-gray-900" /> -11.5%
+                                </div>
+                                <div class="text-2xl font-bold">25.460,00</div>
+                            </div>
+                            <div
+                                class="bg-white rounded-[2rem] p-6 shadow-[0_8px_30px_rgba(0,0,0,0.03)] border border-gray-50">
+                                <div class="flex items-center gap-2 text-sm text-gray-500 font-medium mb-4">
+                                    <Activity class="w-4 h-4" /> Annual average
+                                </div>
+                                <div class="flex items-center gap-1 text-sm font-bold text-[#F05A28] mb-1">
+                                    <ArrowUpRight class="w-4 h-4" /> +11.5%
+                                </div>
+                                <div class="text-2xl font-bold">25.460,00</div>
+                            </div>
+                        </div>
+
+                        <div v-if="showBanner"
+                            class="bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgba(0,0,0,0.03)] border border-gray-50 flex justify-between items-center mt-2">
+                            <h3 class="font-bold text-lg text-gray-900 leading-tight max-w-[200px]">
+                                How is your business management going?
                             </h3>
+                            <button @click="showBanner = false"
+                                class="w-10 h-10 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition">
+                                <X class="w-5 h-5 text-gray-500" />
+                            </button>
                         </div>
-                        <TrendingUp class="w-4 h-4 text-gray-400" />
                     </div>
-                    <div class="h-48 flex items-end gap-2">
-                        <div v-for="(value, idx) in revenueTrend.values" :key="idx"
-                            class="flex-1 flex flex-col items-center">
-                            <div class="w-full bg-gradient-to-t from-blue-500 to-blue-600 rounded-t-lg transition-all duration-500"
-                                :style="{ height: `${(value / maxRevenue) * 100}%`, minHeight: '4px' }"></div>
-                            <span class="text-[10px] sm:text-xs mt-2 text-gray-500">{{ revenueTrend.months[idx]
-                                }}</span>
-                            <span class="text-[9px] font-bold text-gray-600 dark:text-gray-400">₱{{ (value /
-                                1000).toFixed(0) }}K</span>
+
+                    <div class="xl:col-span-8 flex flex-col gap-8">
+
+                        <div>
+                            <div class="flex justify-between items-center mb-4 px-2">
+                                <div>
+                                    <h2 class="text-xl font-bold text-gray-900">Activity</h2>
+                                    <p class="text-sm text-gray-400 font-medium">Track your activity.</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button
+                                        class="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm border border-gray-100 hover:bg-gray-50">
+                                        <Settings2 class="w-4 h-4 text-gray-600" />
+                                    </button>
+                                    <button
+                                        class="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm border border-gray-100 hover:bg-gray-50">
+                                        <ArrowUpRightSquare class="w-4 h-4 text-gray-600" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div
+                                    class="bg-white rounded-[2rem] p-6 shadow-[0_8px_30px_rgba(0,0,0,0.03)] border border-gray-50 flex flex-col relative overflow-hidden group">
+                                    <div class="flex items-center gap-3 mb-6 relative z-10">
+                                        <div class="p-2 bg-gray-50 rounded-xl">
+                                            <Wallet class="w-5 h-5 text-gray-700" />
+                                        </div>
+                                        <span class="font-semibold text-gray-900">Receipts</span>
+                                    </div>
+                                    <div class="relative z-10">
+                                        <div class="text-[#F05A28] text-sm font-bold flex items-center gap-1 mb-1">
+                                            <ArrowUpRight class="w-4 h-4" /> {{ activityStats.receipts.trend }}
+                                        </div>
+                                        <div class="text-3xl font-bold tracking-tight">{{ activityStats.receipts.value
+                                            }}</div>
+                                    </div>
+                                    <div
+                                        class="absolute bottom-0 left-0 w-full h-24 opacity-80 group-hover:opacity-100 transition duration-500">
+                                        <svg viewBox="0 0 200 60" preserveAspectRatio="none" class="w-full h-full">
+                                            <path
+                                                d="M0,40 Q10,30 20,45 T40,35 T60,50 T80,20 T100,45 T120,25 T140,50 T160,15 T180,35 T200,20"
+                                                fill="none" stroke="#F05A28" stroke-width="2.5"
+                                                stroke-linecap="round" />
+                                            <path
+                                                d="M0,40 Q10,30 20,45 T40,35 T60,50 T80,20 T100,45 T120,25 T140,50 T160,15 T180,35 T200,20 L200,60 L0,60 Z"
+                                                fill="url(#gradOrange)" opacity="0.15" />
+                                            <defs>
+                                                <linearGradient id="gradOrange" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stop-color="#F05A28" />
+                                                    <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+                                                </linearGradient>
+                                            </defs>
+                                        </svg>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="bg-white rounded-[2rem] p-6 shadow-[0_8px_30px_rgba(0,0,0,0.03)] border border-gray-50 flex flex-col relative overflow-hidden group">
+                                    <div class="flex items-center gap-3 mb-6 relative z-10">
+                                        <div class="p-2 bg-gray-50 rounded-xl">
+                                            <TrendingUp class="w-5 h-5 text-gray-700" />
+                                        </div>
+                                        <span class="font-semibold text-gray-900">Contributions</span>
+                                    </div>
+                                    <div class="relative z-10">
+                                        <div class="text-[#F05A28] text-sm font-bold flex items-center gap-1 mb-1">
+                                            <ArrowUpRight class="w-4 h-4" /> {{ activityStats.contributions.trend }}
+                                        </div>
+                                        <div class="text-3xl font-bold tracking-tight">{{
+                                            activityStats.contributions.value }}</div>
+                                    </div>
+                                    <div
+                                        class="absolute bottom-0 left-0 w-full h-24 opacity-80 group-hover:opacity-100 transition duration-500">
+                                        <svg viewBox="0 0 200 60" preserveAspectRatio="none" class="w-full h-full">
+                                            <path d="M0,50 Q15,20 30,40 T60,25 T90,45 T120,30 T150,55 T180,25 T200,40"
+                                                fill="none" stroke="#F05A28" stroke-width="2.5"
+                                                stroke-linecap="round" />
+                                            <path
+                                                d="M0,50 Q15,20 30,40 T60,25 T90,45 T120,30 T150,55 T180,25 T200,40 L200,60 L0,60 Z"
+                                                fill="url(#gradOrange2)" opacity="0.15" />
+                                            <defs>
+                                                <linearGradient id="gradOrange2" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stop-color="#F05A28" />
+                                                    <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+                                                </linearGradient>
+                                            </defs>
+                                        </svg>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="bg-[#3E2A1E] text-white rounded-[2rem] p-6 shadow-xl flex flex-col relative overflow-hidden group">
+                                    <div class="flex items-center gap-3 mb-6 relative z-10">
+                                        <div class="p-2 bg-white/10 rounded-xl">
+                                            <DollarSign class="w-5 h-5 text-white" />
+                                        </div>
+                                        <span class="font-semibold text-white">Owes</span>
+                                    </div>
+                                    <div class="relative z-10">
+                                        <div class="text-white/60 text-sm font-medium flex items-center gap-1 mb-1">
+                                            <ArrowDownRight class="w-4 h-4" /> {{ activityStats.owes.trend }}
+                                        </div>
+                                        <div class="text-3xl font-bold tracking-tight">{{ activityStats.owes.value }}
+                                        </div>
+                                    </div>
+                                    <div
+                                        class="absolute bottom-0 left-0 w-full h-24 opacity-90 group-hover:opacity-100 transition duration-500">
+                                        <svg viewBox="0 0 200 60" preserveAspectRatio="none" class="w-full h-full">
+                                            <path d="M0,35 Q20,15 40,45 T80,25 T120,50 T160,30 T200,45" fill="none"
+                                                stroke="#F05A28" stroke-width="2.5" stroke-linecap="round" />
+                                            <path d="M0,35 Q20,15 40,45 T80,25 T120,50 T160,30 T200,45 L200,60 L0,60 Z"
+                                                fill="url(#gradDark)" opacity="0.2" />
+                                            <defs>
+                                                <linearGradient id="gradDark" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stop-color="#F05A28" />
+                                                    <stop offset="100%" stop-color="#3E2A1E" stop-opacity="0" />
+                                                </linearGradient>
+                                            </defs>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div
+                            class="bg-white rounded-[2rem] p-7 shadow-[0_8px_30px_rgba(0,0,0,0.03)] border border-gray-50 flex-1">
+                            <div class="flex justify-between items-center mb-6">
+                                <div>
+                                    <h2 class="text-xl font-bold text-gray-900">Transactions history</h2>
+                                    <p class="text-sm text-gray-400 font-medium">Track your history.</p>
+                                </div>
+                                <button
+                                    class="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm border border-gray-100 hover:bg-gray-50">
+                                    <Settings2 class="w-4 h-4 text-gray-600" />
+                                </button>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr
+                                            class="text-gray-400 text-xs uppercase tracking-wider border-b border-gray-100">
+                                            <th class="pb-4 font-semibold px-2">Name</th>
+                                            <th class="pb-4 font-semibold px-2">ID</th>
+                                            <th class="pb-4 font-semibold px-2">Status</th>
+                                            <th class="pb-4 font-semibold px-2">Date</th>
+                                            <th class="pb-4 font-semibold px-2 text-right">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="text-sm">
+                                        <tr v-for="tx in transactions" :key="tx.id"
+                                            class="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                                            <td class="py-4 px-2">
+                                                <div class="flex items-center gap-3">
+                                                    <div
+                                                        class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-600 text-sm overflow-hidden border border-gray-200">
+                                                        {{ tx.avatar }}
+                                                    </div>
+                                                    <div>
+                                                        <div class="font-bold text-gray-900">{{ tx.name }}</div>
+                                                        <div class="text-xs text-gray-500">{{ tx.role }}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="py-4 px-2 font-medium text-gray-900">{{ tx.id }}</td>
+                                            <td class="py-4 px-2">
+                                                <span
+                                                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold"
+                                                    :class="tx.status === 'Completed' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'">
+                                                    <span class="w-1.5 h-1.5 rounded-full"
+                                                        :class="tx.status === 'Completed' ? 'bg-green-600' : 'bg-orange-600'"></span>
+                                                    {{ tx.status }}
+                                                </span>
+                                            </td>
+                                            <td class="py-4 px-2 font-medium text-gray-900">{{ tx.date }}</td>
+                                            <td class="py-4 px-2 text-right font-bold"
+                                                :class="tx.isNegative ? 'text-[#F05A28]' : 'text-gray-900'">
+                                                {{ tx.amount }}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="pt-4">
+                    <h2 class="text-xl font-bold text-gray-900 mb-6 px-2">Department Overview</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div v-for="(mod, idx) in modules" :key="idx"
+                            class="bg-white rounded-3xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-gray-50 hover:shadow-md transition-shadow">
+                            <div class="flex items-center gap-3 mb-5">
+                                <div :class="[mod.bg, mod.color, 'p-3 rounded-2xl']">
+                                    <component :is="mod.icon" class="w-5 h-5" />
+                                </div>
+                                <h3 class="font-bold text-gray-900">{{ mod.title }}</h3>
+                            </div>
+                            <div class="space-y-3">
+                                <div v-for="(val, key) in mod.stats" :key="key"
+                                    class="flex justify-between items-center text-sm">
+                                    <span class="text-gray-500 font-medium">{{ key }}</span>
+                                    <span class="font-bold text-gray-900">{{ val }}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Order Status Distribution (Stacked Bars) -->
-                <div
-                    class="bg-white dark:bg-zinc-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-zinc-800">
-                    <div class="flex items-center gap-2 mb-4">
-                        <PieChart class="w-4 h-4 text-emerald-500" />
-                        <h3 class="text-sm font-bold text-gray-700 dark:text-gray-200">Order Status Distribution</h3>
-                    </div>
-                    <div class="space-y-3">
-                        <div class="flex items-center gap-3">
-                            <span class="w-20 text-xs font-medium text-gray-600">Pending</span>
-                            <div class="flex-1 h-6 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                <div class="h-full bg-amber-500 rounded-full transition-all duration-700"
-                                    :style="{ width: `${(orderStatuses.pending / totalOrders) * 100}%` }"></div>
-                            </div>
-                            <span class="text-sm font-bold">{{ orderStatuses.pending }}</span>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span class="w-20 text-xs font-medium text-gray-600">Processing</span>
-                            <div class="flex-1 h-6 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                <div class="h-full bg-blue-500 rounded-full transition-all duration-700"
-                                    :style="{ width: `${(orderStatuses.processing / totalOrders) * 100}%` }"></div>
-                            </div>
-                            <span class="text-sm font-bold">{{ orderStatuses.processing }}</span>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span class="w-20 text-xs font-medium text-gray-600">Shipped</span>
-                            <div class="flex-1 h-6 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                <div class="h-full bg-purple-500 rounded-full transition-all duration-700"
-                                    :style="{ width: `${(orderStatuses.shipped / totalOrders) * 100}%` }"></div>
-                            </div>
-                            <span class="text-sm font-bold">{{ orderStatuses.shipped }}</span>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span class="w-20 text-xs font-medium text-gray-600">Delivered</span>
-                            <div class="flex-1 h-6 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                <div class="h-full bg-green-500 rounded-full transition-all duration-700"
-                                    :style="{ width: `${(orderStatuses.delivered / totalOrders) * 100}%` }"></div>
-                            </div>
-                            <span class="text-sm font-bold">{{ orderStatuses.delivered }}</span>
-                        </div>
-                    </div>
-                    <div
-                        class="mt-4 pt-4 border-t border-gray-100 dark:border-zinc-800 flex justify-between text-xs text-gray-500">
-                        <span>Total Orders: {{ totalOrders }}</span>
-                        <span>Delivered: {{ ((orderStatuses.delivered / totalOrders) * 100).toFixed(1) }}%</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Recent Activity (Enhanced) -->
-            <div
-                class="bg-white dark:bg-zinc-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-zinc-800">
-                <div class="flex items-center gap-2 mb-4">
-                    <Clock class="w-4 h-4 text-gray-500" />
-                    <h3 class="text-sm font-bold text-gray-700 dark:text-gray-200">Recent Activity</h3>
-                </div>
-                <div class="space-y-3">
-                    <div class="flex items-start gap-3 pb-3 border-b border-gray-100 dark:border-zinc-800">
-                        <div class="p-1.5 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                            <ShoppingCart class="w-3 h-3 text-green-600" />
-                        </div>
-                        <div class="flex-1">
-                            <p class="text-sm font-medium text-gray-900 dark:text-white">New order #PO-2026-00045 placed
-                            </p>
-                            <p class="text-xs text-gray-500">2 minutes ago</p>
-                        </div>
-                        <CheckCircle2 class="w-4 h-4 text-green-500" />
-                    </div>
-                    <div class="flex items-start gap-3 pb-3 border-b border-gray-100 dark:border-zinc-800">
-                        <div class="p-1.5 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                            <Users class="w-3 h-3 text-blue-600" />
-                        </div>
-                        <div class="flex-1">
-                            <p class="text-sm font-medium text-gray-900 dark:text-white">New employee hired: Sarah
-                                Johnson</p>
-                            <p class="text-xs text-gray-500">1 hour ago</p>
-                        </div>
-                        <CheckCircle2 class="w-4 h-4 text-blue-500" />
-                    </div>
-                    <div class="flex items-start gap-3">
-                        <div class="p-1.5 bg-amber-100 dark:bg-amber-900/20 rounded-lg">
-                            <Package class="w-3 h-3 text-amber-600" />
-                        </div>
-                        <div class="flex-1">
-                            <p class="text-sm font-medium text-gray-900 dark:text-white">Low stock alert: Yarn type
-                                'Polyester'</p>
-                            <p class="text-xs text-gray-500">3 hours ago</p>
-                        </div>
-                        <AlertTriangle class="w-4 h-4 text-amber-500" />
-                    </div>
-                </div>
-                <div class="mt-4 text-center">
-                    <button class="text-xs text-blue-600 dark:text-blue-400 font-medium hover:underline">View all
-                        activity →</button>
-                </div>
             </div>
         </div>
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+/* Importing an elegant sans-serif font to match the modern look */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+.font-sans {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* Subtle custom scrollbar for tables if needed */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e1;
+}
+</style>

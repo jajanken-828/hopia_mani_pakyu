@@ -9,7 +9,7 @@ import {
     Users, UserPlus, Calendar, TrendingUp, UserCheck, ArrowUpCircle,
     Eye, ShieldOff, ShieldCheck, Award, X, History, UserMinus,
     CheckCircle2, XCircle, Star, Building2, ClipboardList,
-    LayoutDashboard, CheckCircle, RotateCcw
+    LayoutDashboard, CheckCircle, RotateCcw, Edit, RefreshCw
 } from 'lucide-vue-next'
 
 // ─────────────────────────────────────────────
@@ -54,7 +54,7 @@ const activeTab = ref('employees') // 'employees' | 'trainees'
 // ─────────────────────────────────────────────
 // Employee Display State & Filters
 // ─────────────────────────────────────────────
-const departments = ['ALL', 'HRM', 'SCM', 'FIN', 'MAN', 'INV', 'ORD', 'WAR', 'CRM', 'ECO']
+const departments = ['ALL', 'HRM', 'SCM', 'FIN', 'MAN', 'INV', 'ORD', 'WAR', 'CRM', 'ECO', 'PRO', 'PROJ', 'IT']
 const activeDept = ref('ALL')
 const showDeactivated = ref(false) // Toggle for active vs deactivated accounts
 
@@ -212,6 +212,82 @@ const promoteToStaff = () => {
             closePromotionModal()
         },
     })
+}
+
+// ─────────────────────────────────────────────
+// NEW: Role/Position Management
+// ─────────────────────────────────────────────
+const isManagingEmployee = ref(false)
+const manageEmployee = ref(null)
+const manageForm = ref({
+    role: '',
+    position: ''
+})
+
+const roleOptions = [
+    { value: 'HRM', label: 'Human Resource' },
+    { value: 'SCM', label: 'Supply Chain' },
+    { value: 'FIN', label: 'Finance' },
+    { value: 'MAN', label: 'Manufacturing' },
+    { value: 'INV', label: 'Inventory' },
+    { value: 'ORD', label: 'Order Processing' },
+    { value: 'WAR', label: 'Warehouse' },
+    { value: 'CRM', label: 'Customer Relationship' },
+    { value: 'ECO', label: 'E-Commerce' },
+    { value: 'PRO', label: 'Procurement' },
+    { value: 'PROJ', label: 'Project Automation' },
+    { value: 'IT', label: 'Information Technology' }
+]
+
+const positionOptions = [
+    { value: 'staff', label: 'Staff' },
+    { value: 'manager', label: 'Manager' }
+]
+
+const openManageModal = (emp) => {
+    manageEmployee.value = emp
+    manageForm.value.role = emp.role
+    manageForm.value.position = emp.position
+    isManagingEmployee.value = true
+}
+
+const closeManageModal = () => {
+    isManagingEmployee.value = false
+    manageEmployee.value = null
+    manageForm.value = { role: '', position: '' }
+}
+
+const updateRolePosition = () => {
+    if (!manageEmployee.value) return
+
+    const originalRole = manageEmployee.value.role
+    const originalPosition = manageEmployee.value.position
+    const newRole = manageForm.value.role
+    const newPosition = manageForm.value.position
+
+    // Skip if no changes
+    if (originalRole === newRole && originalPosition === newPosition) {
+        closeManageModal()
+        return
+    }
+
+    const confirmMsg = `Are you sure you want to change ${manageEmployee.value.name} from ${originalRole} (${originalPosition}) to ${newRole} (${newPosition})?`
+    if (confirm(confirmMsg)) {
+        router.patch(route('hrm.employees.update-role-position', manageEmployee.value.id), {
+            role: newRole,
+            position: newPosition
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                triggerToast(`${manageEmployee.value.name}'s role/position updated.`)
+                closeManageModal()
+            },
+            onError: (errors) => {
+                const msg = Object.values(errors)[0] || 'Update failed.'
+                triggerToast(`Error: ${msg}`)
+            }
+        })
+    }
 }
 
 // ─────────────────────────────────────────────
@@ -432,6 +508,11 @@ const gradeColor = (score) => score == null ? 'text-slate-400' : (score >= 80 ? 
                                             title="Audit Logs">
                                             <History class="h-4 w-4" />
                                         </button>
+                                        <button @click="openManageModal(emp)"
+                                            class="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
+                                            title="Manage Role/Position">
+                                            <Edit class="h-4 w-4" />
+                                        </button>
                                         <button v-if="checkActive(emp)" @click="openDeactivateModal(emp)"
                                             class="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                                             title="Deactivate">
@@ -490,6 +571,11 @@ const gradeColor = (score) => score == null ? 'text-slate-400' : (score >= 80 ? 
                                     class="p-2 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
                                     title="Audit Logs">
                                     <History class="h-4 w-4" />
+                                </button>
+                                <button @click="openManageModal(emp)"
+                                    class="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
+                                    title="Manage Role/Position">
+                                    <Edit class="h-4 w-4" />
                                 </button>
                                 <button v-if="checkActive(emp)" @click="openDeactivateModal(emp)"
                                     class="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
@@ -585,6 +671,11 @@ const gradeColor = (score) => score == null ? 'text-slate-400' : (score >= 80 ? 
                                             title="Audit Logs">
                                             <History class="h-4 w-4" />
                                         </button>
+                                        <button @click="openManageModal(emp)"
+                                            class="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
+                                            title="Manage Role/Position">
+                                            <Edit class="h-4 w-4" />
+                                        </button>
                                         <button v-if="checkActive(emp)" @click="openDeactivateModal(emp)"
                                             class="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
                                             title="Deactivate">
@@ -643,6 +734,11 @@ const gradeColor = (score) => score == null ? 'text-slate-400' : (score >= 80 ? 
                                     class="p-2 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
                                     title="Audit Logs">
                                     <History class="h-4 w-4" />
+                                </button>
+                                <button @click="openManageModal(emp)"
+                                    class="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
+                                    title="Manage Role/Position">
+                                    <Edit class="h-4 w-4" />
                                 </button>
                                 <button v-if="checkActive(emp)" @click="openDeactivateModal(emp)"
                                     class="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
@@ -927,6 +1023,7 @@ const gradeColor = (score) => score == null ? 'text-slate-400' : (score >= 80 ? 
             </div>
         </div>
 
+        <!-- Existing Modals: Deactivate, Activate, History, View, Grading, Promotion (unchanged) -->
         <TransitionRoot as="template" :show="isDeactivating">
             <Dialog as="div" class="relative z-50" @close="closeStatusModals">
                 <TransitionChild as="template" enter="ease-out duration-200" enter-from="opacity-0"
@@ -1301,6 +1398,69 @@ const gradeColor = (score) => score == null ? 'text-slate-400' : (score >= 80 ? 
                                         Promotion</button>
                                     <button @click="closePromotionModal"
                                         class="w-full px-6 py-3 text-slate-400 font-bold hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-all text-xs uppercase">Cancel</button>
+                                </div>
+                            </DialogPanel>
+                        </TransitionChild>
+                    </div>
+                </div>
+            </Dialog>
+        </TransitionRoot>
+
+        <!-- NEW: Role/Position Management Modal -->
+        <TransitionRoot as="template" :show="isManagingEmployee">
+            <Dialog as="div" class="relative z-50" @close="closeManageModal">
+                <TransitionChild as="template" enter="ease-out duration-200" enter-from="opacity-0"
+                    enter-to="opacity-100" leave="ease-in duration-150" leave-from="opacity-100" leave-to="opacity-0">
+                    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" />
+                </TransitionChild>
+                <div class="fixed inset-0 z-10 overflow-y-auto w-full px-4">
+                    <div class="flex min-h-full items-center justify-center py-4">
+                        <TransitionChild as="template" enter="ease-out duration-200" enter-from="opacity-0 scale-95"
+                            enter-to="opacity-100 scale-100" leave="ease-in duration-150"
+                            leave-from="opacity-100 scale-100" leave-to="opacity-0 scale-95">
+                            <DialogPanel
+                                class="relative w-full max-w-md transform rounded-2xl bg-white dark:bg-slate-800 shadow-2xl border border-amber-100 dark:border-amber-900/40 overflow-hidden">
+                                <div class="p-6">
+                                    <div class="flex items-start gap-4">
+                                        <div
+                                            class="flex-shrink-0 h-11 w-11 rounded-xl bg-amber-100 flex items-center justify-center">
+                                            <Edit class="h-5 w-5 text-amber-600" />
+                                        </div>
+                                        <div class="flex-1">
+                                            <DialogTitle
+                                                class="text-base font-black text-slate-900 dark:text-white uppercase">
+                                                Manage Employee</DialogTitle>
+                                            <p class="text-sm text-slate-500 mt-1">Update role (department) and position
+                                                for <span class="font-bold text-slate-900 dark:text-white">{{
+                                                    manageEmployee?.name }}</span>.</p>
+                                        </div>
+                                    </div>
+                                    <div class="mt-5 space-y-4">
+                                        <div>
+                                            <label
+                                                class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Department</label>
+                                            <select v-model="manageForm.role"
+                                                class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/40 text-sm">
+                                                <option v-for="opt in roleOptions" :key="opt.value" :value="opt.value">
+                                                    {{ opt.label }}</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label
+                                                class="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Position</label>
+                                            <select v-model="manageForm.position"
+                                                class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/40 text-sm">
+                                                <option v-for="opt in positionOptions" :key="opt.value"
+                                                    :value="opt.value">{{ opt.label }}</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="mt-5 flex flex-col sm:flex-row-reverse gap-3">
+                                        <button @click="updateRolePosition"
+                                            class="w-full sm:flex-none py-3 px-5 rounded-xl text-xs font-black uppercase bg-amber-600 text-white hover:bg-amber-700 transition-all">Update</button>
+                                        <button @click="closeManageModal"
+                                            class="w-full sm:flex-none py-3 px-5 rounded-xl text-xs font-black uppercase text-slate-700 bg-slate-100 hover:bg-slate-200">Cancel</button>
+                                    </div>
                                 </div>
                             </DialogPanel>
                         </TransitionChild>

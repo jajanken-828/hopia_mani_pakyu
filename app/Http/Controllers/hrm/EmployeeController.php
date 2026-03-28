@@ -146,4 +146,40 @@ class EmployeeController extends Controller
 
         return redirect()->back()->with('message', "Employee {$user->name} has been successfully {$statusText}.");
     }
+
+    /**
+     * Update an employee's role and position.
+     * Clears manufacturing_role when the new role is not MAN.
+     */
+    public function updateRolePosition(Request $request, $id)
+    {
+        $request->validate([
+            'role' => 'required|in:HRM,SCM,FIN,MAN,INV,ORD,WAR,CRM,ECO,PRO,PROJ,IT,CEO',
+            'position' => 'required|in:manager,staff,trainee',
+        ]);
+
+        $user = User::findOrFail($id);
+
+        $data = [
+            'role' => $request->role,
+            'position' => $request->position,
+        ];
+
+        // If the user is being moved out of Manufacturing, clear the manufacturing role
+        if ($request->role !== 'MAN') {
+            $data['manufacturing_role'] = null;
+        }
+
+        $user->update($data);
+
+        AuditLog::create([
+            'admin_id' => Auth::id(),
+            'target_id' => $user->id,
+            'target_name' => $user->name,
+            'action' => 'role_position_change',
+            'reason' => "Role changed to {$request->role}, Position changed to {$request->position}",
+        ]);
+
+        return redirect()->back()->with('message', "Employee {$user->name} updated successfully.");
+    }
 }

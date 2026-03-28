@@ -37,4 +37,9 @@ class PurchaseInvoice extends Model
     {
         return $this->status === 'unpaid' && $this->due_date?->isPast();
     }
+
+    public function supplier()
+    {
+        return $this->belongsTo(Supplier::class, 'supplier_id');
+    }
 }

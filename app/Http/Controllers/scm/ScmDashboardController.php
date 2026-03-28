@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\PurchaseOrder;
 use App\Models\Scm\MaterialRequest;
 use App\Models\Scm\PurchaseInvoice;
+use App\Models\Supplier; // Add this import
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class ScmDashboardController extends Controller
@@ -32,15 +34,20 @@ class ScmDashboardController extends Controller
                 ->count();
         }
 
-        // Supplier performance (top 5 by purchase orders)
-        $supplierPerformance = PurchaseInvoice::with('supplier')
-            ->select('supplier_id', \DB::raw('count(*) as po_count'), \DB::raw('sum(amount) as total_amount'))
-            ->groupBy('supplier_id')
+        // Supplier performance (top 5 by purchase orders) - using join to avoid missing relationship
+        $supplierPerformance = PurchaseInvoice::leftJoin('suppliers', 'purchase_invoices.supplier_id', '=', 'suppliers.id')
+            ->select(
+                'purchase_invoices.supplier_id',
+                DB::raw('count(*) as po_count'),
+                DB::raw('sum(purchase_invoices.amount) as total_amount'),
+                'suppliers.business_name as supplier_name'
+            )
+            ->groupBy('purchase_invoices.supplier_id', 'suppliers.business_name')
             ->orderByDesc('total_amount')
             ->limit(5)
             ->get()
             ->map(fn ($item) => [
-                'supplier_name' => $item->supplier->business_name ?? 'Unknown',
+                'supplier_name' => $item->supplier_name ?? 'Unknown',
                 'po_count' => $item->po_count,
                 'total_amount' => (float) $item->total_amount,
             ]);
@@ -111,6 +118,21 @@ class ScmDashboardController extends Controller
                 'created_at' => $order->created_at,
             ]);
 
+        $insufficientOrders = PurchaseOrder::with(['client', 'items'])
+            ->whereHas('queue', function ($q) {
+                $q->where('stage', 'inv_checked')
+                    ->where('inv_check_sufficient', false);
+            })
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(fn ($order) => [
+                'id' => $order->id,
+                'po_number' => $order->po_number,
+                'client_name' => $order->client->company_name,
+                'total_amount' => $order->total_amount,
+                'created_at' => $order->created_at,
+            ]);
+
         $stats = [
             'pendingMaterialRequests' => $materialRequests->count(),
             'pendingPayments' => $invoices->count(),
@@ -122,6 +144,7 @@ class ScmDashboardController extends Controller
             'materialRequests' => $materialRequests,
             'invoices' => $invoices,
             'readyOrders' => $readyOrders,
+            'insufficientOrders' => $insufficientOrders,
         ]);
     }
 

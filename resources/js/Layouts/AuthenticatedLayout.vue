@@ -67,6 +67,7 @@ const submenuItems = computed(() => {
                 { label: 'Vendor Management', href: route('scm.manager.vendor') },
                 { label: 'Payments', href: route('scm.manager.payments') },
                 { label: 'Close', href: route('scm.manager.close') },
+                { label: 'Staff Assignment', href: route('scm.manager.assignment') },
             ],
             staff: [
                 { label: 'Dashboard', href: route('scm.employee.dashboard') },
@@ -171,10 +172,9 @@ const submenuItems = computed(() => {
         },
         crm: {
             manager: [
-                // { label: 'Dashboard', href: route('crm.manager.dashboard') },
+                { label: 'Lead', href: route('crm.lead') },
+                { label: 'Customer Profile', href: route('crm.customerprofile') },
                 { label: 'Approval Queue', href: route('crm.approval.queue') },
-                { label: 'Oversight', href: route('crm.oversight') },
-                { label: 'Strategy', href: route('crm.strategy') },
             ],
             staff: [
                 { label: 'Dashboard', href: route('crm.employee.dashboard') },

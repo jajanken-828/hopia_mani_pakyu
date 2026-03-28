@@ -107,6 +107,7 @@ class ProductionPlanningController extends Controller
 
                 MaterialRequest::create([
                     'req_number' => $reqNumber,
+                    'purchase_order_id' => $order->id,               // <-- added: link to order
                     'material_id' => $mat['material_id'],
                     'material_name' => $mat['material'],
                     'category' => $mat['category'],
@@ -132,5 +133,46 @@ class ProductionPlanningController extends Controller
                 ->with('insufficient', $insufficient)
                 ->with('success', 'Material requests created. SCM will be notified.');
         }
+    }
+
+    /**
+     * Re‑evaluate a purchase order's material sufficiency and update its queue.
+     * Returns true if now sufficient, false otherwise.
+     *
+     * @return bool
+     */
+    public static function reevaluateOrder(PurchaseOrder $order)
+    {
+        $queue = $order->queue;
+        if (! $queue || $queue->stage !== 'inv_checked') {
+            return false;
+        }
+
+        // Re‑calculate material needs
+        $totalQty = [];
+        foreach ($order->items as $item) {
+            $product = $item->product;
+            if ($product && $product->bom) {
+                foreach ($product->bom as $bom) {
+                    $need = $bom->qty * $item->quantity;
+                    $totalQty[$bom->material_id] = ($totalQty[$bom->material_id] ?? 0) + $need;
+                }
+            }
+        }
+
+        // Check current stock
+        $insufficient = [];
+        foreach ($totalQty as $materialId => $need) {
+            $stock = WarehouseMaterial::where('material_id', $materialId)->sum('quantity');
+            if ($stock < $need) {
+                $insufficient[] = $materialId;
+            }
+        }
+
+        $sufficient = empty($insufficient);
+        $queue->inv_check_sufficient = $sufficient;
+        $queue->save();
+
+        return $sufficient;
     }
 }

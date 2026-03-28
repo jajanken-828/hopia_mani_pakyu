@@ -35,14 +35,14 @@ const totalEmployees = computed(() => props.stats.totalEmployees);
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 class="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
-                        Human Resource Management <span class="text-blue-600">Dashboard</span>
+                        Human Resource Management
                     </h1>
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ getGreeting() }}, Monti Team</p>
                 </div>
                 <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                     <Calendar class="w-4 h-4" />
                     <span>{{ new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-                    }}</span>
+                        }}</span>
                 </div>
             </div>
 
@@ -150,7 +150,7 @@ const totalEmployees = computed(() => props.stats.totalEmployees);
                             <div class="w-full bg-gradient-to-t from-emerald-400 to-emerald-500 rounded-t-lg transition-all duration-500"
                                 :style="{ height: `${(value / maxAttendance) * 100}%`, minHeight: '4px' }"></div>
                             <span class="text-[10px] sm:text-xs mt-2 text-gray-500">{{ attendanceTrend.months[idx]
-                            }}</span>
+                                }}</span>
                             <span class="text-[9px] font-bold text-gray-600 dark:text-gray-400">{{ value }}%</span>
                         </div>
                     </div>
@@ -182,7 +182,7 @@ const totalEmployees = computed(() => props.stats.totalEmployees);
                     </div>
                     <div class="text-center p-3 bg-green-50 dark:bg-green-900/10 rounded-xl">
                         <p class="text-2xl font-black text-green-600 dark:text-green-400">{{ recruitmentPipeline.hired
-                        }}</p>
+                            }}</p>
                         <p class="text-xs text-gray-500">Hired</p>
                     </div>
                 </div>

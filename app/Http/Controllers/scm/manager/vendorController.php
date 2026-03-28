@@ -18,15 +18,15 @@ class VendorController extends Controller
      */
     public function vendor()
     {
-        // Role is stored as 'SCM' (uppercase), position as 'manager' — NOT 'scm_manager'
-        $isManager = auth()->check()
-            && strtoupper(auth()->user()->role) === 'SCM'
-            && strtolower(auth()->user()->position) === 'manager';
+        $user = auth()->user();
+        $isManager = $user && strtoupper($user->role) === 'SCM' && strtolower($user->position) === 'manager';
+        $canViewAll = $isManager || (strtoupper($user->role) === 'CEO' && in_array(strtolower($user->position), ['ceo', 'manager']));
+        $canApprove = $canViewAll; // CEO and SCM manager can approve
 
         $registrations = [];
         $myRegistration = null;
 
-        if ($isManager) {
+        if ($canViewAll) {
             $registrations = VendorRegistration::with('requirements')
                 ->orderBy('created_at', 'desc')
                 ->get()
@@ -51,13 +51,15 @@ class VendorController extends Controller
                 ])
                 ->toArray();
         } else {
-            $myRegistration = VendorRegistration::where('email', auth()->user()->email)
+            $myRegistration = VendorRegistration::where('email', $user->email)
                 ->with('requirements')
                 ->first();
         }
 
         return Inertia::render('Dashboard/SCM/Manager/vendor', [
             'isManager' => $isManager,
+            'canViewAll' => $canViewAll,
+            'canApprove' => $canApprove,
             'registrations' => $registrations,
             'myRegistration' => $myRegistration,
         ]);
@@ -112,7 +114,7 @@ class VendorController extends Controller
      */
     public function approve(Request $request, $id)
     {
-        $this->authorizeManager();
+        $this->authorizeApproval();
 
         $validator = Validator::make($request->all(), [
             'requirements' => 'nullable|array',
@@ -156,7 +158,7 @@ class VendorController extends Controller
      */
     public function reject(Request $request, $id)
     {
-        $this->authorizeManager();
+        $this->authorizeApproval();
 
         $validator = Validator::make($request->all(), [
             'rejection_reason' => 'required|string|max:1000',
@@ -187,7 +189,7 @@ class VendorController extends Controller
      */
     public function setRequirements(Request $request, $id)
     {
-        $this->authorizeManager();
+        $this->authorizeApproval();
 
         $validator = Validator::make($request->all(), [
             'requirements' => 'required|array|min:1',
@@ -216,11 +218,11 @@ class VendorController extends Controller
     }
 
     /**
-     * Get all vendor registrations as JSON (for manager)
+     * Get all vendor registrations as JSON
      */
     public function getRegistrations()
     {
-        $this->authorizeManager();
+        $this->authorizeApproval();
 
         $registrations = VendorRegistration::with('requirements')
             ->orderBy('created_at', 'desc')
@@ -234,7 +236,7 @@ class VendorController extends Controller
      */
     public function getRegistration($id)
     {
-        $this->authorizeManager();
+        $this->authorizeApproval();
 
         $registration = VendorRegistration::with('requirements')->findOrFail($id);
 
@@ -268,15 +270,15 @@ class VendorController extends Controller
     }
 
     /**
-     * Authorize SCM manager — role='SCM', position='manager'
+     * Authorize users who can approve vendors — SCM manager or CEO (position: ceo or manager)
      */
-    private function authorizeManager()
+    private function authorizeApproval()
     {
-        if (
-            ! auth()->check()
-            || strtoupper(auth()->user()->role) !== 'SCM'
-            || strtolower(auth()->user()->position) !== 'manager'
-        ) {
+        $user = auth()->user();
+        $isSCMManager = $user && strtoupper($user->role) === 'SCM' && strtolower($user->position) === 'manager';
+        $isCEO = $user && strtoupper($user->role) === 'CEO' && in_array(strtolower($user->position), ['ceo', 'manager']);
+
+        if (! ($isSCMManager || $isCEO)) {
             abort(403, 'Unauthorized action.');
         }
     }

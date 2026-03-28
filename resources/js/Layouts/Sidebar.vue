@@ -30,6 +30,7 @@ import {
     CalendarDays,
     History,
     Users,
+    UserPen,
     Settings,
     Receipt,
     HelpCircle,
@@ -169,7 +170,8 @@ const navItems = computed(() => {
                 { label: 'Sales Orders', href: route('scm.manager.sales-orders'), icon: ShoppingCart },
                 { label: 'Payment Approval', href: route('scm.manager.payments'), icon: HandCoins },
                 { label: 'Vendor Management', href: route('scm.manager.vendor'), icon: ChartNoAxesCombined },
-                { label: 'Close', href: route('scm.manager.close'), icon: DoorOpen }
+                { label: 'Close', href: route('scm.manager.close'), icon: DoorOpen },
+                { label: 'Staff Assignment', href: route('scm.manager.assignment'), icon: Users },
             )
         } else if (userPosition === 'staff') {
             items.push(
@@ -338,12 +340,13 @@ const navItems = computed(() => {
         items.push(
 
             { label: 'Human Resource', href: route('hrm.manager.dashboard'), icon: Users },
-            { label: 'Supply Chain', href: route('scm.manager.dashboard'), icon: Truck },
-            { label: 'Manufacturing', href: route('man.manager.dashboard'), icon: Factory },
-            { label: 'Inventory', href: route('inv.manager.dashboard'), icon: Boxes },
-            { label: 'Customer Relationship', href: route('crm.dashboard'), icon: Users },
+            { label: 'Customer Relationship', href: route('crm.dashboard'), icon: UserPen },
             { label: 'E‑Commerce', href: route('eco.manager.dashboard'), icon: ShoppingBag },
-            { label: 'Procurement', href: route('pro.manager.dashboard'), icon: ShoppingCart }
+            { label: 'Supply Chain', href: route('scm.manager.dashboard'), icon: Truck },
+            { label: 'Inventory', href: route('inv.manager.dashboard'), icon: Boxes },
+            { label: 'Procurement', href: route('pro.manager.dashboard'), icon: ShoppingCart },
+            { label: 'Manufacturing', href: route('man.manager.dashboard'), icon: Factory },
+
             // Logistics module is commented out until its routes are defined
             // { label: 'Logistics', href: route('log.staff.dashboard'), icon: Truck },
         );

@@ -11,6 +11,8 @@ import {
 
 const props = defineProps({
     isManager: { type: Boolean, default: false },
+    canViewAll: { type: Boolean, default: false },      // determines if user sees full table
+    canApprove: { type: Boolean, default: false },      // NEW: determines if user can approve/reject
     registrations: { type: Array, default: () => [] },
     myRegistration: { type: Object, default: null },
 });
@@ -87,7 +89,6 @@ const submitApprove = () => {
     const validReqs = requirementLines.value.filter(r => r.requirement_name.trim() !== '');
     processing.value = true;
 
-    // Using absolute path to prevent Ziggy routing issues
     router.post(`/dashboard/scm/vendor/registrations/${selectedVendor.value.id}/approve`, {
         requirements: validReqs,
     }, {
@@ -162,7 +163,8 @@ const submitRequirements = () => {
                 </div>
             </div>
 
-            <div v-if="isManager"
+            <!-- Full table view for users with canViewAll (SCM manager and CEO) -->
+            <div v-if="canViewAll"
                 class="bg-white dark:bg-gray-900 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
                 <div
                     class="p-8 border-b border-gray-50 dark:border-gray-800 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
@@ -232,11 +234,18 @@ const submitRequirements = () => {
                                     </div>
                                 </td>
                                 <td class="px-8 py-6 text-center">
-                                    <button @click="openModal(vendor, 'requirements')"
+                                    <!-- Editable requirements button only for SCM manager -->
+                                    <button v-if="isManager" @click="openModal(vendor, 'requirements')"
                                         class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-all">
                                         <ClipboardList class="h-3 w-3" />
                                         {{ vendor.requirements?.length ?? 0 }} req.
                                     </button>
+                                    <!-- Read-only requirements count for others (e.g., CEO) -->
+                                    <span v-else
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                        <ClipboardList class="h-3 w-3" />
+                                        {{ vendor.requirements?.length ?? 0 }} req.
+                                    </span>
                                 </td>
                                 <td class="px-8 py-6 text-right">
                                     <div class="flex items-center justify-end gap-2">
@@ -245,7 +254,8 @@ const submitRequirements = () => {
                                             title="View details">
                                             <Eye class="h-4 w-4" />
                                         </button>
-                                        <template v-if="vendor.status === 'pending'">
+                                        <!-- Approve/Reject buttons for users with canApprove (SCM manager or CEO) and pending vendors -->
+                                        <template v-if="canApprove && vendor.status === 'pending'">
                                             <button @click="openModal(vendor, 'approve')"
                                                 class="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 text-[9px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all disabled:opacity-40">
                                                 Approve
@@ -271,6 +281,7 @@ const submitRequirements = () => {
                 </div>
             </div>
 
+            <!-- Individual registration view for users who cannot view all (e.g., vendor/supplier accounts) -->
             <div v-else class="max-w-2xl">
                 <div v-if="myRegistration"
                     class="bg-white dark:bg-gray-900 rounded-[2.5rem] border border-gray-100 dark:border-gray-800 shadow-sm p-10 space-y-6">

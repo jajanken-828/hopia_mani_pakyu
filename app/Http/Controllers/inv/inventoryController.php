@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\inv;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\inv\manager\ProductionPlanningController; // Added
 use App\Models\inv\Material;
 use App\Models\inv\Warehouse;
 use App\Models\inv\WarehouseMaterial;
+use App\Models\PurchaseOrder; // Added
+use App\Models\Scm\MaterialRequest; // Added
 use App\Models\Scm\ScmPurchaseOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -158,12 +161,14 @@ class InventoryController extends Controller
 
             $po = ScmPurchaseOrder::with('items')->findOrFail($validated['po_id']);
             $hasReceivedSomething = false;
+            $updatedMaterialIds = []; // Track which materials were updated
 
             foreach ($validated['items'] as $itemData) {
                 $rcvd = (float) $itemData['received_qty'];
 
                 if ($rcvd > 0) {
                     $hasReceivedSomething = true;
+                    $updatedMaterialIds[] = $itemData['material_id'];
 
                     // 1. Add Stock to the Physical Warehouse
                     $wm = WarehouseMaterial::firstOrNew([
@@ -203,6 +208,36 @@ class InventoryController extends Controller
                 $po->update(['status' => 'delivered']);
             } elseif ($hasReceivedSomething) {
                 $po->update(['status' => 'partially_received']);
+            }
+
+            // ── NEW: Re‑evaluate orders that were waiting for these materials ──────────
+            if (! empty($updatedMaterialIds)) {
+                // Find material requests that are for these materials and linked to an order
+                $materialRequests = MaterialRequest::whereIn('material_id', $updatedMaterialIds)
+                    ->whereNotNull('purchase_order_id')
+                    ->get();
+
+                $ordersToReevaluate = [];
+                foreach ($materialRequests as $mr) {
+                    $orderId = $mr->purchase_order_id;
+                    if (! in_array($orderId, $ordersToReevaluate)) {
+                        $ordersToReevaluate[] = $orderId;
+                    }
+                }
+
+                foreach ($ordersToReevaluate as $orderId) {
+                    $order = PurchaseOrder::find($orderId);
+                    if ($order) {
+                        // Check if order is still in inv_check stage and insufficient
+                        $queue = $order->queue;
+                        if ($queue && $queue->stage === 'inv_checked' && ! $queue->inv_check_sufficient) {
+                            $sufficient = ProductionPlanningController::reevaluateOrder($order);
+                            if ($sufficient) {
+                                Log::info("Order {$order->po_number} now has sufficient materials.");
+                            }
+                        }
+                    }
+                }
             }
 
             DB::commit();

@@ -173,7 +173,7 @@ Route::prefix('dashboard/hrm')->name('hrm.')->middleware(['auth', 'verified'])->
     // Employee update and delete (now handled by EmployeeController)
     Route::post('/employee/{id}/update', [EmployeeController::class, 'update'])->name('employees.update');
     Route::delete('/employee/{id}', [EmployeeController::class, 'toggleStatus'])->name('employees.destroy');
-
+    Route::patch('/employee/{id}/role-position', [EmployeeController::class, 'updateRolePosition'])->name('employees.update-role-position');
     // Training & Evaluation Module
     Route::get('/training', [TrainingController::class, 'training'])
         ->middleware(['role:HRM', 'position:staff'])
@@ -277,7 +277,10 @@ Route::prefix('dashboard/scm')->name('scm.')->middleware(['auth', 'verified'])->
         Route::get('/sales-orders', [SalesOrderController::class, 'index'])->name('manager.sales-orders');
         Route::post('/sales-orders/{order}/forward-to-inv', [SalesOrderController::class, 'forwardToINV'])->name('manager.sales-orders.forward');
         Route::post('/material-requests/{id}/forward', [ScmManagerController::class, 'forwardMaterialRequest'])->name('manager.material-request.forward');
+        Route::get('/assignment', [ScmManagerController::class, 'assignment'])->name('manager.assignment');
+        Route::post('/staff/{id}/update-role', [ScmManagerController::class, 'updateRole'])->name('manager.update-staff-role');
         Route::post('/orders/{order}/approve-manufacturing', [ScmManagerController::class, 'approveManufacturing'])->name('manager.approve-manufacturing');
+        Route::post('/orders/{order}/recheck', [ScmManagerController::class, 'recheckOrder'])->name('manager.order.recheck');
         Route::get('/manager/payments', [PaymentController::class, 'index'])->name('manager.payments');
         Route::post('/payments', [PaymentController::class, 'processPayment'])->name('manager.payments.process');
         Route::prefix('vendor')->group(function () {
